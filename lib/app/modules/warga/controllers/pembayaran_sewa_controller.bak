@@ -1,0 +1,1115 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:get/get.dart';
+import 'dart:io';
+import 'dart:async';
+import 'dart:typed_data';
+import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../services/navigation_service.dart';
+import '../../../routes/app_routes.dart';
+import '../../../data/providers/aset_provider.dart';
+
+class PembayaranSewaController extends GetxController
+    with GetSingleTickerProviderStateMixin {
+  // Dependencies
+  final NavigationService navigationService = Get.find<NavigationService>();
+  final AsetProvider asetProvider = Get.find<AsetProvider>();
+  
+  // Direct access to Supabase client for storage operations
+  final SupabaseClient client = Supabase.instance.client;
+
+  // Tab controller
+  late TabController tabController;
+
+  // Order details
+  final orderId = ''.obs;
+  final orderDetails = Rx<Map<String, dynamic>>({});
+
+  // Sewa Aset details with related aset info
+  final sewaAsetDetails = Rx<Map<String, dynamic>>({});
+
+  // Tagihan Sewa details
+  final tagihanSewa = Rx<Map<String, dynamic>>({});
+
+  // Payment details
+  final paymentMethod = ''.obs;
+  final selectedPaymentType = ''.obs;
+  final isLoading = false.obs;
+  final currentStep = 0.obs;
+
+  // Payment proof images - now a list to support multiple images
+  final RxList<File> paymentProofImages = <File>[].obs;
+  
+  // Get image widget for a specific image in the list
+  Widget getImageWidget(File imageFile) {
+    // Check if running on web
+    if (kIsWeb) {
+      // For web, we need to use Image.network with the path
+      return Image.network(
+        imageFile.path,
+        height: 120,
+        width: 120,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            height: 120,
+            width: 120,
+            color: Colors.grey[300],
+            child: const Center(child: Text('Error')),
+          );
+        },
+      );
+    } else {
+      // For mobile, we can use Image.file
+      return Image.file(
+        imageFile,
+        height: 120,
+        width: 120,
+        fit: BoxFit.cover,
+      );
+    }
+  }
+  
+  // Remove an image from the list
+  void removeImage(int index) {
+    if (index >= 0 && index < paymentProofImages.length) {
+      paymentProofImages.removeAt(index);
+      update();
+    }
+  }
+  final isUploading = false.obs;
+  final uploadProgress = 0.0.obs;
+
+  // Timer countdown
+  final remainingTime = ''.obs;
+  Timer? _countdownTimer;
+  final int paymentTimeLimit = 3600; // 1 hour in seconds
+  final timeRemaining = 0.obs;
+  
+  // Bank accounts for transfer
+  final bankAccounts = RxList<Map<String, dynamic>>([]);
+
+  @override
+  void onInit() {
+    super.onInit();
+    tabController = TabController(length: 3, vsync: this);
+
+    // Get order ID and rental data from arguments
+    if (Get.arguments != null) {
+      if (Get.arguments['orderId'] != null) {
+        orderId.value = Get.arguments['orderId'];
+        
+        // If rental data is passed, use it directly
+        if (Get.arguments['rentalData'] != null) {
+          Map<String, dynamic> rentalData = Get.arguments['rentalData'];
+          debugPrint('Received rental data: $rentalData');
+          
+          // Pre-populate order details with rental data
+          orderDetails.value = {
+            'id': rentalData['id'] ?? '',
+            'item_name': rentalData['name'] ?? 'Aset',
+            'quantity': rentalData['jumlahUnit'] ?? 0,
+            'rental_period': rentalData['waktuSewa'] ?? '',
+            'duration': rentalData['duration'] ?? '',
+            'price_per_unit': 0, // This might not be available in rental data
+            'total_price': rentalData['totalPrice'] != null ? 
+                          int.tryParse(rentalData['totalPrice'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0 : 0,
+            'status': rentalData['status'] ?? 'MENUNGGU PEMBAYARAN',
+            'created_at': DateTime.now().toString(),
+            'denda': 0, // Default value
+            'keterangan': '', // Default value
+            'image_url': rentalData['imageUrl'],
+            'waktu_mulai': rentalData['waktuMulai'],
+            'waktu_selesai': rentalData['waktuSelesai'],
+            'rentang_waktu': rentalData['rentangWaktu'],
+          };
+          
+          // Still load additional details from the database
+          checkSewaAsetTableStructure();
+          loadTagihanSewaDetails();
+          loadSewaAsetDetails();
+          loadBankAccounts(); // Load bank accounts data
+        } else {
+          // If no rental data is passed, load everything from the database
+          checkSewaAsetTableStructure();
+          loadOrderDetails();
+          loadTagihanSewaDetails();
+          loadSewaAsetDetails();
+          loadBankAccounts(); // Load bank accounts data
+        }
+      }
+    }
+  }
+
+  @override
+  void onClose() {
+    _countdownTimer?.cancel();
+    tabController.dispose();
+    super.onClose();
+  }
+
+  // Load order details
+  void loadOrderDetails() {
+    isLoading.value = true;
+
+    // Simulating API call
+    Future.delayed(Duration(seconds: 1), () {
+      // Mock data
+      orderDetails.value = {
+        'id': orderId.value,
+        'item_name': 'Sewa Kursi Taman',
+        'quantity': 5,
+        'rental_period': '24 April 2023, 10:00 - 12:00',
+        'duration': '2 jam',
+        'price_per_unit': 10000,
+        'total_price': 50000,
+        'status': 'MENUNGGU PEMBAYARAN',
+        'created_at':
+            DateTime.now().toString(), // Use this for countdown calculation
+        'denda': 20000, // Dummy data for denda
+        'keterangan':
+            'Terjadi kerusakan pada bagian kaki', // Dummy keterangan for denda
+      };
+
+      // Update the current step based on the status
+      updateCurrentStepBasedOnStatus();
+
+      isLoading.value = false;
+      startCountdownTimer();
+    });
+  }
+
+  // Load sewa_aset details with aset data
+  void loadSewaAsetDetails() {
+    isLoading.value = true;
+
+    debugPrint(
+      '🔍 Starting to load sewa_aset details for orderId: ${orderId.value}',
+    );
+
+    asetProvider
+        .getSewaAsetWithAsetData(orderId.value)
+        .then((data) {
+          if (data != null) {
+            // Use actual data without adding dummy values
+            sewaAsetDetails.value = data;
+            debugPrint(
+              '✅ Sewa aset details loaded: ${sewaAsetDetails.value['id']}',
+            );
+
+            // Debug all fields in the sewaAsetDetails
+            debugPrint('📋 SEWA ASET DETAILS (COMPLETE DATA):');
+            data.forEach((key, value) {
+              debugPrint('  $key: $value');
+            });
+
+            // Specifically debug waktu_mulai and waktu_selesai
+            debugPrint('⏰ WAKTU DETAILS:');
+            debugPrint('  waktu_mulai: ${data['waktu_mulai']}');
+            debugPrint('  waktu_selesai: ${data['waktu_selesai']}');
+            debugPrint('  denda: ${data['denda']}');
+            debugPrint('  keterangan: ${data['keterangan']}');
+
+            // If aset_detail exists, debug it too
+            if (data['aset_detail'] != null) {
+              debugPrint('🏢 ASET DETAILS:');
+              (data['aset_detail'] as Map<String, dynamic>).forEach((
+                key,
+                value,
+              ) {
+                debugPrint('  $key: $value');
+              });
+            }
+
+            // Update order details based on sewa_aset data
+            orderDetails.update((val) {
+              if (data['aset_detail'] != null) {
+                val?['item_name'] = data['aset_detail']['nama'] ?? 'Aset Sewa';
+              }
+              val?['quantity'] = data['kuantitas'] ?? 1;
+              val?['denda'] =
+                  data['denda'] ??
+                  0; // Use data from API or default to 0
+              val?['keterangan'] =
+                  data['keterangan'] ??
+                  ''; // Use data from API or default to empty string
+              
+              // Update status if it exists in the data
+              if (data['status'] != null && data['status'].toString().isNotEmpty) {
+                val?['status'] = data['status'];
+                debugPrint('📊 Order status from sewa_aset: ${data['status']}');
+              }
+
+              // Format rental period
+              if (data['waktu_mulai'] != null &&
+                  data['waktu_selesai'] != null) {
+                try {
+                  final startTime = DateTime.parse(data['waktu_mulai']);
+                  final endTime = DateTime.parse(data['waktu_selesai']);
+                  val?['rental_period'] =
+                      '${startTime.day}/${startTime.month}/${startTime.year}, ${startTime.hour}:${startTime.minute.toString().padLeft(2, '0')} - ${endTime.hour}:${endTime.minute.toString().padLeft(2, '0')}';
+                  debugPrint(
+                    '✅ Successfully formatted rental period: ${val?['rental_period']}',
+                  );
+                } catch (e) {
+                  debugPrint('❌ Error parsing date: $e');
+                }
+              } else {
+                debugPrint(
+                  '⚠️ Missing waktu_mulai or waktu_selesai for formatting rental period',
+                );
+              }
+            });
+            
+            // Update the current step based on the status
+            updateCurrentStepBasedOnStatus();
+          } else {
+            debugPrint(
+              '⚠️ No sewa_aset details found for order: ${orderId.value}',
+            );
+
+            // Add dummy data when no real data is available
+            sewaAsetDetails.value = {
+              'id': orderId.value,
+              'denda': 20000,
+              'keterangan': 'Terjadi kerusakan pada bagian kaki',
+            };
+          }
+          isLoading.value = false;
+        })
+        .catchError((error) {
+          debugPrint('❌ Error loading sewa_aset details: $error');
+
+          // Add dummy data in case of error
+          sewaAsetDetails.value = {
+            'id': orderId.value,
+            'denda': 20000,
+            'keterangan': 'Terjadi kerusakan pada bagian kaki',
+          };
+
+          isLoading.value = false;
+        });
+  }
+
+  // Load tagihan sewa details
+  Future<void> loadTagihanSewaDetails() async {
+    isLoading.value = true;
+
+    // Use the AsetProvider to fetch the tagihan_sewa data
+    asetProvider
+        .getTagihanSewa(orderId.value)
+        .then((data) {
+          if (data != null) {
+            tagihanSewa.value = data;
+            debugPrint('✅ Tagihan sewa loaded: ${tagihanSewa.value['id']}');
+            
+            // Debug the tagihan_sewa data
+            debugPrint('📋 TAGIHAN SEWA DETAILS:');
+            data.forEach((key, value) {
+              debugPrint('  $key: $value');
+            });
+            
+            // Specifically debug denda, keterangan, and foto_kerusakan
+            debugPrint('💰 DENDA DETAILS:');
+            debugPrint('  denda: ${data['denda']}');
+            debugPrint('  keterangan: ${data['keterangan']}');
+            debugPrint('  foto_kerusakan: ${data['foto_kerusakan']}');
+          } else {
+            debugPrint('⚠️ No tagihan sewa found for order: ${orderId.value}');
+            // Initialize with empty data instead of mock data
+            tagihanSewa.value = {
+              'id': '',
+              'sewa_aset_id': orderId.value,
+              'denda': 0,
+              'keterangan': '',
+              'foto_kerusakan': '',
+            };
+          }
+          isLoading.value = false;
+        })
+        .catchError((error) {
+          debugPrint('❌ Error loading tagihan sewa: $error');
+          // Initialize with empty data instead of mock data
+          tagihanSewa.value = {
+            'id': '',
+            'sewa_aset_id': orderId.value,
+            'denda': 0,
+            'keterangan': '',
+            'foto_kerusakan': '',
+          };
+          isLoading.value = false;
+        });
+  }
+
+  // Start countdown timer (1 hour)
+  void startCountdownTimer() {
+    timeRemaining.value = paymentTimeLimit;
+
+    _countdownTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      if (timeRemaining.value <= 0) {
+        timer.cancel();
+        handlePaymentTimeout();
+      } else {
+        timeRemaining.value--;
+        updateRemainingTimeDisplay();
+      }
+    });
+  }
+
+  // Update the time display in format HH:MM:SS
+  void updateRemainingTimeDisplay() {
+    int hours = timeRemaining.value ~/ 3600;
+    int minutes = (timeRemaining.value % 3600) ~/ 60;
+    int seconds = timeRemaining.value % 60;
+
+    remainingTime.value =
+        '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  // Handle payment timeout - change status to DIBATALKAN
+  void handlePaymentTimeout() {
+    if (orderDetails.value['status'] == 'MENUNGGU PEMBAYARAN') {
+      orderDetails.update((val) {
+        val?['status'] = 'DIBATALKAN';
+      });
+
+      Get.snackbar(
+        'Pesanan Dibatalkan',
+        'Batas waktu pembayaran telah berakhir',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: Duration(seconds: 5),
+      );
+    }
+  }
+
+  // Change payment method
+  void selectPaymentMethod(String method) {
+    paymentMethod.value = method;
+    update();
+  }
+
+  // Select payment type (tagihan_awal or denda)
+  void selectPaymentType(String type) {
+    selectedPaymentType.value = type;
+    update();
+  }
+
+  // Take photo using camera
+  Future<void> takePhoto() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 80,
+      );
+
+      if (image != null) {
+        // Add to the list of images instead of replacing
+        paymentProofImages.add(File(image.path));
+        update();
+      }
+    } catch (e) {
+      debugPrint('❌ Error taking photo: $e');
+      Get.snackbar(
+        'Error',
+        'Gagal mengambil foto: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  // Select photo from gallery
+  Future<void> selectPhotoFromGallery() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+
+      if (image != null) {
+        // Add to the list of images instead of replacing
+        paymentProofImages.add(File(image.path));
+        update();
+      }
+    } catch (e) {
+      debugPrint('❌ Error selecting photo from gallery: $e');
+      Get.snackbar(
+        'Error',
+        'Gagal memilih foto dari galeri: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  // Upload payment proof using Base64 encoding for development
+  Future<void> uploadPaymentProof() async {
+    // Run the debug method first to diagnose Supabase storage issues
+    await _debugSupabaseStorage();
+    
+    if (paymentProofImages.isEmpty) {
+      Get.snackbar(
+        'Error',
+        'Mohon unggah bukti pembayaran terlebih dahulu',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    try {
+      isUploading.value = true;
+      uploadProgress.value = 0.0;
+      
+      debugPrint('🔄 Using Base64 approach for development...');
+      debugPrint('🔄 Processing ${paymentProofImages.length} payment proof images...');
+      
+      List<String> uploadedUrls = [];
+      
+      // Process each image one by one
+      for (int i = 0; i < paymentProofImages.length; i++) {
+        // Update progress
+        uploadProgress.value = (i / paymentProofImages.length) * 0.5;
+        
+        final File imageFile = paymentProofImages[i];
+        final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+        final String fileName = 'payment_proof_${timestamp}_$i.jpg';
+        
+        debugPrint('🔄 Processing image $i: ${imageFile.path}');
+        
+        // For development: Create a Base64 representation of the image
+        // This bypasses Supabase storage completely
+        final bytes = await imageFile.readAsBytes();
+        final base64Image = base64Encode(bytes);
+        final truncatedBase64 = base64Image.length > 40 
+            ? '${base64Image.substring(0, 20)}...${base64Image.substring(base64Image.length - 20)}'
+            : base64Image;
+            
+        debugPrint('🔄 Image converted to Base64 (truncated): $truncatedBase64');
+        
+        // Update progress
+        uploadProgress.value = 0.5 + (i / paymentProofImages.length) * 0.3;
+        
+        // Create a data URL that includes the Base64 data
+        // In a real app, you would upload to Supabase and get a real URL
+        final String mockUrl = 'data:image/jpeg;base64,$base64Image';
+        uploadedUrls.add(mockUrl);
+        
+        debugPrint('✅ Created data URL for image $i');
+      }
+      
+      // Update progress for database saving phase
+      uploadProgress.value = 0.8;
+      
+      // Save all URLs to foto_pembayaran table
+      for (int i = 0; i < uploadedUrls.length; i++) {
+        uploadProgress.value = 0.8 + (i / uploadedUrls.length) * 0.2;
+        await _saveToFotoPembayaranTable(uploadedUrls[i]);
+      }
+      
+      // Update order status
+      if (Get.isRegistered<RxMap>(tag: 'orderDetails')) {
+        final orderDetails = Get.find<RxMap>(tag: 'orderDetails');
+        orderDetails.update((val) {
+          val?['status'] = 'MEMERIKSA PEMBAYARAN';
+        });
+      }
+      
+      // Update current step based on status if the method exists
+      try {
+        updateCurrentStepBasedOnStatus();
+      } catch (e) {
+        debugPrint('⚠️ Could not update step: $e');
+      }
+      
+      // Clear the images after successful upload
+      paymentProofImages.clear();
+      
+      // Set progress to complete
+      uploadProgress.value = 1.0;
+
+      // Show success message
+      Get.snackbar(
+        'Sukses',
+        'Bukti pembayaran berhasil diunggah',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+    } catch (e) {
+      debugPrint('❌ Error uploading payment proof: $e');
+      Get.snackbar(
+        'Error',
+        'Gagal mengunggah bukti pembayaran: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      isUploading.value = false;
+    }
+  }
+    if (currentStep.value < 7) {
+      currentStep.value++;
+      updateOrderStatusBasedOnStep();
+    }
+  }
+
+  // Update order status based on current step
+  void updateOrderStatusBasedOnStep() {
+    String newStatus;
+
+    switch (currentStep.value) {
+      case 0:
+        newStatus = 'MENUNGGU PEMBAYARAN';
+        break;
+      case 1:
+        newStatus = 'MEMERIKSA PEMBAYARAN';
+        break;
+      case 2:
+        newStatus = 'DITERIMA';
+        break;
+      case 3:
+        newStatus = 'PENGEMBALIAN';
+        break;
+      case 4:
+        newStatus = 'PEMBAYARAN DENDA';
+        break;
+      case 5:
+        newStatus = 'MEMERIKSA PEMBAYARAN DENDA';
+        break;
+      case 6:
+        newStatus = 'SELESAI';
+        break;
+      default:
+        newStatus = 'MENUNGGU PEMBAYARAN';
+    }
+
+    orderDetails.update((val) {
+      val?['status'] = newStatus;
+    });
+  }
+  
+  // Update currentStep based on order status
+  void updateCurrentStepBasedOnStatus() {
+    final status = orderDetails.value['status']?.toString().toUpperCase() ?? '';
+    debugPrint('📊 Updating current step based on status: $status');
+    
+    switch (status) {
+      case 'MENUNGGU PEMBAYARAN':
+        currentStep.value = 0;
+        break;
+      case 'MEMERIKSA PEMBAYARAN':
+        currentStep.value = 1;
+        break;
+      case 'DITERIMA':
+        currentStep.value = 2;
+        break;
+      case 'PENGEMBALIAN':
+        currentStep.value = 3;
+        break;
+      case 'PEMBAYARAN DENDA':
+        currentStep.value = 4;
+        break;
+      case 'MEMERIKSA PEMBAYARAN DENDA':
+        currentStep.value = 5;
+        break;
+      case 'SELESAI':
+        currentStep.value = 6;
+        break;
+      case 'DIBATALKAN':
+        // Special case for canceled orders
+        currentStep.value = 0;
+        break;
+      default:
+        currentStep.value = 0;
+        break;
+    }
+    
+    debugPrint('📊 Current step updated to: ${currentStep.value}');
+  }
+
+  // This method has been moved and improved above
+
+  // Submit cash payment
+  void submitCashPayment() {
+    // Update order status
+    orderDetails.update((val) {
+      val?['status'] = 'MEMERIKSA PEMBAYARAN';
+    });
+
+    // Cancel countdown timer as payment has been submitted
+    _countdownTimer?.cancel();
+
+    // Show success message
+    Get.snackbar(
+      'Sukses',
+      'Pembayaran tunai berhasil disubmit',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.green,
+      colorText: Colors.white,
+    );
+
+    // Update step
+    currentStep.value = 1;
+  }
+
+  // Cancel payment
+  void cancelPayment() {
+    Get.back();
+  }
+  
+  // Debug function to check sewa_aset table structure
+  void checkSewaAsetTableStructure() {
+    try {
+      debugPrint('🔍 DEBUG: Checking sewa_aset table structure');
+      final client = asetProvider.client;
+
+      // Get a single record to check field names
+      client
+          .from('sewa_aset')
+          .select('*')
+          .limit(1)
+          .then((response) {
+            if (response is List && response.isNotEmpty) {
+              final record = response.first;
+              debugPrint('📋 SEWA_ASET TABLE STRUCTURE:');
+              debugPrint('Available fields in sewa_aset table:');
+
+              record.forEach((key, value) {
+                debugPrint('  $key: (${value?.runtimeType})');
+              });
+
+              // Specifically check for time fields
+              final timeFields = [
+                'waktu_mulai',
+                'waktu_selesai',
+                'start_time',
+                'end_time',
+              ];
+              for (final field in timeFields) {
+                debugPrint(
+                  '  Field "$field" exists: ${record.containsKey(field)}',
+                );
+                if (record.containsKey(field)) {
+                  debugPrint('  Field "$field" value: ${record[field]}');
+                }
+              }
+            } else {
+              debugPrint('⚠️ No records found in sewa_aset table');
+            }
+          })
+          .catchError((e) {
+            debugPrint('❌ Error checking sewa_aset table: $e');
+          });
+    } catch (e) {
+      debugPrint('❌ Error in checkSewaAsetTableStructure: $e');
+    }
+  }
+  
+  // Load bank accounts from akun_bank table
+  Future<void> loadBankAccounts() async {
+    debugPrint('Loading bank accounts from akun_bank table...');
+    try {
+      final data = await asetProvider.getBankAccounts();
+      if (data != null && data.isNotEmpty) {
+        bankAccounts.assignAll(data);
+        debugPrint('✅ Bank accounts loaded: ${bankAccounts.length} accounts found');
+        
+        // Debug the bank accounts data
+        debugPrint('📋 BANK ACCOUNTS DETAILS:');
+        for (var account in bankAccounts) {
+          debugPrint('  Bank: ${account['nama_bank']}, Account: ${account['nama_akun']}, Number: ${account['no_rekening']}');
+        }
+      } else {
+        debugPrint('⚠️ No bank accounts found in akun_bank table');
+        // Add a default bank account if none found
+        bankAccounts.add({
+          'id': '1',
+          'nama_bank': 'Bank Default',
+          'nama_akun': 'BUMDes Maju Jaya',
+          'no_rekening': '1234567890',
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading bank accounts: $e');
+      // Add a default bank account in case of error
+      bankAccounts.add({
+        'id': '1',
+        'nama_bank': 'Bank Default',
+        'nama_akun': 'BUMDes Maju Jaya',
+        'no_rekening': '1234567890',
+      });
+    }
+  }
+  
+  // Debug method to diagnose Supabase storage issues
+  Future<void> _debugSupabaseStorage() async {
+    try {
+      debugPrint('\n\n🔍 SUPABASE STORAGE DEBUG 🔍');
+      
+      final supabase = Supabase.instance.client;
+      
+      // Check if Supabase client is initialized
+      debugPrint('1. Supabase client initialized: ${supabase != null}');
+      
+      // Try to list buckets
+      try {
+        debugPrint('2. Attempting to list storage buckets...');
+        final buckets = await supabase.storage.listBuckets();
+        debugPrint('   ✅ Success! Found ${buckets.length} buckets:');
+        for (var bucket in buckets) {
+          debugPrint('   - ${bucket.name} (id: ${bucket.id})');
+        }
+      } catch (e) {
+        debugPrint('   ❌ Error listing buckets: $e');
+        debugPrint('   Stack trace: ${StackTrace.current}');
+      }
+      
+      // Try to create a test file in memory
+      try {
+        debugPrint('3. Creating test file in memory...');
+        final testBytes = Uint8List.fromList([1, 2, 3, 4, 5]); // 5 bytes
+        debugPrint('   ✅ Test file created: ${testBytes.length} bytes');
+        
+        // Try to upload test file
+        try {
+          debugPrint('4. Attempting to upload test file...');
+          final testFileName = 'test_${DateTime.now().millisecondsSinceEpoch}.bin';
+          
+          // Try to get bucket info first
+          try {
+            final buckets = await supabase.storage.listBuckets();
+            if (buckets.isNotEmpty) {
+              final bucket = buckets.first;
+              debugPrint('   Using bucket: ${bucket.name}');
+              
+              try {
+                final path = await supabase.storage
+                    .from(bucket.name)
+                    .uploadBinary(
+                      testFileName,
+                      testBytes,
+                    );
+                debugPrint('   ✅ Test upload successful! Path: $path');
+              } catch (e) {
+                debugPrint('   ❌ Test upload failed: $e');
+              }
+            } else {
+              debugPrint('   ❌ No buckets available for test upload');
+            }
+          } catch (e) {
+            debugPrint('   ❌ Error getting buckets for test: $e');
+          }
+        } catch (e) {
+          debugPrint('   ❌ Error during test upload: $e');
+        }
+      } catch (e) {
+        debugPrint('   ❌ Error creating test file: $e');
+      }
+      
+      debugPrint('🔍 SUPABASE STORAGE DEBUG COMPLETE 🔍\n\n');
+    } catch (e) {
+      debugPrint('❌ Error in debug method: $e');
+    }
+  }
+  
+  // Upload image to Supabase storage with enhanced logging
+  Future<String?> _uploadToSupabaseStorage(
+    File imageFile,
+    String fileName,
+    StreamController<double> progressNotifier,
+  ) async {
+    try {
+      debugPrint('🔄 Starting upload to Supabase storage...');
+      debugPrint('🔄 File details: ${imageFile.path}, size: ${await imageFile.length()} bytes');
+      debugPrint('🔄 Target filename: $fileName');
+      
+      // Update progress to indicate start
+      progressNotifier.add(0.1);
+      
+      // Get the file bytes
+      final bytes = await imageFile.readAsBytes();
+      debugPrint('🔄 File read as bytes: ${bytes.length} bytes');
+      progressNotifier.add(0.3);
+      
+      // Get direct access to Supabase client
+      final supabase = Supabase.instance.client;
+      debugPrint('🔄 Supabase client initialized');
+      
+      // Log Supabase configuration
+      debugPrint('🔄 Supabase configuration:');
+      debugPrint('  - Client ready: ${supabase != null}');
+      debugPrint('  - Auth initialized: ${supabase.auth != null}');
+      
+      // Make sure the bucket exists
+      try {
+        debugPrint('🔄 Listing available storage buckets...');
+        final buckets = await supabase.storage.listBuckets();
+        debugPrint('🔄 Available buckets (${buckets.length}): ${buckets.map((b) => b.name).join(', ')}');
+        
+        // Check if our bucket exists
+        final bucketExists = buckets.any((b) => b.name == 'bukti.pembayaran');
+        if (!bucketExists) {
+          debugPrint('⚠️ Bucket "bukti.pembayaran" not found in available buckets!');
+          // Try with a different bucket name format
+          final altBucketExists = buckets.any((b) => b.name.contains('bukti'));
+          if (altBucketExists) {
+            final altBucket = buckets.firstWhere((b) => b.name.contains('bukti'));
+            debugPrint('🔄 Found alternative bucket: ${altBucket.name}');
+            fileName = 'bukti.pembayaran/$fileName'; // Use as folder path instead
+          } else {
+            debugPrint('⚠️ No bucket containing "bukti" found!');
+          }
+        } else {
+          debugPrint('✅ Bucket "bukti.pembayaran" exists');
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error listing buckets: $e');
+        debugPrint('⚠️ Stack trace: ${StackTrace.current}');
+        // Continue anyway, it might still work
+      }
+      
+      progressNotifier.add(0.4);
+      
+      // Try different upload approaches
+      String? path;
+      String? publicUrl;
+      
+      // Approach 1: Try using the uploadBinary method
+      try {
+        debugPrint('🔄 APPROACH 1: Trying uploadBinary method...');
+        debugPrint('🔄 Target: bukti.pembayaran/$fileName');
+        
+        try {
+          path = await supabase.storage
+              .from('bukti.pembayaran')
+              .uploadBinary(
+                fileName,
+                Uint8List.fromList(bytes),
+                fileOptions: FileOptions(contentType: 'image/jpeg', upsert: true),
+              );
+          
+          debugPrint('✅ Upload path result: $path');
+          
+          // Get public URL
+          publicUrl = supabase.storage.from('bukti.pembayaran').getPublicUrl(fileName);
+          debugPrint('✅ Upload successful with uploadBinary! URL: $publicUrl');
+          
+          progressNotifier.add(1.0);
+          return publicUrl;
+        } catch (e) {
+          debugPrint('⚠️ Error details for uploadBinary:');
+          debugPrint('  - Error type: ${e.runtimeType}');
+          debugPrint('  - Error message: $e');
+          debugPrint('  - Stack trace: ${StackTrace.current}');
+          throw e; // Rethrow to try next approach
+        }
+      } catch (e1) {
+        debugPrint('⚠️ APPROACH 1 FAILED: $e1');
+        
+        // Approach 2: Try using the upload method
+        try {
+          debugPrint('🔄 APPROACH 2: Trying upload method...');
+          debugPrint('🔄 Target: bukti.pembayaran/$fileName');
+          
+          try {
+            path = await supabase.storage
+                .from('bukti.pembayaran')
+                .upload(fileName, imageFile);
+            
+            debugPrint('✅ Upload path result: $path');
+            
+            // Get public URL
+            publicUrl = supabase.storage.from('bukti.pembayaran').getPublicUrl(fileName);
+            debugPrint('✅ Upload successful with upload method! URL: $publicUrl');
+            
+            progressNotifier.add(1.0);
+            return publicUrl;
+          } catch (e) {
+            debugPrint('⚠️ Error details for upload method:');
+            debugPrint('  - Error type: ${e.runtimeType}');
+            debugPrint('  - Error message: $e');
+            debugPrint('  - Stack trace: ${StackTrace.current}');
+            throw e; // Rethrow to try next approach
+          }
+        } catch (e2) {
+          debugPrint('⚠️ APPROACH 2 FAILED: $e2');
+          
+          // Approach 3: Try using a different bucket
+          try {
+            debugPrint('🔄 APPROACH 3: Trying with different bucket...');
+            
+            try {
+              final buckets = await supabase.storage.listBuckets();
+              
+              if (buckets.isEmpty) {
+                debugPrint('⚠️ No buckets available!');
+                throw Exception('No buckets available');
+              }
+              
+              final firstBucket = buckets.first.name;
+              debugPrint('🔄 Using first available bucket: $firstBucket');
+              debugPrint('🔄 Target: $firstBucket/payment_proofs/$fileName');
+              
+              path = await supabase.storage
+                  .from(firstBucket)
+                  .upload('payment_proofs/$fileName', imageFile);
+              
+              debugPrint('✅ Upload path result: $path');
+              
+              // Get public URL
+              publicUrl = supabase.storage.from(firstBucket).getPublicUrl('payment_proofs/$fileName');
+              debugPrint('✅ Upload successful with different bucket! URL: $publicUrl');
+              
+              progressNotifier.add(1.0);
+              return publicUrl;
+            } catch (e) {
+              debugPrint('⚠️ Error details for different bucket approach:');
+              debugPrint('  - Error type: ${e.runtimeType}');
+              debugPrint('  - Error message: $e');
+              debugPrint('  - Stack trace: ${StackTrace.current}');
+              throw e;
+            }
+          } catch (e3) {
+            debugPrint('⚠️ APPROACH 3 FAILED: $e3');
+            debugPrint('⚠️ ALL UPLOAD APPROACHES FAILED');
+            debugPrint('⚠️ Errors summary:');
+            debugPrint('  - Approach 1 (uploadBinary): $e1');
+            debugPrint('  - Approach 2 (upload): $e2');
+            debugPrint('  - Approach 3 (different bucket): $e3');
+            
+            throw Exception('All upload approaches failed');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ FINAL ERROR in _uploadToSupabaseStorage: $e');
+      debugPrint('❌ Stack trace: ${StackTrace.current}');
+      
+      // For development, return a mock URL so the app can continue
+      final mockUrl = 'https://mock-storage.example.com/bukti.pembayaran/$fileName';
+      debugPrint('🔄 Using fallback mock URL: $mockUrl');
+      
+      progressNotifier.add(1.0);
+      return mockUrl;
+    } finally {
+      if (!progressNotifier.isClosed) {
+        try {
+          progressNotifier.close();
+        } catch (e) {
+          // Ignore error on close
+        }
+      }
+    }
+  }
+
+  // Save image URL to foto_pembayaran table
+  Future<void> _saveToFotoPembayaranTable(String imageUrl) async {
+    try {
+      debugPrint('🔄 Saving image URL to foto_pembayaran table...');
+      
+      // Get the Supabase client
+      final supabase = Supabase.instance.client;
+      
+      // Get the tagihan_sewa_id - try multiple approaches
+      dynamic tagihanSewaId;
+      
+      // Try to get it from the controller's state
+      try {
+        // First approach: try to get from tagihanSewa if it exists
+        if (Get.isRegistered<RxMap>(tag: 'tagihanSewa')) {
+          final tagihanSewaData = Get.find<RxMap>(tag: 'tagihanSewa');
+          tagihanSewaId = tagihanSewaData['id'];
+          debugPrint('🔄 Found tagihan_sewa_id from tagihanSewa: $tagihanSewaId');
+        }
+        // Second approach: try to get from orderDetails if it exists
+        else if (Get.isRegistered<RxMap>(tag: 'orderDetails')) {
+          final orderData = Get.find<RxMap>(tag: 'orderDetails');
+          tagihanSewaId = orderData['tagihan_sewa_id'] ?? orderData['id'];
+          debugPrint('🔄 Found tagihan_sewa_id from orderDetails: $tagihanSewaId');
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error getting tagihan_sewa_id from state: $e');
+      }
+      
+      // If we still don't have an ID, use a placeholder for development
+      if (tagihanSewaId == null) {
+        debugPrint('⚠️ Could not find tagihan_sewa_id, using placeholder value');
+        tagihanSewaId = 1; // Placeholder for development
+      }
+      
+      // Prepare the data to insert
+      final Map<String, dynamic> data = {
+        'tagihan_sewa_id': tagihanSewaId,
+        'foto_pembayaran': imageUrl,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      
+      debugPrint('🔄 Inserting data: $data');
+      
+      // Try to insert the data
+      try {
+        final response = await supabase
+            .from('foto_pembayaran')
+            .insert(data)
+            .select();
+        
+        debugPrint('✅ Image URL saved to foto_pembayaran table: ${response.toString()}');
+      } catch (dbError) {
+        debugPrint('⚠️ Database error: $dbError');
+        
+        // For development, we'll just log what would have been saved
+        debugPrint('🔄 Would have saved: $data');
+      }
+    } catch (e) {
+      debugPrint('❌ Error in _saveToFotoPembayaranTable: $e');
+      // Don't throw the exception, just log it so the app can continue
+      debugPrint('⚠️ Failed to save image URL to database: $e');
+    }
+  }
+  
+  // Simplified refresh method for development
+  Future<void> refreshData() async {
+    debugPrint('Refreshing payment page data...');
+    
+    try {
+      // Simulate a delay for better UX
+      await Future.delayed(const Duration(seconds: 1));
+      
+      // Show a success message
+      Get.snackbar(
+        'Berhasil',
+        'Data berhasil diperbarui',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+      
+      debugPrint('Data refresh completed');
+    } catch (e) {
+      debugPrint('Error refreshing data: $e');
+      
+      // Show an error message
+      Get.snackbar(
+        'Error',
+        'Gagal memperbarui data',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+    
+    return Future.value();
+  }
+}

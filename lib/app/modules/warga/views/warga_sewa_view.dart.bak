@@ -1,0 +1,2851 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:get/get.dart';
+import '../controllers/warga_sewa_controller.dart';
+import '../views/warga_layout.dart';
+import '../../../services/navigation_service.dart';
+import '../../../widgets/app_drawer.dart';
+import '../../../theme/app_colors.dart';
+
+class WargaSewaView extends GetView<WargaSewaController> {
+  const WargaSewaView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final navigationService = Get.find<NavigationService>();
+
+    return WargaLayout(
+      drawer: AppDrawer(
+        onNavItemTapped: controller.onNavItemTapped,
+        onLogout: () {
+          Get.find<NavigationService>().toLogin();
+        },
+      ),
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        elevation: 0,
+        title: const Text(
+          'Sewa Aset Saya',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        centerTitle: true,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: _buildTabBar(),
+        ),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: TabBarView(
+              controller: controller.tabController,
+              physics: const PageScrollPhysics(),
+              dragStartBehavior: DragStartBehavior.start,
+              children: [
+                _buildBelumBayarTab(),
+                _buildPendingTab(),
+                _buildDiterimaTab(),
+                _buildAktifTab(),
+                _buildSelesaiTab(),
+                _buildDibatalkanTab(),
+              ],
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: Container(
+        margin: const EdgeInsets.only(bottom: 16, right: 16),
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+              spreadRadius: 0,
+            ),
+          ],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: () => controller.navigateToRentals(),
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          icon: const Icon(
+            Icons.add_circle_outline,
+            size: 20,
+            color: Colors.white,
+          ),
+          label: const Text(
+            'Sewa Baru',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+              color: Colors.white,
+            ),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+    );
+  }
+
+  Widget _buildTabBar() {
+    return Container(
+      width: double.infinity,
+      height: 60,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+      ),
+      child: TabBar(
+        controller: controller.tabController,
+        labelColor: AppColors.primary,
+        unselectedLabelColor: Colors.grey.shade600,
+        indicatorColor: AppColors.primary,
+        indicatorWeight: 3,
+        indicatorSize: TabBarIndicatorSize.label,
+        labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        isScrollable: true,
+        tabs: [
+          _buildTab(text: 'Belum Bayar', icon: Icons.payment_outlined),
+          _buildTab(text: 'Pending', icon: Icons.hourglass_empty_outlined),
+          _buildTab(text: 'Diterima', icon: Icons.check_circle_outline),
+          _buildTab(text: 'Aktif', icon: Icons.play_circle_outline),
+          _buildTab(text: 'Selesai', icon: Icons.task_alt_outlined),
+          _buildTab(text: 'Dibatalkan', icon: Icons.cancel_outlined),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTab({required String text, required IconData icon}) {
+    return Tab(
+      height: 60,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 20),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBelumBayarTab() {
+    return Obx(() {
+      // Show loading indicator while fetching data
+      if (controller.isLoading.value) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      }
+      
+      // Check if there is any data to display
+      if (controller.rentals.isNotEmpty) {
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              // Build a card for each rental item
+              ...controller.rentals.map((rental) => Column(
+                children: [
+                  _buildUnpaidRentalCard(rental),
+                  const SizedBox(height: 20),
+                ],
+              )).toList(),
+              _buildTipsSection(),
+            ],
+          ),
+        );
+      }
+
+      // Return empty state if no data
+      return _buildTabContent(
+        icon: Icons.payment_outlined,
+        title: 'Belum ada pembayaran',
+        subtitle: 'Tidak ada sewa yang menunggu pembayaran',
+        buttonText: 'Sewa Sekarang',
+        onButtonPressed: () => controller.navigateToRentals(),
+        color: AppColors.primary,
+      );
+    });
+  }
+  
+  Widget _buildPendingTab() {
+    return Obx(() {
+      // Show loading indicator while fetching data
+      if (controller.isLoadingPending.value) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      }
+      
+      // Check if there is any data to display
+      if (controller.pendingRentals.isNotEmpty) {
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              // Build a card for each pending rental item
+              ...controller.pendingRentals.map((rental) => Column(
+                children: [
+                  _buildPendingRentalCard(rental),
+                  const SizedBox(height: 20),
+                ],
+              )).toList(),
+              _buildTipsSectionPending(),
+            ],
+          ),
+        );
+      }
+
+      // Return empty state if no data
+      return _buildTabContent(
+        icon: Icons.hourglass_empty_outlined,
+        title: 'Tidak ada pembayaran pending',
+        subtitle: 'Pembayaran yang sedang diverifikasi akan muncul di sini',
+        buttonText: 'Sewa Sekarang',
+        onButtonPressed: () => controller.navigateToRentals(),
+        color: Colors.orange,
+      );
+    });
+  }
+  
+  Widget _buildAktifTab() {
+    return Obx(() {
+      // Show loading indicator while fetching data
+      if (controller.isLoadingActive.value) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      }
+      
+      // Check if there is any data to display
+      if (controller.activeRentals.isNotEmpty) {
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              // Build a card for each active rental item
+              ...controller.activeRentals.map((rental) => Column(
+                children: [
+                  _buildAktifRentalCard(rental),
+                  const SizedBox(height: 20),
+                ],
+              )).toList(),
+              _buildTipsSectionAktif(),
+            ],
+          ),
+        );
+      }
+
+      // Return empty state if no data
+      return _buildTabContent(
+        icon: Icons.play_circle_outline,
+        title: 'Tidak ada sewa aktif',
+        subtitle: 'Sewa yang sedang berlangsung akan muncul di sini',
+        buttonText: 'Sewa Sekarang',
+        onButtonPressed: () => controller.navigateToRentals(),
+        color: Colors.blue,
+      );
+    });
+  }
+
+  Widget _buildPendingRentalCard(Map<String, dynamic> rental) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header section with status
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.hourglass_empty_outlined,
+                  size: 18,
+                  color: Colors.orange,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  rental['status'] ?? 'PERIKSA PEMBAYARAN',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Asset details
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Asset image with rounded corners
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: rental['imageUrl'] != null && rental['imageUrl'].toString().startsWith('http')
+                    ? Image.network(
+                        rental['imageUrl'],
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 36,
+                              color: Colors.grey.shade400,
+                            ),
+                          );
+                        },
+                      )
+                    : Image.asset(
+                        rental['imageUrl'] ?? 'assets/images/gambar_pendukung.jpg',
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                      ),
+                ),
+                const SizedBox(width: 16),
+                // Asset details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        rental['name'] ?? 'Nama Aset',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        icon: Icons.inventory_2_outlined,
+                        text: '${rental['jumlahUnit'] ?? 0} Unit',
+                      ),
+                      const SizedBox(height: 6),
+                      _buildInfoRow(
+                        icon: Icons.calendar_today_outlined,
+                        text: rental['tanggalSewa'] ?? '',
+                      ),
+                      const SizedBox(height: 6),
+                      _buildInfoRow(
+                        icon: Icons.schedule,
+                        text: rental['rentangWaktu'] ?? '',
+                      ),
+                      const SizedBox(height: 12),
+                      // Verification status
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.orange.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.pending_outlined,
+                              size: 14,
+                              color: Colors.orange,
+                            ),
+                            const SizedBox(width: 4),
+                            const Text(
+                              'Menunggu verifikasi',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Divider
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade100),
+
+          // Price section
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Total Bayar',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      rental['totalPrice'] ?? 'Rp 0',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                // View detail button
+                ElevatedButton(
+                  onPressed: () => controller.viewRentalDetail(rental),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Lihat Detail',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAktifRentalCard(Map<String, dynamic> rental) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header section with status
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.play_circle_outline,
+                  size: 18,
+                  color: Colors.blue,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  rental['status'] ?? 'AKTIF',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Asset details
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Asset image with rounded corners
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: rental['imageUrl'] != null && rental['imageUrl'].toString().startsWith('http')
+                    ? Image.network(
+                        rental['imageUrl'],
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 36,
+                              color: Colors.grey.shade400,
+                            ),
+                          );
+                        },
+                      )
+                    : Image.asset(
+                        rental['imageUrl'] ?? 'assets/images/gambar_pendukung.jpg',
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                      ),
+                ),
+                const SizedBox(width: 16),
+                // Asset details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        rental['name'] ?? 'Nama Aset',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        icon: Icons.inventory_2_outlined,
+                        text: '${rental['jumlahUnit'] ?? 0} Unit',
+                      ),
+                      const SizedBox(height: 6),
+                      _buildInfoRow(
+                        icon: Icons.calendar_today_outlined,
+                        text: rental['tanggalSewa'] ?? '',
+                      ),
+                      const SizedBox(height: 6),
+                      _buildInfoRow(
+                        icon: Icons.schedule,
+                        text: rental['rentangWaktu'] ?? '',
+                      ),
+                      const SizedBox(height: 12),
+                      // Active status
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.blue.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.access_time_filled,
+                              size: 14,
+                              color: Colors.blue,
+                            ),
+                            const SizedBox(width: 4),
+                            const Text(
+                              'Sedang berlangsung',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Divider
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade100),
+
+          // Price section
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Total Bayar',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      rental['totalPrice'] ?? 'Rp 0',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                // View detail button
+                ElevatedButton(
+                  onPressed: () => controller.viewRentalDetail(rental),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Lihat Detail',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildUnpaidRentalCard(Map<String, dynamic> rental) {
+    // Determine status color based on status
+    final bool isPembayaranDenda = rental['status'] == 'PEMBAYARAN DENDA';
+    final Color statusColor = isPembayaranDenda ? AppColors.error : AppColors.warning;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header section with status
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Icon(
+                  isPembayaranDenda ? Icons.warning_amber_rounded : Icons.access_time_rounded,
+                  size: 18,
+                  color: statusColor,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  rental['status'] ?? 'MENUNGGU PEMBAYARAN',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: statusColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Asset details
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Asset image with rounded corners
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: rental['imageUrl'] != null && rental['imageUrl'].toString().startsWith('http')
+                    ? Image.network(
+                        rental['imageUrl'],
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 36,
+                              color: Colors.grey.shade400,
+                            ),
+                          );
+                        },
+                      )
+                    : Image.asset(
+                        rental['imageUrl'] ?? 'assets/images/gambar_pendukung.jpg',
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 36,
+                              color: Colors.grey.shade400,
+                            ),
+                          );
+                        },
+                      ),
+                ),
+                const SizedBox(width: 16),
+                // Asset details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        rental['name'] ?? 'Aset',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        icon: Icons.inventory_2_outlined,
+                        text: '${rental['jumlahUnit'] ?? 0} Unit',
+                      ),
+                      const SizedBox(height: 6),
+                      _buildInfoRow(
+                        icon: Icons.calendar_today_outlined,
+                        text: rental['tanggalSewa'] ?? '',
+                      ),
+                      const SizedBox(height: 6),
+                      _buildInfoRow(
+                        icon: Icons.schedule,
+                        text: rental['rentangWaktu'] ?? '',
+                      ),
+                      const SizedBox(height: 12),
+                      // Countdown timer
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.error.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.timer_outlined,
+                              size: 14,
+                              color: AppColors.error,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Bayar dalam ${rental['countdown'] ?? '00:59:59'}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.error,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Divider
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade100),
+
+          // Price section
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Total Bayar',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      rental['totalPrice'] ?? 'Rp 0',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                // Pay button
+                ElevatedButton(
+                  onPressed: () {},
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: rental['status'] == 'PEMBAYARAN DENDA' ? AppColors.error : AppColors.warning,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    rental['status'] == 'PEMBAYARAN DENDA' ? 'Bayar Denda' : 'Bayar Sekarang',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Divider
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade100),
+
+          // Action buttons
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildActionButton(
+                    icon: Icons.info_outline,
+                    label: 'Lihat Detail',
+                    onPressed: () => controller.viewRentalDetail(rental),
+                    iconColor: AppColors.info,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildActionButton(
+                    icon: Icons.cancel_outlined,
+                    label: 'Batalkan',
+                    onPressed: () => controller.cancelRental(rental['id']),
+                    iconColor: AppColors.error,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow({required IconData icon, required String text}) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: AppColors.textSecondary),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    required Color iconColor,
+  }) {
+    return TextButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 16, color: iconColor),
+      label: Text(
+        label,
+        style: TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+
+  Widget _buildDiterimaTab() {
+    return Obx(() {
+      // Show loading indicator while fetching data
+      if (controller.isLoadingAccepted.value) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      }
+      
+      // Check if there is any data to display
+      if (controller.acceptedRentals.isNotEmpty) {
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              // Build a card for each accepted rental item
+              ...controller.acceptedRentals.map((rental) => Column(
+                children: [
+                  _buildDiterimaRentalCard(rental),
+                  const SizedBox(height: 20),
+                ],
+              )).toList(),
+              _buildTipsSectionDiterima(),
+            ],
+          ),
+        );
+      }
+
+      // Return empty state if no data
+      return _buildTabContent(
+        icon: Icons.check_circle_outline,
+        title: 'Belum ada sewa diterima',
+        subtitle: 'Sewa yang sudah diterima akan muncul di sini',
+        buttonText: 'Sewa Sekarang',
+        onButtonPressed: () => controller.navigateToRentals(),
+        color: AppColors.success,
+      );
+    });
+  }
+  
+  Widget _buildAktifTab() {
+    return Obx(() {
+      // Show loading indicator while fetching data
+      if (controller.isLoadingActive.value) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      }
+      
+      // Check if there is any data to display
+      if (controller.activeRentals.isNotEmpty) {
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              // Build a card for each active rental item
+              ...controller.activeRentals.map((rental) => Column(
+                children: [
+                  _buildAktifRentalCard(rental),
+                  const SizedBox(height: 20),
+                ],
+              )).toList(),
+              _buildTipsSectionAktif(),
+            ],
+          ),
+        );
+      }
+
+      // Return empty state if no data
+      return _buildTabContent(
+        icon: Icons.play_circle_outline,
+        title: 'Tidak ada sewa aktif',
+        subtitle: 'Sewa yang sedang berlangsung akan muncul di sini',
+        buttonText: 'Sewa Sekarang',
+        onButtonPressed: () => controller.navigateToRentals(),
+        color: Colors.blue,
+      );
+    });
+  }
+
+  Widget _buildDiterimaRentalCard(Map<String, dynamic> rental) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header section with status
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.success.withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 18,
+                  color: AppColors.success,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  rental['status'] ?? 'DITERIMA',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.success,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Asset details
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Asset image with rounded corners
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: rental['imageUrl'] != null && rental['imageUrl'].toString().startsWith('http')
+                    ? Image.network(
+                        rental['imageUrl'],
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 36,
+                              color: Colors.grey.shade400,
+                            ),
+                          );
+                        },
+                      )
+                    : Image.asset(
+                        rental['imageUrl'] ?? 'assets/images/gambar_pendukung.jpg',
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 36,
+                              color: Colors.grey.shade400,
+                            ),
+                          );
+                        },
+                      ),
+                ),
+                const SizedBox(width: 16),
+                // Asset details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        rental['name'] ?? 'Aset',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        icon: Icons.inventory_2_outlined,
+                        text: '${rental['jumlahUnit'] ?? 0} Unit',
+                      ),
+                      const SizedBox(height: 6),
+                      _buildInfoRow(
+                        icon: Icons.calendar_today_outlined,
+                        text: rental['tanggalSewa'] ?? '',
+                      ),
+                      const SizedBox(height: 6),
+                      _buildInfoRow(
+                        icon: Icons.schedule,
+                        text: rental['rentangWaktu'] ?? '',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Divider
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade100),
+
+          // Price section
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Total Bayar',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      rental['totalPrice'] ?? 'Rp 0',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Divider
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade100),
+
+          // Action buttons
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildActionButton(
+                    icon: Icons.info_outline,
+                    label: 'Lihat Detail',
+                    onPressed: () => controller.viewRentalDetail(rental),
+                    iconColor: AppColors.info,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildActionButton(
+                    icon: Icons.cancel_outlined,
+                    label: 'Batalkan',
+                    onPressed: () => controller.cancelRental(rental['id']),
+                    iconColor: AppColors.error,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelesaiTab() {
+    return Obx(() {
+      if (controller.isLoadingCompleted.value) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(20.0),
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+
+      if (controller.completedRentals.isEmpty) {
+        return _buildTabContent(
+          icon: Icons.check_circle_outline,
+          title: 'Belum Ada Sewa Selesai',
+          subtitle: 'Anda belum memiliki riwayat sewa yang telah selesai',
+          buttonText: 'Lihat Aset',
+          onButtonPressed: () => Get.toNamed('/warga-aset'),
+          color: AppColors.info,
+        );
+      }
+
+      return SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: controller.completedRentals
+              .map((rental) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: _buildSelesaiRentalCard(rental),
+                  ))
+              .toList(),
+        ),
+      );
+    });
+  }
+
+  Widget _buildSelesaiRentalCard(Map<String, dynamic> rental) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header section with status
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.info.withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Icon(Icons.task_alt_outlined, size: 18, color: AppColors.info),
+                const SizedBox(width: 8),
+                Text(
+                  rental['status'] ?? 'SELESAI',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.info,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Asset details
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Asset image with rounded corners
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: rental['imageUrl'] != null && rental['imageUrl'].toString().startsWith('http')
+                    ? Image.network(
+                        rental['imageUrl'],
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 36,
+                              color: Colors.grey.shade400,
+                            ),
+                          );
+                        },
+                      )
+                    : Image.asset(
+                        rental['imageUrl'] ?? 'assets/images/gambar_pendukung.jpg',
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 36,
+                              color: Colors.grey.shade400,
+                            ),
+                          );
+                        },
+                      ),
+                ),
+                const SizedBox(width: 16),
+                // Asset details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        rental['name'] ?? 'Aset',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${rental['jumlahUnit'] ?? 0} Unit',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        icon: Icons.calendar_today,
+                        text: rental['rentangWaktu'] ?? '-',
+                      ),
+                      const SizedBox(height: 4),
+                      _buildInfoRow(
+                        icon: Icons.access_time,
+                        text: rental['duration'] ?? '-',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Divider
+          Divider(
+            color: Colors.grey.shade200,
+            thickness: 1,
+            height: 1,
+          ),
+
+          // Price section
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    Text(
+                      rental['totalPrice'] ?? 'Rp 0',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: _buildActionButton(
+                    icon: Icons.info_outline,
+                    label: 'Lihat Detail',
+                    onPressed: () => controller.viewRentalDetail(rental),
+                    iconColor: AppColors.info,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDibatalkanTab() {
+    return Obx(() {
+      if (controller.isLoadingCancelled.value) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(20.0),
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+
+      if (controller.cancelledRentals.isEmpty) {
+        return _buildTabContent(
+          icon: Icons.cancel_outlined,
+          title: 'Belum Ada Sewa Dibatalkan',
+          subtitle: 'Anda belum memiliki riwayat sewa yang dibatalkan',
+          buttonText: 'Lihat Aset',
+          onButtonPressed: () => Get.toNamed('/warga-aset'),
+          color: AppColors.error,
+        );
+      }
+
+      return SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: controller.cancelledRentals
+              .map((rental) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: _buildDibatalkanRentalCard(rental),
+                  ))
+              .toList(),
+        ),
+      );
+    });
+  }
+
+  Widget _buildDibatalkanRentalCard(Map<String, dynamic> rental) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header section with status
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.error.withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Icon(Icons.cancel_outlined, size: 18, color: AppColors.error),
+                const SizedBox(width: 8),
+                Text(
+                  rental['status'] ?? 'DIBATALKAN',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.error,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Asset details
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Asset image with rounded corners
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: rental['imageUrl'] != null && rental['imageUrl'].toString().startsWith('http')
+                    ? Image.network(
+                        rental['imageUrl'],
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 36,
+                              color: Colors.grey.shade400,
+                            ),
+                          );
+                        },
+                      )
+                    : Image.asset(
+                        rental['imageUrl'] ?? 'assets/images/gambar_pendukung.jpg',
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 36,
+                              color: Colors.grey.shade400,
+                            ),
+                          );
+                        },
+                      ),
+                ),
+                const SizedBox(width: 16),
+                // Asset details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        rental['name'] ?? 'Aset',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${rental['jumlahUnit'] ?? 0} Unit',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        icon: Icons.calendar_today,
+                        text: rental['rentangWaktu'] ?? '-',
+                      ),
+                      const SizedBox(height: 4),
+                      _buildInfoRow(
+                        icon: Icons.access_time,
+                        text: rental['duration'] ?? '-',
+                      ),
+                      if (rental['alasanPembatalan'] != null && rental['alasanPembatalan'] != '-')
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: _buildInfoRow(
+                            icon: Icons.info_outline,
+                            text: 'Alasan: ${rental['alasanPembatalan']}',
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Divider
+          Divider(
+            color: Colors.grey.shade200,
+            thickness: 1,
+            height: 1,
+          ),
+
+          // Price section
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    Text(
+                      rental['totalPrice'] ?? 'Rp 0',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildActionButton(
+                        icon: Icons.info_outline,
+                        label: 'Lihat Detail',
+                        onPressed: () => controller.viewRentalDetail(rental),
+                        iconColor: AppColors.info,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildActionButton(
+                        icon: Icons.refresh,
+                        label: 'Pesan Kembali',
+                        onPressed: () {},
+                        iconColor: AppColors.success,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabContent({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String buttonText,
+    required VoidCallback onButtonPressed,
+    required Color color,
+  }) {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(height: 40),
+            Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, size: 60, color: color),
+                  ),
+                  const SizedBox(height: 28),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 36),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 54,
+                    child: ElevatedButton(
+                      onPressed: onButtonPressed,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: color,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_circle_outline, size: 20),
+                          const SizedBox(width: 10),
+                          Text(
+                            buttonText,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Tips section
+            _buildTipsSection(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTipsSection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lightbulb_outline, color: AppColors.warning),
+              const SizedBox(width: 8),
+              Text(
+                'Tips & Informasi',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildTipItem(
+            icon: Icons.schedule,
+            title: 'Pembayaran dalam 1 jam',
+            description:
+                'Lakukan pembayaran dalam 1 jam untuk menghindari pembatalan otomatis.',
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildTipsSectionPending() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lightbulb_outline, color: Colors.orange),
+              const SizedBox(width: 8),
+              Text(
+                'Tips Verifikasi',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildTipItem(
+            icon: Icons.access_time,
+            title: 'Proses Verifikasi',
+            description:
+                'Verifikasi pembayaran biasanya membutuhkan waktu 1-2 jam kerja.',
+          ),
+          const SizedBox(height: 12),
+          _buildTipItem(
+            icon: Icons.image_outlined,
+            title: 'Bukti Pembayaran',
+            description:
+                'Pastikan bukti pembayaran yang diupload jelas dan terbaca.',
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildTipsSectionAktif() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lightbulb_outline, color: Colors.blue),
+              const SizedBox(width: 8),
+              Text(
+                'Tips Sewa Aktif',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildTipItem(
+            icon: Icons.rule_outlined,
+            title: 'Ketentuan Penggunaan',
+            description:
+                'Gunakan aset sesuai dengan ketentuan yang berlaku.',
+          ),
+          const SizedBox(height: 12),
+          _buildTipItem(
+            icon: Icons.access_time,
+            title: 'Waktu Pengembalian',
+            description:
+                'Kembalikan aset tepat waktu untuk menghindari denda.',
+          ),
+        ],
+      ),
+    );
+  }
+  Widget _buildTipItem({
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.info.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 18, color: AppColors.info),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTipsSectionDiterima() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lightbulb_outline, color: AppColors.warning),
+              const SizedBox(width: 8),
+              Text(
+                'Tips & Informasi',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildTipItem(
+            icon: Icons.access_time,
+            title: 'Pengembalian Tepat Waktu',
+            description:
+                'Lakukan pengembalian aset sebelum waktu sewa berakhir agar tidak dikenakan denda.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+    W i d g e t   _ b u i l d D i t e r i m a T a b ( )   {  
+         r e t u r n   O b x ( ( )   {  
+             / /   S h o w   l o a d i n g   i n d i c a t o r   w h i l e   f e t c h i n g   d a t a  
+             i f   ( c o n t r o l l e r . i s L o a d i n g A c c e p t e d . v a l u e )   {  
+                 r e t u r n   c o n s t   C e n t e r (  
+                     c h i l d :   C i r c u l a r P r o g r e s s I n d i c a t o r ( ) ,  
+                 ) ;  
+             }  
+              
+             / /   C h e c k   i f   t h e r e   i s   a n y   d a t a   t o   d i s p l a y  
+             i f   ( c o n t r o l l e r . a c c e p t e d R e n t a l s . i s N o t E m p t y )   {  
+                 r e t u r n   S i n g l e C h i l d S c r o l l V i e w (  
+                     p h y s i c s :   c o n s t   B o u n c i n g S c r o l l P h y s i c s ( ) ,  
+                     p a d d i n g :   c o n s t   E d g e I n s e t s . a l l ( 2 0 ) ,  
+                     c h i l d :   C o l u m n (  
+                         c h i l d r e n :   [  
+                             / /   B u i l d   a   c a r d   f o r   e a c h   a c c e p t e d   r e n t a l   i t e m  
+                             . . . c o n t r o l l e r . a c c e p t e d R e n t a l s . m a p ( ( r e n t a l )   = >   C o l u m n (  
+                                 c h i l d r e n :   [  
+                                     _ b u i l d A c c e p t e d R e n t a l C a r d ( r e n t a l ) ,  
+                                     c o n s t   S i z e d B o x ( h e i g h t :   2 0 ) ,  
+                                 ] ,  
+                             ) ) . t o L i s t ( ) ,  
+                             _ b u i l d T i p s S e c t i o n ( ) ,  
+                         ] ,  
+                     ) ,  
+                 ) ;  
+             }  
+  
+             / /   R e t u r n   e m p t y   s t a t e   i f   n o   d a t a  
+             r e t u r n   _ b u i l d T a b C o n t e n t (  
+                 i c o n :   I c o n s . c h e c k _ c i r c l e _ o u t l i n e ,  
+                 t i t l e :   ' B e l u m   a d a   p e m b a y a r a n   d i t e r i m a ' ,  
+                 s u b t i t l e :   ' P e m b a y a r a n   y a n g   t e l a h   d i v e r i f i k a s i   a k a n   m u n c u l   d i   s i n i ' ,  
+                 b u t t o n T e x t :   ' S e w a   S e k a r a n g ' ,  
+                 o n B u t t o n P r e s s e d :   ( )   = >   c o n t r o l l e r . n a v i g a t e T o R e n t a l s ( ) ,  
+                 c o l o r :   A p p C o l o r s . s u c c e s s ,  
+             ) ;  
+         } ) ;  
+     }  
+  
+     W i d g e t   _ b u i l d S e l e s a i T a b ( )   {  
+         r e t u r n   O b x ( ( )   {  
+             / /   S h o w   l o a d i n g   i n d i c a t o r   w h i l e   f e t c h i n g   d a t a  
+             i f   ( c o n t r o l l e r . i s L o a d i n g C o m p l e t e d . v a l u e )   {  
+                 r e t u r n   c o n s t   C e n t e r (  
+                     c h i l d :   C i r c u l a r P r o g r e s s I n d i c a t o r ( ) ,  
+                 ) ;  
+             }  
+              
+             / /   C h e c k   i f   t h e r e   i s   a n y   d a t a   t o   d i s p l a y  
+             i f   ( c o n t r o l l e r . c o m p l e t e d R e n t a l s . i s N o t E m p t y )   {  
+                 r e t u r n   S i n g l e C h i l d S c r o l l V i e w (  
+                     p h y s i c s :   c o n s t   B o u n c i n g S c r o l l P h y s i c s ( ) ,  
+                     p a d d i n g :   c o n s t   E d g e I n s e t s . a l l ( 2 0 ) ,  
+                     c h i l d :   C o l u m n (  
+                         c h i l d r e n :   [  
+                             / /   B u i l d   a   c a r d   f o r   e a c h   c o m p l e t e d   r e n t a l   i t e m  
+                             . . . c o n t r o l l e r . c o m p l e t e d R e n t a l s . m a p ( ( r e n t a l )   = >   C o l u m n (  
+                                 c h i l d r e n :   [  
+                                     _ b u i l d C o m p l e t e d R e n t a l C a r d ( r e n t a l ) ,  
+                                     c o n s t   S i z e d B o x ( h e i g h t :   2 0 ) ,  
+                                 ] ,  
+                             ) ) . t o L i s t ( ) ,  
+                             _ b u i l d T i p s S e c t i o n ( ) ,  
+                         ] ,  
+                     ) ,  
+                 ) ;  
+             }  
+  
+             / /   R e t u r n   e m p t y   s t a t e   i f   n o   d a t a  
+             r e t u r n   _ b u i l d T a b C o n t e n t (  
+                 i c o n :   I c o n s . t a s k _ a l t _ o u t l i n e d ,  
+                 t i t l e :   ' B e l u m   a d a   s e w a   s e l e s a i ' ,  
+                 s u b t i t l e :   ' S e w a   y a n g   t e l a h   s e l e s a i   a k a n   m u n c u l   d i   s i n i ' ,  
+                 b u t t o n T e x t :   ' S e w a   S e k a r a n g ' ,  
+                 o n B u t t o n P r e s s e d :   ( )   = >   c o n t r o l l e r . n a v i g a t e T o R e n t a l s ( ) ,  
+                 c o l o r :   A p p C o l o r s . s u c c e s s ,  
+             ) ;  
+         } ) ;  
+     }  
+      
+     W i d g e t   _ b u i l d D i b a t a l k a n T a b ( )   {  
+         r e t u r n   O b x ( ( )   {  
+             / /   S h o w   l o a d i n g   i n d i c a t o r   w h i l e   f e t c h i n g   d a t a  
+             i f   ( c o n t r o l l e r . i s L o a d i n g C a n c e l l e d . v a l u e )   {  
+                 r e t u r n   c o n s t   C e n t e r (  
+                     c h i l d :   C i r c u l a r P r o g r e s s I n d i c a t o r ( ) ,  
+                 ) ;  
+             }  
+              
+             / /   C h e c k   i f   t h e r e   i s   a n y   d a t a   t o   d i s p l a y  
+             i f   ( c o n t r o l l e r . c a n c e l l e d R e n t a l s . i s N o t E m p t y )   {  
+                 r e t u r n   S i n g l e C h i l d S c r o l l V i e w (  
+                     p h y s i c s :   c o n s t   B o u n c i n g S c r o l l P h y s i c s ( ) ,  
+                     p a d d i n g :   c o n s t   E d g e I n s e t s . a l l ( 2 0 ) ,  
+                     c h i l d :   C o l u m n (  
+                         c h i l d r e n :   [  
+                             / /   B u i l d   a   c a r d   f o r   e a c h   c a n c e l l e d   r e n t a l   i t e m  
+                             . . . c o n t r o l l e r . c a n c e l l e d R e n t a l s . m a p ( ( r e n t a l )   = >   C o l u m n (  
+                                 c h i l d r e n :   [  
+                                     _ b u i l d C a n c e l l e d R e n t a l C a r d ( r e n t a l ) ,  
+                                     c o n s t   S i z e d B o x ( h e i g h t :   2 0 ) ,  
+                                 ] ,  
+                             ) ) . t o L i s t ( ) ,  
+                             _ b u i l d T i p s S e c t i o n ( ) ,  
+                         ] ,  
+                     ) ,  
+                 ) ;  
+             }  
+  
+             / /   R e t u r n   e m p t y   s t a t e   i f   n o   d a t a  
+             r e t u r n   _ b u i l d T a b C o n t e n t (  
+                 i c o n :   I c o n s . c a n c e l _ o u t l i n e d ,  
+                 t i t l e :   ' T i d a k   a d a   s e w a   d i b a t a l k a n ' ,  
+                 s u b t i t l e :   ' S e w a   y a n g   d i b a t a l k a n   a k a n   m u n c u l   d i   s i n i ' ,  
+                 b u t t o n T e x t :   ' S e w a   S e k a r a n g ' ,  
+                 o n B u t t o n P r e s s e d :   ( )   = >   c o n t r o l l e r . n a v i g a t e T o R e n t a l s ( ) ,  
+                 c o l o r :   A p p C o l o r s . e r r o r ,  
+             ) ;  
+         } ) ;  
+     }  
+  
+     W i d g e t   _ b u i l d A c c e p t e d R e n t a l C a r d ( M a p < S t r i n g ,   d y n a m i c >   r e n t a l )   {  
+         r e t u r n   C o n t a i n e r (  
+             d e c o r a t i o n :   B o x D e c o r a t i o n (  
+                 c o l o r :   C o l o r s . w h i t e ,  
+                 b o r d e r R a d i u s :   B o r d e r R a d i u s . c i r c u l a r ( 1 6 ) ,  
+                 b o x S h a d o w :   [  
+                     B o x S h a d o w (  
+                         c o l o r :   C o l o r s . b l a c k . w i t h O p a c i t y ( 0 . 0 5 ) ,  
+                         b l u r R a d i u s :   1 0 ,  
+                         o f f s e t :   c o n s t   O f f s e t ( 0 ,   2 ) ,  
+                     ) ,  
+                 ] ,  
+             ) ,  
+             c h i l d :   C o l u m n (  
+                 c h i l d r e n :   [  
+                     / /   H e a d e r   s e c t i o n   w i t h   s t a t u s  
+                     C o n t a i n e r (  
+                         p a d d i n g :   c o n s t   E d g e I n s e t s . s y m m e t r i c ( h o r i z o n t a l :   1 6 ,   v e r t i c a l :   1 2 ) ,  
+                         d e c o r a t i o n :   B o x D e c o r a t i o n (  
+                             c o l o r :   A p p C o l o r s . s u c c e s s . w i t h O p a c i t y ( 0 . 1 ) ,  
+                             b o r d e r R a d i u s :   c o n s t   B o r d e r R a d i u s . o n l y (  
+                                 t o p L e f t :   R a d i u s . c i r c u l a r ( 1 6 ) ,  
+                                 t o p R i g h t :   R a d i u s . c i r c u l a r ( 1 6 ) ,  
+                             ) ,  
+                         ) ,  
+                         c h i l d :   R o w (  
+                             m a i n A x i s A l i g n m e n t :   M a i n A x i s A l i g n m e n t . s t a r t ,  
+                             c h i l d r e n :   [  
+                                 I c o n (  
+                                     I c o n s . c h e c k _ c i r c l e _ o u t l i n e ,  
+                                     s i z e :   1 8 ,  
+                                     c o l o r :   A p p C o l o r s . s u c c e s s ,  
+                                 ) ,  
+                                 c o n s t   S i z e d B o x ( w i d t h :   8 ) ,  
+                                 T e x t (  
+                                     r e n t a l [ ' s t a t u s ' ]   ? ?   ' P E M B A Y A R A N   D I T E R I M A ' ,  
+                                     s t y l e :   T e x t S t y l e (  
+                                         f o n t S i z e :   1 3 ,  
+                                         f o n t W e i g h t :   F o n t W e i g h t . b o l d ,  
+                                         c o l o r :   A p p C o l o r s . s u c c e s s ,  
+                                     ) ,  
+                                 ) ,  
+                             ] ,  
+                         ) ,  
+                     ) ,  
+  
+                     / /   A s s e t   d e t a i l s  
+                     P a d d i n g (  
+                         p a d d i n g :   c o n s t   E d g e I n s e t s . a l l ( 1 6 ) ,  
+                         c h i l d :   R o w (  
+                             c r o s s A x i s A l i g n m e n t :   C r o s s A x i s A l i g n m e n t . s t a r t ,  
+                             c h i l d r e n :   [  
+                                 / /   A s s e t   i m a g e   w i t h   r o u n d e d   c o r n e r s  
+                                 C l i p R R e c t (  
+                                     b o r d e r R a d i u s :   B o r d e r R a d i u s . c i r c u l a r ( 1 2 ) ,  
+                                     c h i l d :   r e n t a l [ ' i m a g e U r l ' ]   ! =   n u l l   & &   r e n t a l [ ' i m a g e U r l ' ] . t o S t r i n g ( ) . s t a r t s W i t h ( ' h t t p ' )  
+                                         ?   I m a g e . n e t w o r k (  
+                                                 r e n t a l [ ' i m a g e U r l ' ] ,  
+                                                 w i d t h :   9 0 ,  
+                                                 h e i g h t :   9 0 ,  
+                                                 f i t :   B o x F i t . c o v e r ,  
+                                                 e r r o r B u i l d e r :   ( c o n t e x t ,   e r r o r ,   s t a c k T r a c e )   {  
+                                                     r e t u r n   C o n t a i n e r (  
+                                                         w i d t h :   9 0 ,  
+                                                         h e i g h t :   9 0 ,  
+                                                         d e c o r a t i o n :   B o x D e c o r a t i o n (  
+                                                             c o l o r :   C o l o r s . g r e y . s h a d e 2 0 0 ,  
+                                                             b o r d e r R a d i u s :   B o r d e r R a d i u s . c i r c u l a r ( 1 2 ) ,  
+                                                         ) ,  
+                                                         c h i l d :   I c o n (  
+                                                             I c o n s . i m a g e _ n o t _ s u p p o r t e d _ o u t l i n e d ,  
+                                                             s i z e :   3 6 ,  
+                                                             c o l o r :   C o l o r s . g r e y . s h a d e 4 0 0 ,  
+                                                         ) ,  
+                                                     ) ;  
+                                                 } ,  
+                                             )  
+                                         :   I m a g e . a s s e t (  
+                                                 r e n t a l [ ' i m a g e U r l ' ]   ? ?   ' a s s e t s / i m a g e s / g a m b a r _ p e n d u k u n g . j p g ' ,  
+                                                 w i d t h :   9 0 ,  
+                                                 h e i g h t :   9 0 ,  
+                                                 f i t :   B o x F i t . c o v e r ,  
+                                             ) ,  
+                                 ) ,  
+                                 c o n s t   S i z e d B o x ( w i d t h :   1 6 ) ,  
+                                 / /   A s s e t   d e t a i l s  
+                                 E x p a n d e d (  
+                                     c h i l d :   C o l u m n (  
+                                         c r o s s A x i s A l i g n m e n t :   C r o s s A x i s A l i g n m e n t . s t a r t ,  
+                                         c h i l d r e n :   [  
+                                             T e x t (  
+                                                 r e n t a l [ ' n a m e ' ]   ? ?   ' N a m a   A s e t ' ,  
+                                                 s t y l e :   T e x t S t y l e (  
+                                                     f o n t S i z e :   1 6 ,  
+                                                     f o n t W e i g h t :   F o n t W e i g h t . b o l d ,  
+                                                     c o l o r :   A p p C o l o r s . t e x t P r i m a r y ,  
+                                                 ) ,  
+                                             ) ,  
+                                             c o n s t   S i z e d B o x ( h e i g h t :   8 ) ,  
+                                             _ b u i l d I n f o R o w (  
+                                                 i c o n :   I c o n s . i n v e n t o r y _ 2 _ o u t l i n e d ,  
+                                                 t e x t :   ' $ { r e n t a l [ ' j u m l a h U n i t ' ]   ? ?   0 }   U n i t ' ,  
+                                             ) ,  
+                                             c o n s t   S i z e d B o x ( h e i g h t :   6 ) ,  
+                                             _ b u i l d I n f o R o w (  
+                                                 i c o n :   I c o n s . c a l e n d a r _ t o d a y _ o u t l i n e d ,  
+                                                 t e x t :   r e n t a l [ ' t a n g g a l S e w a ' ]   ? ?   ' ' ,  
+                                             ) ,  
+                                             c o n s t   S i z e d B o x ( h e i g h t :   6 ) ,  
+                                             _ b u i l d I n f o R o w (  
+                                                 i c o n :   I c o n s . s c h e d u l e ,  
+                                                 t e x t :   r e n t a l [ ' r e n t a n g W a k t u ' ]   ? ?   ' ' ,  
+                                             ) ,  
+                                             c o n s t   S i z e d B o x ( h e i g h t :   1 2 ) ,  
+                                             / /   P a y m e n t   a c c e p t e d   s t a t u s  
+                                             C o n t a i n e r (  
+                                                 p a d d i n g :   c o n s t   E d g e I n s e t s . s y m m e t r i c (  
+                                                     h o r i z o n t a l :   1 0 ,  
+                                                     v e r t i c a l :   6 ,  
+                                                 ) ,  
+                                                 d e c o r a t i o n :   B o x D e c o r a t i o n (  
+                                                     c o l o r :   A p p C o l o r s . s u c c e s s . w i t h O p a c i t y ( 0 . 1 ) ,  
+                                                     b o r d e r R a d i u s :   B o r d e r R a d i u s . c i r c u l a r ( 8 ) ,  
+                                                     b o r d e r :   B o r d e r . a l l (  
+                                                         c o l o r :   A p p C o l o r s . s u c c e s s . w i t h O p a c i t y ( 0 . 3 ) ,  
+                                                         w i d t h :   1 ,  
+                                                     ) ,  
+                                                 ) ,  
+                                                 c h i l d :   R o w (  
+                                                     m a i n A x i s S i z e :   M a i n A x i s S i z e . m i n ,  
+                                                     c h i l d r e n :   [  
+                                                         I c o n (  
+                                                             I c o n s . c h e c k _ c i r c l e ,  
+                                                             s i z e :   1 4 ,  
+                                                             c o l o r :   A p p C o l o r s . s u c c e s s ,  
+                                                         ) ,  
+                                                         c o n s t   S i z e d B o x ( w i d t h :   4 ) ,  
+                                                         T e x t (  
+                                                             ' P e m b a y a r a n   d i t e r i m a ' ,  
+                                                             s t y l e :   T e x t S t y l e (  
+                                                                 f o n t S i z e :   1 2 ,  
+                                                                 f o n t W e i g h t :   F o n t W e i g h t . b o l d ,  
+                                                                 c o l o r :   A p p C o l o r s . s u c c e s s ,  
+                                                             ) ,  
+                                                         ) ,  
+                                                     ] ,  
+                                                 ) ,  
+                                             ) ,  
+                                         ] ,  
+                                     ) ,  
+                                 ) ,  
+                             ] ,  
+                         ) ,  
+                     ) ,  
+  
+                     / /   D i v i d e r  
+                     D i v i d e r ( h e i g h t :   1 ,   t h i c k n e s s :   1 ,   c o l o r :   C o l o r s . g r e y . s h a d e 1 0 0 ) ,  
+  
+                     / /   A c t i o n   s e c t i o n  
+                     P a d d i n g (  
+                         p a d d i n g :   c o n s t   E d g e I n s e t s . a l l ( 1 6 ) ,  
+                         c h i l d :   R o w (  
+                             m a i n A x i s A l i g n m e n t :   M a i n A x i s A l i g n m e n t . s p a c e B e t w e e n ,  
+                             c h i l d r e n :   [  
+                                 / /   P r i c e  
+                                 C o l u m n (  
+                                     c r o s s A x i s A l i g n m e n t :   C r o s s A x i s A l i g n m e n t . s t a r t ,  
+                                     c h i l d r e n :   [  
+                                         T e x t (  
+                                             ' T o t a l   P e m b a y a r a n ' ,  
+                                             s t y l e :   T e x t S t y l e (  
+                                                 f o n t S i z e :   1 2 ,  
+                                                 c o l o r :   C o l o r s . g r e y . s h a d e 6 0 0 ,  
+                                             ) ,  
+                                         ) ,  
+                                         c o n s t   S i z e d B o x ( h e i g h t :   2 ) ,  
+                                         T e x t (  
+                                             r e n t a l [ ' t o t a l P r i c e ' ]   ? ?   ' R p   0 ' ,  
+                                             s t y l e :   T e x t S t y l e (  
+                                                 f o n t S i z e :   1 8 ,  
+                                                 f o n t W e i g h t :   F o n t W e i g h t . b o l d ,  
+                                                 c o l o r :   A p p C o l o r s . t e x t P r i m a r y ,  
+                                             ) ,  
+                                         ) ,  
+                                     ] ,  
+                                 ) ,  
+                                 / /   V i e w   d e t a i l   b u t t o n  
+                                 E l e v a t e d B u t t o n (  
+                                     o n P r e s s e d :   ( )   = >   c o n t r o l l e r . v i e w R e n t a l D e t a i l ( r e n t a l ) ,  
+                                     s t y l e :   E l e v a t e d B u t t o n . s t y l e F r o m (  
+                                         b a c k g r o u n d C o l o r :   A p p C o l o r s . s u c c e s s ,  
+                                         f o r e g r o u n d C o l o r :   C o l o r s . w h i t e ,  
+                                         e l e v a t i o n :   0 ,  
+                                         p a d d i n g :   c o n s t   E d g e I n s e t s . s y m m e t r i c (  
+                                             h o r i z o n t a l :   2 0 ,  
+                                             v e r t i c a l :   1 0 ,  
+                                         ) ,  
+                                         s h a p e :   R o u n d e d R e c t a n g l e B o r d e r (  
+                                             b o r d e r R a d i u s :   B o r d e r R a d i u s . c i r c u l a r ( 8 ) ,  
+                                         ) ,  
+                                     ) ,  
+                                     c h i l d :   c o n s t   T e x t (  
+                                         ' L i h a t   D e t a i l ' ,  
+                                         s t y l e :   T e x t S t y l e (  
+                                             f o n t S i z e :   1 4 ,  
+                                             f o n t W e i g h t :   F o n t W e i g h t . w 6 0 0 ,  
+                                         ) ,  
+                                     ) ,  
+                                 ) ,  
+                             ] ,  
+                         ) ,  
+                     ) ,  
+                 ] ,  
+             ) ,  
+         ) ;  
+     }  
+  
+     W i d g e t   _ b u i l d C o m p l e t e d R e n t a l C a r d ( M a p < S t r i n g ,   d y n a m i c >   r e n t a l )   {  
+         r e t u r n   C o n t a i n e r (  
+             d e c o r a t i o n :   B o x D e c o r a t i o n (  
+                 c o l o r :   C o l o r s . w h i t e ,  
+                 b o r d e r R a d i u s :   B o r d e r R a d i u s . c i r c u l a r ( 1 6 ) ,  
+                 b o x S h a d o w :   [  
+                     B o x S h a d o w (  
+                         c o l o r :   C o l o r s . b l a c k . w i t h O p a c i t y ( 0 . 0 5 ) ,  
+                         b l u r R a d i u s :   1 0 ,  
+                         o f f s e t :   c o n s t   O f f s e t ( 0 ,   2 ) ,  
+                     ) ,  
+                 ] ,  
+             ) ,  
+             c h i l d :   C o l u m n (  
+                 c h i l d r e n :   [  
+                     / /   H e a d e r   s e c t i o n   w i t h   s t a t u s  
+                     C o n t a i n e r (  
+                         p a d d i n g :   c o n s t   E d g e I n s e t s . s y m m e t r i c ( h o r i z o n t a l :   1 6 ,   v e r t i c a l :   1 2 ) ,  
+                         d e c o r a t i o n :   B o x D e c o r a t i o n (  
+                             c o l o r :   A p p C o l o r s . s u c c e s s . w i t h O p a c i t y ( 0 . 1 ) ,  
+                             b o r d e r R a d i u s :   c o n s t   B o r d e r R a d i u s . o n l y (  
+                                 t o p L e f t :   R a d i u s . c i r c u l a r ( 1 6 ) ,  
+                                 t o p R i g h t :   R a d i u s . c i r c u l a r ( 1 6 ) ,  
+                             ) ,  
+                         ) ,  
+                         c h i l d :   R o w (  
+                             m a i n A x i s A l i g n m e n t :   M a i n A x i s A l i g n m e n t . s t a r t ,  
+                             c h i l d r e n :   [  
+                                 I c o n (  
+                                     I c o n s . t a s k _ a l t _ o u t l i n e d ,  
+                                     s i z e :   1 8 ,  
+                                     c o l o r :   A p p C o l o r s . s u c c e s s ,  
+                                 ) ,  
+                                 c o n s t   S i z e d B o x ( w i d t h :   8 ) ,  
+                                 T e x t (  
+                                     r e n t a l [ ' s t a t u s ' ]   ? ?   ' S E L E S A I ' ,  
+                                     s t y l e :   T e x t S t y l e (  
+                                         f o n t S i z e :   1 3 ,  
+                                         f o n t W e i g h t :   F o n t W e i g h t . b o l d ,  
+                                         c o l o r :   A p p C o l o r s . s u c c e s s ,  
+                                     ) ,  
+                                 ) ,  
+                             ] ,  
+                         ) ,  
+                     ) ,  
+  
+                     / /   A s s e t   d e t a i l s  
+                     P a d d i n g (  
+                         p a d d i n g :   c o n s t   E d g e I n s e t s . a l l ( 1 6 ) ,  
+                         c h i l d :   R o w (  
+                             c r o s s A x i s A l i g n m e n t :   C r o s s A x i s A l i g n m e n t . s t a r t ,  
+                             c h i l d r e n :   [  
+                                 / /   A s s e t   i m a g e   w i t h   r o u n d e d   c o r n e r s  
+                                 C l i p R R e c t (  
+                                     b o r d e r R a d i u s :   B o r d e r R a d i u s . c i r c u l a r ( 1 2 ) ,  
+                                     c h i l d :   r e n t a l [ ' i m a g e U r l ' ]   ! =   n u l l   & &   r e n t a l [ ' i m a g e U r l ' ] . t o S t r i n g ( ) . s t a r t s W i t h ( ' h t t p ' )  
+                                         ?   I m a g e . n e t w o r k (  
+                                                 r e n t a l [ ' i m a g e U r l ' ] ,  
+                                                 w i d t h :   9 0 ,  
+                                                 h e i g h t :   9 0 ,  
+                                                 f i t :   B o x F i t . c o v e r ,  
+                                                 e r r o r B u i l d e r :   ( c o n t e x t ,   e r r o r ,   s t a c k T r a c e )   {  
+                                                     r e t u r n   C o n t a i n e r (  
+                                                         w i d t h :   9 0 ,  
+                                                         h e i g h t :   9 0 ,  
+                                                         d e c o r a t i o n :   B o x D e c o r a t i o n (  
+                                                             c o l o r :   C o l o r s . g r e y . s h a d e 2 0 0 ,  
+                                                             b o r d e r R a d i u s :   B o r d e r R a d i u s . c i r c u l a r ( 1 2 ) ,  
+                                                         ) ,  
+                                                         c h i l d :   I c o n (  
+                                                             I c o n s . i m a g e _ n o t _ s u p p o r t e d _ o u t l i n e d ,  
+                                                             s i z e :   3 6 ,  
+                                                             c o l o r :   C o l o r s . g r e y . s h a d e 4 0 0 ,  
+                                                         ) ,  
+                                                     ) ;  
+                                                 } ,  
+                                             )  
+                                         :   I m a g e . a s s e t (  
+                                                 r e n t a l [ ' i m a g e U r l ' ]   ? ?   ' a s s e t s / i m a g e s / g a m b a r _ p e n d u k u n g . j p g ' ,  
+                                                 w i d t h :   9 0 ,  
+                                                 h e i g h t :   9 0 ,  
+                                                 f i t :   B o x F i t . c o v e r ,  
+                                             ) ,  
+                                 ) ,  
+                                 c o n s t   S i z e d B o x ( w i d t h :   1 6 ) ,  
+                                 / /   A s s e t   d e t a i l s  
+                                 E x p a n d e d (  
+                                     c h i l d :   C o l u m n (  
+                                         c r o s s A x i s A l i g n m e n t :   C r o s s A x i s A l i g n m e n t . s t a r t ,  
+                                         c h i l d r e n :   [  
+                                             T e x t (  
+                                                 r e n t a l [ ' n a m e ' ]   ? ?   ' N a m a   A s e t ' ,  
+                                                 s t y l e :   T e x t S t y l e (  
+                                                     f o n t S i z e :   1 6 ,  
+                                                     f o n t W e i g h t :   F o n t W e i g h t . b o l d ,  
+                                                     c o l o r :   A p p C o l o r s . t e x t P r i m a r y ,  
+                                                 ) ,  
+                                             ) ,  
+                                             c o n s t   S i z e d B o x ( h e i g h t :   8 ) ,  
+                                             _ b u i l d I n f o R o w (  
+                                                 i c o n :   I c o n s . i n v e n t o r y _ 2 _ o u t l i n e d ,  
+                                                 t e x t :   ' $ { r e n t a l [ ' j u m l a h U n i t ' ]   ? ?   0 }   U n i t ' ,  
+                                             ) ,  
+                                             c o n s t   S i z e d B o x ( h e i g h t :   6 ) ,  
+                                             _ b u i l d I n f o R o w (  
+                                                 i c o n :   I c o n s . c a l e n d a r _ t o d a y _ o u t l i n e d ,  
+                                                 t e x t :   r e n t a l [ ' t a n g g a l S e w a ' ]   ? ?   ' ' ,  
+                                             ) ,  
+                                             c o n s t   S i z e d B o x ( h e i g h t :   6 ) ,  
+                                             _ b u i l d I n f o R o w (  
+                                                 i c o n :   I c o n s . s c h e d u l e ,  
+                                                 t e x t :   r e n t a l [ ' r e n t a n g W a k t u ' ]   ? ?   ' ' ,  
+                                             ) ,  
+                                             c o n s t   S i z e d B o x ( h e i g h t :   1 2 ) ,  
+                                             / /   C o m p l e t e d   s t a t u s  
+                                             C o n t a i n e r (  
+                                                 p a d d i n g :   c o n s t   E d g e I n s e t s . s y m m e t r i c (  
+                                                     h o r i z o n t a l :   1 0 ,  
+                                                     v e r t i c a l :   6 ,  
+                                                 ) ,  
+                                                 d e c o r a t i o n :   B o x D e c o r a t i o n (  
+                                                     c o l o r :   A p p C o l o r s . s u c c e s s . w i t h O p a c i t y ( 0 . 1 ) ,  
+                                                     b o r d e r R a d i u s :   B o r d e r R a d i u s . c i r c u l a r ( 8 ) ,  
+                                                     b o r d e r :   B o r d e r . a l l (  
+                                                         c o l o r :   A p p C o l o r s . s u c c e s s . w i t h O p a c i t y ( 0 . 3 ) ,  
+                                                         w i d t h :   1 ,  
+                                                     ) ,  
+                                                 ) ,  
+                                                 c h i l d :   R o w (  
+                                                     m a i n A x i s S i z e :   M a i n A x i s S i z e . m i n ,  
+                                                     c h i l d r e n :   [  
+                                                         I c o n (  
+                                                             I c o n s . c h e c k _ c i r c l e ,  
+                                                             s i z e :   1 4 ,  
+                                                             c o l o r :   A p p C o l o r s . s u c c e s s ,  
+                                                         ) ,  
+                                                         c o n s t   S i z e d B o x ( w i d t h :   4 ) ,  
+                                                         T e x t (  
+                                                             ' S e w a   s e l e s a i ' ,  
+                                                             s t y l e :   T e x t S t y l e (  
+                                                                 f o n t S i z e :   1 2 ,  
+                                                                 f o n t W e i g h t :   F o n t W e i g h t . b o l d ,  
+                                                                 c o l o r :   A p p C o l o r s . s u c c e s s ,  
+                                                             ) ,  
+                                                         ) ,  
+                                                     ] ,  
+                                                 ) ,  
+                                             ) ,  
+                                         ] ,  
+                                     ) ,  
+                                 ) ,  
+                             ] ,  
+                         ) ,  
+                     ) ,  
+  
+                     / /   D i v i d e r  
+                     D i v i d e r ( h e i g h t :   1 ,   t h i c k n e s s :   1 ,   c o l o r :   C o l o r s . g r e y . s h a d e 1 0 0 ) ,  
+  
+                     / /   A c t i o n   s e c t i o n  
+                     P a d d i n g (  
+                         p a d d i n g :   c o n s t   E d g e I n s e t s . a l l ( 1 6 ) ,  
+                         c h i l d :   R o w (  
+                             m a i n A x i s A l i g n m e n t :   M a i n A x i s A l i g n m e n t . s p a c e B e t w e e n ,  
+                             c h i l d r e n :   [  
+                                 / /   P r i c e  
+                                 C o l u m n (  
+                                     c r o s s A x i s A l i g n m e n t :   C r o s s A x i s A l i g n m e n t . s t a r t ,  
+                                     c h i l d r e n :   [  
+                                         T e x t (  
+                                             ' T o t a l   P e m b a y a r a n ' ,  
+                                             s t y l e :   T e x t S t y l e (  
+                                                 f o n t S i z e :   1 2 ,  
+                                                 c o l o r :   C o l o r s . g r e y . s h a d e 6 0 0 ,  
+                                             ) ,  
+                                         ) ,  
+                                         c o n s t   S i z e d B o x ( h e i g h t :   2 ) ,  
+                                         T e x t (  
+                                             r e n t a l [ ' t o t a l P r i c e ' ]   ? ?   ' R p   0 ' ,  
+                                             s t y l e :   T e x t S t y l e (  
+                                                 f o n t S i z e :   1 8 ,  
+                                                 f o n t W e i g h t :   F o n t W e i g h t . b o l d ,  
+                                                 c o l o r :   A p p C o l o r s . t e x t P r i m a r y ,  
+                                             ) ,  
+                                         ) ,  
+                                     ] ,  
+                                 ) ,  
+                                 / /   V i e w   d e t a i l   b u t t o n  
+                                 E l e v a t e d B u t t o n (  
+                                     o n P r e s s e d :   ( )   = >   c o n t r o l l e r . v i e w R e n t a l D e t a i l ( r e n t a l ) ,  
+                                     s t y l e :   E l e v a t e d B u t t o n . s t y l e F r o m (  
+                                         b a c k g r o u n d C o l o r :   A p p C o l o r s . s u c c e s s ,  
+                                         f o r e g r o u n d C o l o r :   C o l o r s . w h i t e ,  
+                                         e l e v a t i o n :   0 ,  
+                                         p a d d i n g :   c o n s t   E d g e I n s e t s . s y m m e t r i c (  
+                                             h o r i z o n t a l :   2 0 ,  
+                                             v e r t i c a l :   1 0 ,  
+                                         ) ,  
+                                         s h a p e :   R o u n d e d R e c t a n g l e B o r d e r (  
+                                             b o r d e r R a d i u s :   B o r d e r R a d i u s . c i r c u l a r ( 8 ) ,  
+                                         ) ,  
+                                     ) ,  
+                                     c h i l d :   c o n s t   T e x t (  
+                                         ' L i h a t   D e t a i l ' ,  
+                                         s t y l e :   T e x t S t y l e (  
+                                             f o n t S i z e :   1 4 ,  
+                                             f o n t W e i g h t :   F o n t W e i g h t . w 6 0 0 ,  
+                                         ) ,  
+                                     ) ,  
+                                 ) ,  
+                             ] ,  
+                         ) ,  
+                     ) ,  
+                 ] ,  
+             ) ,  
+         ) ;  
+     }  
+  
+     W i d g e t   _ b u i l d C a n c e l l e d R e n t a l C a r d ( M a p < S t r i n g ,   d y n a m i c >   r e n t a l )   {  
+         r e t u r n   C o n t a i n e r (  
+             d e c o r a t i o n :   B o x D e c o r a t i o n (  
+                 c o l o r :   C o l o r s . w h i t e ,  
+                 b o r d e r R a d i u s :   B o r d e r R a d i u s . c i r c u l a r ( 1 6 ) ,  
+                 b o x S h a d o w :   [  
+                     B o x S h a d o w (  
+                         c o l o r :   C o l o r s . b l a c k . w i t h O p a c i t y ( 0 . 0 5 ) ,  
+                         b l u r R a d i u s :   1 0 ,  
+                         o f f s e t :   c o n s t   O f f s e t ( 0 ,   2 ) ,  
+                     ) ,  
+                 ] ,  
+             ) ,  
+             c h i l d :   C o l u m n (  
+                 c h i l d r e n :   [  
+                     / /   H e a d e r   s e c t i o n   w i t h   s t a t u s  
+                     C o n t a i n e r (  
+                         p a d d i n g :   c o n s t   E d g e I n s e t s . s y m m e t r i c ( h o r i z o n t a l :   1 6 ,   v e r t i c a l :   1 2 ) ,  
+                         d e c o r a t i o n :   B o x D e c o r a t i o n (  
+                             c o l o r :   A p p C o l o r s . e r r o r . w i t h O p a c i t y ( 0 . 1 ) ,  
+                             b o r d e r R a d i u s :   c o n s t   B o r d e r R a d i u s . o n l y (  
+                                 t o p L e f t :   R a d i u s . c i r c u l a r ( 1 6 ) ,  
+                                 t o p R i g h t :   R a d i u s . c i r c u l a r ( 1 6 ) ,  
+                             ) ,  
+                         ) ,  
+                         c h i l d :   R o w (  
+                             m a i n A x i s A l i g n m e n t :   M a i n A x i s A l i g n m e n t . s t a r t ,  
+                             c h i l d r e n :   [  
+                                 I c o n (  
+                                     I c o n s . c a n c e l _ o u t l i n e d ,  
+                                     s i z e :   1 8 ,  
+                                     c o l o r :   A p p C o l o r s . e r r o r ,  
+                                 ) ,  
+                                 c o n s t   S i z e d B o x ( w i d t h :   8 ) ,  
+                                 T e x t (  
+                                     r e n t a l [ ' s t a t u s ' ]   ? ?   ' D I B A T A L K A N ' ,  
+                                     s t y l e :   T e x t S t y l e (  
+                                         f o n t S i z e :   1 3 ,  
+                                         f o n t W e i g h t :   F o n t W e i g h t . b o l d ,  
+                                         c o l o r :   A p p C o l o r s . e r r o r ,  
+                                     ) ,  
+                                 ) ,  
+                             ] ,  
+                         ) ,  
+                     ) ,  
+  
+                     / /   A s s e t   d e t a i l s  
+                     P a d d i n g (  
+                         p a d d i n g :   c o n s t   E d g e I n s e t s . a l l ( 1 6 ) ,  
+                         c h i l d :   R o w (  
+                             c r o s s A x i s A l i g n m e n t :   C r o s s A x i s A l i g n m e n t . s t a r t ,  
+                             c h i l d r e n :   [  
+                                 / /   A s s e t   i m a g e   w i t h   r o u n d e d   c o r n e r s  
+                                 C l i p R R e c t (  
+                                     b o r d e r R a d i u s :   B o r d e r R a d i u s . c i r c u l a r ( 1 2 ) ,  
+                                     c h i l d :   r e n t a l [ ' i m a g e U r l ' ]   ! =   n u l l   & &   r e n t a l [ ' i m a g e U r l ' ] . t o S t r i n g ( ) . s t a r t s W i t h ( ' h t t p ' )  
+                                         ?   I m a g e . n e t w o r k (  
+                                                 r e n t a l [ ' i m a g e U r l ' ] ,  
+                                                 w i d t h :   9 0 ,  
+                                                 h e i g h t :   9 0 ,  
+                                                 f i t :   B o x F i t . c o v e r ,  
+                                                 e r r o r B u i l d e r :   ( c o n t e x t ,   e r r o r ,   s t a c k T r a c e )   {  
+                                                     r e t u r n   C o n t a i n e r (  
+                                                         w i d t h :   9 0 ,  
+                                                         h e i g h t :   9 0 ,  
+                                                         d e c o r a t i o n :   B o x D e c o r a t i o n (  
+                                                             c o l o r :   C o l o r s . g r e y . s h a d e 2 0 0 ,  
+                                                             b o r d e r R a d i u s :   B o r d e r R a d i u s . c i r c u l a r ( 1 2 ) ,  
+                                                         ) ,  
+                                                         c h i l d :   I c o n (  
+                                                             I c o n s . i m a g e _ n o t _ s u p p o r t e d _ o u t l i n e d ,  
+                                                             s i z e :   3 6 ,  
+                                                             c o l o r :   C o l o r s . g r e y . s h a d e 4 0 0 ,  
+                                                         ) ,  
+                                                     ) ;  
+                                                 } ,  
+                                             )  
+                                         :   I m a g e . a s s e t (  
+                                                 r e n t a l [ ' i m a g e U r l ' ]   ? ?   ' a s s e t s / i m a g e s / g a m b a r _ p e n d u k u n g . j p g ' ,  
+                                                 w i d t h :   9 0 ,  
+                                                 h e i g h t :   9 0 ,  
+                                                 f i t :   B o x F i t . c o v e r ,  
+                                             ) ,  
+                                 ) ,  
+                                 c o n s t   S i z e d B o x ( w i d t h :   1 6 ) ,  
+                                 / /   A s s e t   d e t a i l s  
+                                 E x p a n d e d (  
+                                     c h i l d :   C o l u m n (  
+                                         c r o s s A x i s A l i g n m e n t :   C r o s s A x i s A l i g n m e n t . s t a r t ,  
+                                         c h i l d r e n :   [  
+                                             T e x t (  
+                                                 r e n t a l [ ' n a m e ' ]   ? ?   ' N a m a   A s e t ' ,  
+                                                 s t y l e :   T e x t S t y l e (  
+                                                     f o n t S i z e :   1 6 ,  
+                                                     f o n t W e i g h t :   F o n t W e i g h t . b o l d ,  
+                                                     c o l o r :   A p p C o l o r s . t e x t P r i m a r y ,  
+                                                 ) ,  
+                                             ) ,  
+                                             c o n s t   S i z e d B o x ( h e i g h t :   8 ) ,  
+                                             _ b u i l d I n f o R o w (  
+                                                 i c o n :   I c o n s . i n v e n t o r y _ 2 _ o u t l i n e d ,  
+                                                 t e x t :   ' $ { r e n t a l [ ' j u m l a h U n i t ' ]   ? ?   0 }   U n i t ' ,  
+                                             ) ,  
+                                             c o n s t   S i z e d B o x ( h e i g h t :   6 ) ,  
+                                             _ b u i l d I n f o R o w (  
+                                                 i c o n :   I c o n s . c a l e n d a r _ t o d a y _ o u t l i n e d ,  
+                                                 t e x t :   r e n t a l [ ' t a n g g a l S e w a ' ]   ? ?   ' ' ,  
+                                             ) ,  
+                                             c o n s t   S i z e d B o x ( h e i g h t :   6 ) ,  
+                                             _ b u i l d I n f o R o w (  
+                                                 i c o n :   I c o n s . s c h e d u l e ,  
+                                                 t e x t :   r e n t a l [ ' r e n t a n g W a k t u ' ]   ? ?   ' ' ,  
+                                             ) ,  
+                                             c o n s t   S i z e d B o x ( h e i g h t :   1 2 ) ,  
+                                             / /   C a n c e l l e d   s t a t u s  
+                                             C o n t a i n e r (  
+                                                 p a d d i n g :   c o n s t   E d g e I n s e t s . s y m m e t r i c (  
+                                                     h o r i z o n t a l :   1 0 ,  
+                                                     v e r t i c a l :   6 ,  
+                                                 ) ,  
+                                                 d e c o r a t i o n :   B o x D e c o r a t i o n (  
+                                                     c o l o r :   A p p C o l o r s . e r r o r . w i t h O p a c i t y ( 0 . 1 ) ,  
+                                                     b o r d e r R a d i u s :   B o r d e r R a d i u s . c i r c u l a r ( 8 ) ,  
+                                                     b o r d e r :   B o r d e r . a l l (  
+                                                         c o l o r :   A p p C o l o r s . e r r o r . w i t h O p a c i t y ( 0 . 3 ) ,  
+                                                         w i d t h :   1 ,  
+                                                     ) ,  
+                                                 ) ,  
+                                                 c h i l d :   R o w (  
+                                                     m a i n A x i s S i z e :   M a i n A x i s S i z e . m i n ,  
+                                                     c h i l d r e n :   [  
+                                                         I c o n (  
+                                                             I c o n s . c a n c e l ,  
+                                                             s i z e :   1 4 ,  
+                                                             c o l o r :   A p p C o l o r s . e r r o r ,  
+                                                         ) ,  
+                                                         c o n s t   S i z e d B o x ( w i d t h :   4 ) ,  
+                                                         T e x t (  
+                                                             ' S e w a   d i b a t a l k a n ' ,  
+                                                             s t y l e :   T e x t S t y l e (  
+                                                                 f o n t S i z e :   1 2 ,  
+                                                                 f o n t W e i g h t :   F o n t W e i g h t . b o l d ,  
+                                                                 c o l o r :   A p p C o l o r s . e r r o r ,  
+                                                             ) ,  
+                                                         ) ,  
+                                                     ] ,  
+                                                 ) ,  
+                                             ) ,  
+                                         ] ,  
+                                     ) ,  
+                                 ) ,  
+                             ] ,  
+                         ) ,  
+                     ) ,  
+  
+                     / /   D i v i d e r  
+                     D i v i d e r ( h e i g h t :   1 ,   t h i c k n e s s :   1 ,   c o l o r :   C o l o r s . g r e y . s h a d e 1 0 0 ) ,  
+  
+                     / /   A c t i o n   s e c t i o n  
+                     P a d d i n g (  
+                         p a d d i n g :   c o n s t   E d g e I n s e t s . a l l ( 1 6 ) ,  
+                         c h i l d :   R o w (  
+                             m a i n A x i s A l i g n m e n t :   M a i n A x i s A l i g n m e n t . s p a c e B e t w e e n ,  
+                             c h i l d r e n :   [  
+                                 / /   P r i c e  
+                                 C o l u m n (  
+                                     c r o s s A x i s A l i g n m e n t :   C r o s s A x i s A l i g n m e n t . s t a r t ,  
+                                     c h i l d r e n :   [  
+                                         T e x t (  
+                                             ' T o t a l   P e m b a y a r a n ' ,  
+                                             s t y l e :   T e x t S t y l e (  
+                                                 f o n t S i z e :   1 2 ,  
+                                                 c o l o r :   C o l o r s . g r e y . s h a d e 6 0 0 ,  
+                                             ) ,  
+                                         ) ,  
+                                         c o n s t   S i z e d B o x ( h e i g h t :   2 ) ,  
+                                         T e x t (  
+                                             r e n t a l [ ' t o t a l P r i c e ' ]   ? ?   ' R p   0 ' ,  
+                                             s t y l e :   T e x t S t y l e (  
+                                                 f o n t S i z e :   1 8 ,  
+                                                 f o n t W e i g h t :   F o n t W e i g h t . b o l d ,  
+                                                 c o l o r :   A p p C o l o r s . t e x t P r i m a r y ,  
+                                             ) ,  
+                                         ) ,  
+                                     ] ,  
+                                 ) ,  
+                                 / /   V i e w   d e t a i l   b u t t o n  
+                                 E l e v a t e d B u t t o n (  
+                                     o n P r e s s e d :   ( )   = >   c o n t r o l l e r . v i e w R e n t a l D e t a i l ( r e n t a l ) ,  
+                                     s t y l e :   E l e v a t e d B u t t o n . s t y l e F r o m (  
+                                         b a c k g r o u n d C o l o r :   A p p C o l o r s . e r r o r ,  
+                                         f o r e g r o u n d C o l o r :   C o l o r s . w h i t e ,  
+                                         e l e v a t i o n :   0 ,  
+                                         p a d d i n g :   c o n s t   E d g e I n s e t s . s y m m e t r i c (  
+                                             h o r i z o n t a l :   2 0 ,  
+                                             v e r t i c a l :   1 0 ,  
+                                         ) ,  
+                                         s h a p e :   R o u n d e d R e c t a n g l e B o r d e r (  
+                                             b o r d e r R a d i u s :   B o r d e r R a d i u s . c i r c u l a r ( 8 ) ,  
+                                         ) ,  
+                                     ) ,  
+                                     c h i l d :   c o n s t   T e x t (  
+                                         ' L i h a t   D e t a i l ' ,  
+                                         s t y l e :   T e x t S t y l e (  
+                                             f o n t S i z e :   1 4 ,  
+                                             f o n t W e i g h t :   F o n t W e i g h t . w 6 0 0 ,  
+                                         ) ,  
+                                     ) ,  
+                                 ) ,  
+                             ] ,  
+                         ) ,  
+                     ) ,  
+                 ] ,  
+             ) ,  
+         ) ;  
+     }  
+ 

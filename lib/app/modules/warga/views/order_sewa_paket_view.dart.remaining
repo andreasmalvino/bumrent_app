@@ -1,0 +1,470 @@
+  // Build price options section
+  Widget _buildPriceOptions() {
+    final paket = controller.paket.value!;
+    final PaketModel? paketModel = paket is PaketModel ? paket : null;
+    final satuanWaktuSewa = paketModel?.satuanWaktuSewa ?? controller.getPaketSatuanWaktuSewa(paket);
+
+    return Container(
+      padding: EdgeInsets.all(16),
+      color: Colors.white,
+      margin: EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Pilih Durasi',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          SizedBox(height: 16),
+
+          // Price options grid
+          GridView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 2.5,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            itemCount: satuanWaktuSewa.length,
+            itemBuilder: (context, index) {
+              final option = satuanWaktuSewa[index];
+              final isSelected = controller.selectedSatuanWaktu.value != null &&
+                  controller.selectedSatuanWaktu.value!['id'] == option['id'];
+
+              return GestureDetector(
+                onTap: () => controller.selectSatuanWaktu(option),
+                child: AnimatedContainer(
+                  duration: Duration(milliseconds: 200),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? AppColors.primary : AppColors.borderLight,
+                      width: 1,
+                    ),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        option['nama_satuan_waktu'] ?? 'Durasi',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: isSelected ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        controller.formatPrice(double.tryParse(option['harga'].toString()) ?? 0),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isSelected ? Colors.white.withOpacity(0.8) : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build date selection section
+  Widget _buildDateSelection(BuildContext context) {
+    return Obx(
+      () => controller.selectedSatuanWaktu.value == null
+          ? SizedBox.shrink()
+          : Container(
+              padding: EdgeInsets.all(16),
+              color: Colors.white,
+              margin: EdgeInsets.only(top: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    controller.isDailyRental() ? 'Pilih Tanggal' : 'Pilih Waktu',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 16),
+
+                  // Date selection for daily rental
+                  if (controller.isDailyRental())
+                    GestureDetector(
+                      onTap: () async {
+                        // Show date range picker
+                        final now = DateTime.now();
+                        final initialStartDate = controller.selectedStartDate.value ?? now;
+                        final initialEndDate = controller.selectedEndDate.value ?? now.add(Duration(days: 1));
+
+                        final DateTimeRange? picked = await showDateRangePicker(
+                          context: context,
+                          initialDateRange: DateTimeRange(start: initialStartDate, end: initialEndDate),
+                          firstDate: now,
+                          lastDate: now.add(Duration(days: 365)),
+                          builder: (context, child) {
+                            return Theme(
+                              data: ThemeData.light().copyWith(
+                                colorScheme: ColorScheme.light(
+                                  primary: AppColors.primary,
+                                  onPrimary: Colors.white,
+                                  surface: Colors.white,
+                                  onSurface: AppColors.textPrimary,
+                                ),
+                                dialogBackgroundColor: Colors.white,
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+
+                        if (picked != null) {
+                          controller.selectDateRange(picked.start, picked.end);
+                        }
+                      },
+                      child: Container(
+                        padding: EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.borderLight),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_today, color: AppColors.primary),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                controller.formattedDateRange.value.isEmpty
+                                    ? 'Pilih tanggal sewa'
+                                    : controller.formattedDateRange.value,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: controller.formattedDateRange.value.isEmpty
+                                      ? AppColors.textSecondary
+                                      : AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
+                          ],
+                        ),
+                      ),
+                    )
+                  // Time selection for hourly rental
+                  else
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Date selection
+                        GestureDetector(
+                          onTap: () async {
+                            final now = DateTime.now();
+                            final initialDate = controller.selectedStartDate.value ?? now;
+
+                            final DateTime? picked = await showDatePicker(
+                              context: context,
+                              initialDate: initialDate,
+                              firstDate: now,
+                              lastDate: now.add(Duration(days: 30)),
+                              builder: (context, child) {
+                                return Theme(
+                                  data: ThemeData.light().copyWith(
+                                    colorScheme: ColorScheme.light(
+                                      primary: AppColors.primary,
+                                      onPrimary: Colors.white,
+                                      surface: Colors.white,
+                                      onSurface: AppColors.textPrimary,
+                                    ),
+                                    dialogBackgroundColor: Colors.white,
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            );
+
+                            if (picked != null) {
+                              controller.selectDate(picked);
+                            }
+                          },
+                          child: Container(
+                            padding: EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: AppColors.borderLight),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.calendar_today, color: AppColors.primary),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    controller.selectedDate.value.isEmpty
+                                        ? 'Pilih tanggal sewa'
+                                        : controller.selectedDate.value,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: controller.selectedDate.value.isEmpty
+                                          ? AppColors.textSecondary
+                                          : AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
+                              ],
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 16),
+
+                        // Time range selection
+                        controller.selectedDate.value.isEmpty
+                            ? SizedBox.shrink()
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Pilih Jam',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      // Start time
+                                      Expanded(
+                                        child: GestureDetector(
+                                          onTap: () async {
+                                            // Show time picker for start time (8-20)
+                                            final List<int> availableHours = List.generate(13, (i) => i + 8);
+                                            final int? selectedHour = await showDialog<int>(
+                                              context: context,
+                                              builder: (context) => SimpleDialog(
+                                                title: Text('Pilih Jam Mulai'),
+                                                children: availableHours.map((hour) {
+                                                  return SimpleDialogOption(
+                                                    onPressed: () => Navigator.pop(context, hour),
+                                                    child: Text('$hour:00'),
+                                                  );
+                                                }).toList(),
+                                              ),
+                                            );
+
+                                            if (selectedHour != null) {
+                                              // If end time is already selected and less than start time, reset it
+                                              if (controller.selectedEndTime.value > 0 &&
+                                                  controller.selectedEndTime.value <= selectedHour) {
+                                                controller.selectedEndTime.value = -1;
+                                              }
+                                              controller.selectedStartTime.value = selectedHour;
+                                              if (controller.selectedEndTime.value > 0) {
+                                                controller.selectTimeRange(
+                                                  controller.selectedStartTime.value,
+                                                  controller.selectedEndTime.value,
+                                                );
+                                              }
+                                            }
+                                          },
+                                          child: Container(
+                                            padding: EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              border: Border.all(color: AppColors.borderLight),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(Icons.access_time, size: 16, color: AppColors.primary),
+                                                SizedBox(width: 8),
+                                                Text(
+                                                  controller.selectedStartTime.value < 0
+                                                      ? 'Jam Mulai'
+                                                      : '${controller.selectedStartTime.value}:00',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    color: controller.selectedStartTime.value < 0
+                                                        ? AppColors.textSecondary
+                                                        : AppColors.textPrimary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(width: 16),
+                                      // End time
+                                      Expanded(
+                                        child: GestureDetector(
+                                          onTap: () async {
+                                            if (controller.selectedStartTime.value < 0) {
+                                              Get.snackbar(
+                                                'Perhatian',
+                                                'Pilih jam mulai terlebih dahulu',
+                                                snackPosition: SnackPosition.BOTTOM,
+                                                backgroundColor: AppColors.warning,
+                                                colorText: Colors.white,
+                                              );
+                                              return;
+                                            }
+
+                                            // Show time picker for end time (start+1 to 21)
+                                            final List<int> availableHours = List.generate(
+                                              21 - controller.selectedStartTime.value,
+                                              (i) => i + controller.selectedStartTime.value + 1,
+                                            );
+                                            final int? selectedHour = await showDialog<int>(
+                                              context: context,
+                                              builder: (context) => SimpleDialog(
+                                                title: Text('Pilih Jam Selesai'),
+                                                children: availableHours.map((hour) {
+                                                  return SimpleDialogOption(
+                                                    onPressed: () => Navigator.pop(context, hour),
+                                                    child: Text('$hour:00'),
+                                                  );
+                                                }).toList(),
+                                              ),
+                                            );
+
+                                            if (selectedHour != null) {
+                                              controller.selectedEndTime.value = selectedHour;
+                                              controller.selectTimeRange(
+                                                controller.selectedStartTime.value,
+                                                controller.selectedEndTime.value,
+                                              );
+                                            }
+                                          },
+                                          child: Container(
+                                            padding: EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              border: Border.all(color: AppColors.borderLight),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(Icons.access_time, size: 16, color: AppColors.primary),
+                                                SizedBox(width: 8),
+                                                Text(
+                                                  controller.selectedEndTime.value < 0
+                                                      ? 'Jam Selesai'
+                                                      : '${controller.selectedEndTime.value}:00',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    color: controller.selectedEndTime.value < 0
+                                                        ? AppColors.textSecondary
+                                                        : AppColors.textPrimary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  // Build bottom bar with total price and order button
+  Widget _buildBottomBar({required VoidCallback onTapPesan}) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, -5),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            // Price info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Total',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  Obx(
+                    () => Text(
+                      controller.formatPrice(controller.totalPrice.value),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Order button
+            Obx(
+              () => ElevatedButton(
+                onPressed: controller.selectedSatuanWaktu.value == null ||
+                        (controller.isDailyRental() &&
+                            (controller.selectedStartDate.value == null ||
+                                controller.selectedEndDate.value == null)) ||
+                        (!controller.isDailyRental() &&
+                            (controller.selectedStartDate.value == null ||
+                                controller.selectedStartTime.value < 0 ||
+                                controller.selectedEndTime.value < 0))
+                    ? null
+                    : onTapPesan,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Pesan Sekarang',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
