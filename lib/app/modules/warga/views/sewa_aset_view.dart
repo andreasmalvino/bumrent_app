@@ -392,7 +392,9 @@ class SewaAsetView extends GetView<SewaAsetController> {
             String imageUrl = paket['gambar_url'] ?? '';
 
             return GestureDetector(
-              onTap: () => _showPaketDetailModal(paket),
+              onTap: () {
+                _showPaketDetailModal(paket);
+              },
               child: Container(
                 decoration: BoxDecoration(
                   color: AppColors.surface,
@@ -535,7 +537,7 @@ class SewaAsetView extends GetView<SewaAsetController> {
                                           ],
                                         ),
                                       );
-                                    }).toList(),
+                                    }),
                                   ],
                                 ),
                               )
@@ -571,7 +573,18 @@ class SewaAsetView extends GetView<SewaAsetController> {
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton(
-                                onPressed: () => _showPaketDetailModal(paket),
+                                onPressed: () {
+                                  // Navigate directly to order page with package data
+                                  Get.toNamed(
+                                    Routes.ORDER_SEWA_PAKET,
+                                    arguments: {
+                                      'id': paket['id'],
+                                      'paketId': paket['id'],
+                                      'paketData': paket,
+                                      'satuanWaktuSewa': satuanWaktuSewa,
+                                    },
+                                  );
+                                },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                   foregroundColor: Colors.white,
@@ -893,35 +906,37 @@ class SewaAsetView extends GetView<SewaAsetController> {
 
             // Order button
             Padding(
-              padding: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.only(top: 16.0, bottom: 24.0),
               child: SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
                   onPressed: () {
-                    if (satuanWaktuSewa.isEmpty) {
-                      Get.snackbar(
-                        'Tidak Dapat Memesan',
-                        'Pilihan harga belum tersedia untuk paket ini',
-                        snackPosition: SnackPosition.BOTTOM,
-                        backgroundColor: Colors.red[100],
-                        colorText: Colors.red[800],
-                      );
-                      return;
-                    }
-
-                    _showOrderPaketForm(paket, satuanWaktuSewa);
+                    // Close the modal
+                    Get.back();
+                    // Navigate to order_sewa_paket page with package data
+                    Get.toNamed(
+                      Routes.ORDER_SEWA_PAKET,
+                      arguments: {
+                        'paket': paket,
+                        'satuanWaktuSewa': satuanWaktuSewa,
+                      },
+                    );
                   },
                   style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.white,
                     backgroundColor: AppColors.primary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    elevation: 2,
                   ),
                   child: const Text(
-                    'Pesan Paket Ini',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    'Pesan Sekarang',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -929,6 +944,9 @@ class SewaAsetView extends GetView<SewaAsetController> {
           ],
         ),
       ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
     );
   }
 
@@ -945,10 +963,11 @@ class SewaAsetView extends GetView<SewaAsetController> {
     final RxInt duration = RxInt(selectedSWS.value?['durasi_min'] ?? 1);
 
     // Calculate total price
-    final calculateTotal = () {
+    calculateTotal() {
       if (selectedSWS.value == null) return 0;
       return (selectedSWS.value!['harga'] ?? 0) * duration.value;
-    };
+    }
+
     final RxInt totalPrice = RxInt(calculateTotal());
 
     // Update total when duration or pricing option changes
@@ -1231,7 +1250,7 @@ class SewaAsetView extends GetView<SewaAsetController> {
                           ],
                         ),
                         Text(
-                          'Minimum ${minDuration} ${namaSatuanWaktu.toLowerCase()}',
+                          'Minimum $minDuration ${namaSatuanWaktu.toLowerCase()}',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[600],
@@ -1285,20 +1304,12 @@ class SewaAsetView extends GetView<SewaAsetController> {
                 onPressed: () {
                   Get.back(); // Close the form
 
-                  // Navigate to order_sewa_paket page
-                  // Get the navigation service from the controller
-                  final navigationService = controller.navigationService;
-                  
-                  // Store the selected parameters in a controller or pass as arguments
-                  Get.toNamed(
-                    Routes.ORDER_SEWA_PAKET,
-                    arguments: {
-                      'paketId': paket['id'],
-                      'satuanWaktuSewaId': selectedSWS.value?['id'] ?? '',
-                      'durasi': duration.value,
-                      'totalHarga': totalPrice.value,
-                      'paketData': paket,
-                    },
+                  // Order the package
+                  controller.placeOrderPaket(
+                    paketId: paket['id'],
+                    satuanWaktuSewaId: selectedSWS.value?['id'] ?? '',
+                    durasi: duration.value,
+                    totalHarga: totalPrice.value,
                   );
                 },
                 style: ElevatedButton.styleFrom(

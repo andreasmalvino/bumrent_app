@@ -1,54 +1,156 @@
 import 'dart:convert';
 
 class PaketModel {
-  final String? id;
-  final String? nama;
-  final String? deskripsi;
-  final int? harga;
-  final int? kuantitas;
-  final String? foto_paket;
-  final List<dynamic>? satuanWaktuSewa;
-  
+  final String id;
+  final String nama;
+  final String deskripsi;
+  final double harga;
+  final int kuantitas;
+  final List<String> foto;
+  final List<Map<String, dynamic>> satuanWaktuSewa;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String? foto_paket; // Main photo URL
+  final List<String>? images; // List of photo URLs
+
   PaketModel({
-    this.id,
-    this.nama,
-    this.deskripsi,
-    this.harga,
-    this.kuantitas,
+    required this.id,
+    required this.nama,
+    required this.deskripsi,
+    required this.harga,
+    required this.kuantitas,
+    required this.foto,
+    required this.satuanWaktuSewa,
     this.foto_paket,
-    this.satuanWaktuSewa,
+    this.images,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'nama': nama,
-      'deskripsi': deskripsi,
-      'harga': harga,
-      'kuantitas': kuantitas,
-      'foto_paket': foto_paket,
-      'satuanWaktuSewa': satuanWaktuSewa,
-    };
-  }
-
-  factory PaketModel.fromMap(Map<String, dynamic> map) {
+  // Alias for fromJson to maintain compatibility
+  factory PaketModel.fromMap(Map<String, dynamic> json) => PaketModel.fromJson(json);
+  
+  factory PaketModel.fromJson(Map<String, dynamic> json) {
+    // Handle different possible JSON structures
+    final fotoList = <String>[];
+    
+    // Check for different possible photo field names
+    if (json['foto'] != null) {
+      if (json['foto'] is String) {
+        fotoList.add(json['foto']);
+      } else if (json['foto'] is List) {
+        fotoList.addAll((json['foto'] as List).whereType<String>());
+      }
+    }
+    
+    if (json['foto_paket'] != null) {
+      if (json['foto_paket'] is String) {
+        fotoList.add(json['foto_paket']);
+      } else if (json['foto_paket'] is List) {
+        fotoList.addAll((json['foto_paket'] as List).whereType<String>());
+      }
+    }
+    
+    // Handle satuan_waktu_sewa
+    List<Map<String, dynamic>> satuanWaktuList = [];
+    if (json['satuan_waktu_sewa'] != null) {
+      if (json['satuan_waktu_sewa'] is List) {
+        satuanWaktuList = List<Map<String, dynamic>>.from(
+          json['satuan_waktu_sewa'].map((x) => x is Map ? Map<String, dynamic>.from(x) : {})
+        );
+      } else if (json['satuan_waktu_sewa'] is Map) {
+        satuanWaktuList = [Map<String, dynamic>.from(json['satuan_waktu_sewa'])];
+      }
+    }
+    
     return PaketModel(
-      id: map['id'],
-      nama: map['nama'],
-      deskripsi: map['deskripsi'],
-      harga: map['harga']?.toInt(),
-      kuantitas: map['kuantitas']?.toInt(),
-      foto_paket: map['foto_paket'],
-      satuanWaktuSewa: map['satuanWaktuSewa'],
+      id: json['id']?.toString() ?? '',
+      nama: json['nama']?.toString() ?? '',
+      deskripsi: json['deskripsi']?.toString() ?? '',
+      harga: (json['harga'] is num) ? (json['harga'] as num).toDouble() : 0.0,
+      kuantitas: (json['kuantitas'] is num) ? (json['kuantitas'] as num).toInt() : 1,
+      foto: fotoList,
+      satuanWaktuSewa: satuanWaktuList,
+      foto_paket: json['foto_paket']?.toString(),
+      images: json['images'] != null ? List<String>.from(json['images']) : null,
+      createdAt: json['created_at'] != null 
+          ? DateTime.parse(json['created_at'].toString())
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null 
+          ? DateTime.parse(json['updated_at'].toString())
+          : DateTime.now(),
     );
   }
 
-  String toJson() => json.encode(toMap());
+  // Convert to JSON
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'nama': nama,
+    'deskripsi': deskripsi,
+    'harga': harga,
+    'kuantitas': kuantitas,
+    'foto': foto,
+    'foto_paket': foto_paket,
+    'images': images,
+    'satuan_waktu_sewa': satuanWaktuSewa,
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
+  };
 
-  factory PaketModel.fromJson(String source) => PaketModel.fromMap(json.decode(source));
-
-  @override
-  String toString() {
-    return 'PaketModel(id: $id, nama: $nama, deskripsi: $deskripsi, harga: $harga, kuantitas: $kuantitas, foto_paket: $foto_paket, satuanWaktuSewa: $satuanWaktuSewa)';
+  // Create a copy of the model with some fields updated
+  PaketModel copyWith({
+    String? id,
+    String? nama,
+    String? deskripsi,
+    double? harga,
+    int? kuantitas,
+    List<String>? foto,
+    List<Map<String, dynamic>>? satuanWaktuSewa,
+    String? foto_paket,
+    List<String>? images,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return PaketModel(
+      id: id ?? this.id,
+      nama: nama ?? this.nama,
+      deskripsi: deskripsi ?? this.deskripsi,
+      harga: harga ?? this.harga,
+      kuantitas: kuantitas ?? this.kuantitas,
+      foto: foto ?? List.from(this.foto),
+      satuanWaktuSewa: satuanWaktuSewa ?? List.from(this.satuanWaktuSewa),
+      foto_paket: foto_paket ?? this.foto_paket,
+      images: images ?? (this.images != null ? List.from(this.images!) : null),
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+  
+  // Get the first photo URL or a placeholder
+  String get firstPhotoUrl => foto.isNotEmpty ? foto.first : '';
+  
+  // Get the formatted price
+  String get formattedPrice => 'Rp${harga.toStringAsFixed(0).replaceAllMapped(
+    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+    (Match m) => '${m[1]}.',
+  )}';
+  
+  // Check if the package is available
+  bool get isAvailable => kuantitas > 0;
+  
+  // Get the first available time unit
+  Map<String, dynamic>? get defaultTimeUnit => 
+      satuanWaktuSewa.isNotEmpty ? satuanWaktuSewa.first : null;
+  
+  // Get the price for a specific time unit
+  double getPriceForTimeUnit(String timeUnitId) {
+    try {
+      final unit = satuanWaktuSewa.firstWhere(
+        (unit) => unit['id'] == timeUnitId || unit['id'].toString() == timeUnitId,
+      );
+      return (unit['harga'] as num?)?.toDouble() ?? 0.0;
+    } catch (e) {
+      return 0.0;
+    }
   }
 }

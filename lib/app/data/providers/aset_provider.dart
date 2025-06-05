@@ -846,28 +846,6 @@ class AsetProvider extends GetxService {
       return null;
     }
   }
-  
-  // Get bank accounts from akun_bank table
-  Future<List<Map<String, dynamic>>> getBankAccounts() async {
-    try {
-      debugPrint('🔍 Fetching bank accounts from akun_bank table');
-      
-      final response = await client
-          .from('akun_bank')
-          .select('*')
-          .order('nama_bank', ascending: true);
-          
-      debugPrint('✅ Fetched ${response.length} bank accounts');
-      
-      // Convert response to List<Map<String, dynamic>>
-      List<Map<String, dynamic>> accounts = List<Map<String, dynamic>>.from(response);
-      
-      return accounts;
-    } catch (e) {
-      debugPrint('❌ Error fetching bank accounts: $e');
-      return [];
-    }
-  }
 
   // Get sewa_aset details with aset data
   Future<Map<String, dynamic>?> getSewaAsetWithAsetData(
@@ -967,29 +945,6 @@ class AsetProvider extends GetxService {
       return null;
     }
   }
-  
-  // Get all photos for a paket using id_paket column
-  Future<List<dynamic>> getFotoPaket(String paketId) async {
-    try {
-      debugPrint('📷 Fetching all photos for paket ID: $paketId');
-      
-      final response = await client
-          .from('foto_aset')
-          .select('*')
-          .eq('id_paket', paketId);
-      
-      if (response.isEmpty) {
-        debugPrint('⚠️ No photos found for paket $paketId');
-        return [];
-      }
-      
-      debugPrint('✅ Found ${response.length} photos for paket $paketId');
-      return response;
-    } catch (e) {
-      debugPrint('❌ Error fetching photos for paket $paketId: $e');
-      return [];
-    }
-  }
 
   // Get paket data with their associated satuan waktu sewa data
   Future<List<dynamic>> getPakets() async {
@@ -1058,8 +1013,7 @@ class AsetProvider extends GetxService {
 
       // Default to hourly if not specified
       String satuanWaktu = 'jam';
-      if (swsResponse != null &&
-          swsResponse['satuan_waktu'] != null &&
+      if (swsResponse['satuan_waktu'] != null &&
           swsResponse['satuan_waktu']['nama'] != null) {
         satuanWaktu = swsResponse['satuan_waktu']['nama'];
       }
@@ -1087,13 +1041,198 @@ class AsetProvider extends GetxService {
 
       final response = await client.from('sewa_paket').insert(sewa).select();
 
-      if (response != null && response.isNotEmpty) {
+      if (response.isNotEmpty) {
         return true;
       }
       return false;
     } catch (e) {
       debugPrint('Error ordering paket: $e');
       return false;
+    }
+  }
+
+  // Get photos for a package
+  Future<List<String>> getFotoPaket(String paketId) async {
+    try {
+      final response = await client
+          .from('foto_aset')
+          .select('foto_aset')
+          .eq('id_paket', paketId)
+          .order('created_at');
+
+      if (response != null && response.isNotEmpty) {
+        return response.map<String>((item) => item['foto_aset'] as String).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error getting package photos: $e');
+      return [];
+    }
+  }
+
+  // Get items included in a package with additional asset details
+  Future<List<Map<String, dynamic>>> getPaketItems(String paketId) async {
+    debugPrint('🔄 [1/3] Starting to fetch items for paket ID: $paketId');
+    
+    try {
+      // 1. First, get the basic package items (aset_id and kuantitas)
+      debugPrint('🔍 [2/3] Querying paket_item table for paket_id: $paketId');
+      
+      final response = await client
+          .from('paket_item')
+          .select('''
+            aset_id,
+            kuantitas
+          ''')
+          .eq('paket_id', paketId);
+
+      debugPrint('📊 Raw response from paket_item query:');
+      debugPrint(response.toString());
+
+      if (response == null) {
+        debugPrint('❌ [ERROR] Null response from paket_item query');
+        return [];
+      }
+      
+      if (response.isEmpty) {
+        debugPrint('ℹ️ [INFO] No items found in paket_item for paket ID: $paketId');
+        return [];
+      }
+      
+      debugPrint('✅ [SUCCESS] Found ${response.length} items in paket_item');
+
+      final List<Map<String, dynamic>> enrichedItems = [];
+      
+      // Process each item to fetch additional details
+      debugPrint('🔄 [3/3] Processing ${response.length} items to fetch asset details');
+      
+      for (var item in response) {
+        final String? asetId = item['aset_id']?.toString();
+        final int kuantitas = item['kuantitas'] ?? 1;
+        
+        debugPrint('\n🔍 Processing item:');
+        debugPrint('   - Raw item data: $item');
+        debugPrint('   - aset_id: $asetId');
+        debugPrint('   - kuantitas: $kuantitas');
+        
+        if (asetId == null || asetId.isEmpty) {
+          debugPrint('⚠️ [WARNING] Skipping item with null/empty aset_id');
+          continue;
+        }
+        
+        try {
+          // 1. Get asset name from aset table
+          debugPrint('   - Querying aset table for id: $asetId');
+          final asetResponse = await client
+              .from('aset')
+              .select('id, nama, deskripsi')
+              .eq('id', asetId)
+              .maybeSingle();
+              
+          debugPrint('   - Aset response: ${asetResponse?.toString() ?? 'null'}');
+          
+          if (asetResponse == null) {
+            debugPrint('⚠️ [WARNING] No asset found with id: $asetId');
+            enrichedItems.add({
+              'aset_id': asetId,
+              'kuantitas': kuantitas,
+              'nama_aset': 'Item tidak diketahui',
+              'foto_aset': '',
+              'semua_foto': <String>[],
+              'error': 'Asset not found'
+            });
+            continue;
+          }
+          
+          // 2. Get only the first photo from foto_aset table
+          debugPrint('   - Querying first photo for id_aset: $asetId');
+          final fotoResponse = await client
+              .from('foto_aset')
+              .select('foto_aset')
+              .eq('id_aset', asetId)
+              .order('created_at', ascending: true)
+              .limit(1);
+              
+          String? fotoUtama = '';
+          List<String> semuaFoto = [];
+          
+          if (fotoResponse.isNotEmpty) {
+            final firstFoto = fotoResponse.first['foto_aset']?.toString();
+            if (firstFoto != null && firstFoto.isNotEmpty) {
+              fotoUtama = firstFoto;
+              semuaFoto = [firstFoto];
+              debugPrint('   - Found photo: $firstFoto');
+            } else {
+              debugPrint('   - No valid photo URL found');
+            }
+          } else {
+            debugPrint('   - No photos found for asset $asetId');
+          }
+          
+          // 4. Combine all data
+          final enrichedItem = {
+            'aset_id': asetId,
+            'kuantitas': kuantitas,
+            'nama_aset': asetResponse['nama']?.toString() ?? 'Nama tidak tersedia',
+            'foto_aset': fotoUtama,
+            'semua_foto': semuaFoto,
+            'debug': {
+              'aset_query': asetResponse,
+              'foto_count': semuaFoto.length
+            }
+          };
+          
+          enrichedItems.add(enrichedItem);
+          
+          // Debug log
+          debugPrint('✅ Successfully processed item:');
+          debugPrint('   - Aset ID: $asetId');
+          debugPrint('   - Nama: ${enrichedItem['nama_aset']}');
+          debugPrint('   - Kuantitas: $kuantitas');
+          debugPrint('   - Jumlah Foto: ${semuaFoto.length}');
+          if (semuaFoto.isNotEmpty) {
+            debugPrint('   - Foto Utama: ${semuaFoto.first}');
+          }
+          
+        } catch (e) {
+          debugPrint('❌ Error processing asset $asetId: $e');
+          // Still add the basic item even if we couldn't fetch additional details
+          enrichedItems.add({
+            'aset_id': asetId,
+            'kuantitas': item['kuantitas'],
+            'nama_aset': 'Nama Aset Tidak Ditemukan',
+            'foto_aset': '',
+            'semua_foto': <String>[],
+          });
+        }
+      }
+      
+      debugPrint('✅ Successfully fetched ${enrichedItems.length} items with details');
+      return enrichedItems;
+      
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error getting package items for paket $paketId: $e');
+      debugPrint('Stack trace: $stackTrace');
+      return [];
+    }
+  }
+
+  // Get available bank accounts for payment
+  Future<List<Map<String, dynamic>>> getBankAccounts() async {
+    try {
+      final response = await client
+          .from('bank_accounts')
+          .select('*')
+          .eq('is_active', true)
+          .order('bank_name');
+
+      if (response != null && response.isNotEmpty) {
+        return List<Map<String, dynamic>>.from(response);
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error getting bank accounts: $e');
+      return [];
     }
   }
 }
