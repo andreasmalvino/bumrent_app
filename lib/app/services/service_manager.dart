@@ -2,6 +2,8 @@ import 'package:get/get.dart';
 import 'navigation_service.dart';
 import '../data/providers/auth_provider.dart';
 import '../modules/warga/controllers/warga_dashboard_controller.dart';
+import '../data/providers/aset_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Abstract class untuk mengelola lifecycle service dan dependency
 abstract class ServiceManager {
@@ -24,6 +26,11 @@ abstract class ServiceManager {
     // Register AuthProvider if not already registered
     if (!Get.isRegistered<AuthProvider>()) {
       Get.put(AuthProvider(), permanent: true);
+    }
+
+    // Register AsetProvider if not already registered
+    if (!Get.isRegistered<AsetProvider>()) {
+      Get.put(AsetProvider(), permanent: true);
     }
 
     // Register WargaDashboardController as a permanent controller

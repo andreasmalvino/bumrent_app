@@ -5,6 +5,7 @@ import '../controllers/petugas_bumdes_dashboard_controller.dart';
 import '../widgets/petugas_bumdes_bottom_navbar.dart';
 import '../widgets/petugas_side_navbar.dart';
 import '../../../theme/app_colors_petugas.dart';
+import '../../../utils/format_utils.dart';
 
 class PetugasBumdesDashboardView
     extends GetView<PetugasBumdesDashboardController> {
@@ -23,12 +24,7 @@ class PetugasBumdesDashboardView
           backgroundColor: AppColorsPetugas.navyBlue,
           foregroundColor: Colors.white,
           elevation: 0,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () => _showLogoutConfirmation(context),
-            ),
-          ],
+          // actions: [],
         ),
         drawer: PetugasSideNavbar(controller: controller),
         drawerEdgeDragWidth: 60,
@@ -118,8 +114,6 @@ class PetugasBumdesDashboardView
           ),
           _buildRevenueStatistics(),
           const SizedBox(height: 16),
-          _buildRevenueSources(),
-          const SizedBox(height: 16),
           _buildRevenueTrend(),
 
           // Add some padding at the bottom for better scrolling
@@ -156,25 +150,51 @@ class PetugasBumdesDashboardView
             children: [
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
+                  Obx(() {
+                    final avatar = controller.avatarUrl.value;
+                    if (avatar.isNotEmpty) {
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          avatar,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (context, error, stackTrace) => Container(
+                                width: 48,
+                                height: 48,
+                                color: Colors.white.withOpacity(0.2),
+                                child: const Icon(
+                                  Icons.person,
+                                  color: Colors.white,
+                                  size: 30,
+                                ),
+                              ),
                         ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.person,
-                      color: Colors.white,
-                      size: 30,
-                    ),
-                  ),
+                      );
+                    } else {
+                      return Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.person,
+                          color: Colors.white,
+                          size: 30,
+                        ),
+                      );
+                    }
+                  }),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -208,15 +228,17 @@ class PetugasBumdesDashboardView
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Obx(
-                          () => Text(
-                            controller.userEmail.value,
+                        Obx(() {
+                          final name = controller.userName.value;
+                          final email = controller.userEmail.value;
+                          return Text(
+                            name.isNotEmpty ? name : email,
                             style: const TextStyle(
                               fontSize: 14,
                               color: Colors.white70,
                             ),
-                          ),
-                        ),
+                          );
+                        }),
                       ],
                     ),
                   ),
@@ -642,19 +664,24 @@ class PetugasBumdesDashboardView
                         ),
                       ),
                       const SizedBox(height: 10),
-                      Obx(
-                        () => Text(
-                          controller.totalPendapatanBulanIni.value,
+                      Obx(() {
+                        final stats = controller.pembayaranStats;
+                        final total = stats['totalThisMonth'] ?? 0.0;
+                        return Text(
+                          formatRupiah(total),
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
                             color: AppColorsPetugas.success,
                           ),
-                        ),
-                      ),
+                        );
+                      }),
                       const SizedBox(height: 6),
-                      Obx(
-                        () => Row(
+                      Obx(() {
+                        final stats = controller.pembayaranStats;
+                        final percent = stats['percentComparedLast'] ?? 0.0;
+                        final isPositive = percent >= 0;
+                        return Row(
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -663,7 +690,7 @@ class PetugasBumdesDashboardView
                               ),
                               decoration: BoxDecoration(
                                 color:
-                                    controller.isKenaikanPositif.value
+                                    isPositive
                                         ? AppColorsPetugas.success.withOpacity(
                                           0.1,
                                         )
@@ -676,23 +703,23 @@ class PetugasBumdesDashboardView
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    controller.isKenaikanPositif.value
+                                    isPositive
                                         ? Icons.arrow_upward
                                         : Icons.arrow_downward,
                                     size: 14,
                                     color:
-                                        controller.isKenaikanPositif.value
+                                        isPositive
                                             ? AppColorsPetugas.success
                                             : AppColorsPetugas.error,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    controller.persentaseKenaikan.value,
+                                    '${percent.toStringAsFixed(1)}%',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.bold,
                                       color:
-                                          controller.isKenaikanPositif.value
+                                          isPositive
                                               ? AppColorsPetugas.success
                                               : AppColorsPetugas.error,
                                     ),
@@ -709,8 +736,8 @@ class PetugasBumdesDashboardView
                               ),
                             ),
                           ],
-                        ),
-                      ),
+                        );
+                      }),
                     ],
                   ),
                 ),
@@ -747,12 +774,29 @@ class PetugasBumdesDashboardView
     return Row(
       children: [
         Expanded(
-          child: _buildRevenueQuickInfo(
-            'Pendapatan Sewa',
-            controller.pendapatanSewa.value,
-            AppColorsPetugas.navyBlue,
-            Icons.shopping_cart_outlined,
-          ),
+          child: Obx(() {
+            final stats = controller.pembayaranStats;
+            final totalTunai = stats['totalTunai'] ?? 0.0;
+            return _buildRevenueQuickInfo(
+              'Tunai',
+              formatRupiah(totalTunai),
+              AppColorsPetugas.navyBlue,
+              Icons.payments,
+            );
+          }),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Obx(() {
+            final stats = controller.pembayaranStats;
+            final totalTransfer = stats['totalTransfer'] ?? 0.0;
+            return _buildRevenueQuickInfo(
+              'Transfer',
+              formatRupiah(totalTransfer),
+              AppColorsPetugas.blueGrotto,
+              Icons.account_balance,
+            );
+          }),
         ),
       ],
     );
@@ -811,81 +855,6 @@ class PetugasBumdesDashboardView
     );
   }
 
-  Widget _buildRevenueSources() {
-    return Card(
-      elevation: 2,
-      shadowColor: AppColorsPetugas.shadowColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Sumber Pendapatan',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: AppColorsPetugas.navyBlue,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                // Revenue Donut Chart
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColorsPetugas.navyBlue.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          children: [
-                            Text(
-                              'Sewa Aset',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppColorsPetugas.navyBlue,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Obx(
-                              () => Text(
-                                controller.pendapatanSewa.value,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColorsPetugas.navyBlue,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '100% dari total pendapatan',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildRevenueTrend() {
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'];
 
@@ -912,6 +881,9 @@ class PetugasBumdesDashboardView
               child: Obx(() {
                 // Get the trend data from controller
                 final List<double> trendData = controller.trendPendapatan;
+                if (trendData.isEmpty) {
+                  return Center(child: Text('Tidak ada data'));
+                }
                 final double maxValue = trendData.reduce(
                   (curr, next) => curr > next ? curr : next,
                 );
@@ -925,28 +897,28 @@ class PetugasBumdesDashboardView
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '${maxValue.toStringAsFixed(1)}M',
+                          formatRupiah(maxValue),
                           style: TextStyle(
                             fontSize: 10,
                             color: AppColorsPetugas.textSecondary,
                           ),
                         ),
                         Text(
-                          '${(maxValue * 0.75).toStringAsFixed(1)}M',
+                          formatRupiah(maxValue * 0.75),
                           style: TextStyle(
                             fontSize: 10,
                             color: AppColorsPetugas.textSecondary,
                           ),
                         ),
                         Text(
-                          '${(maxValue * 0.5).toStringAsFixed(1)}M',
+                          formatRupiah(maxValue * 0.5),
                           style: TextStyle(
                             fontSize: 10,
                             color: AppColorsPetugas.textSecondary,
                           ),
                         ),
                         Text(
-                          '${(maxValue * 0.25).toStringAsFixed(1)}M',
+                          formatRupiah(maxValue * 0.25),
                           style: TextStyle(
                             fontSize: 10,
                             color: AppColorsPetugas.textSecondary,

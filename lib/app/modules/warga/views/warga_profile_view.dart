@@ -3,12 +3,16 @@ import 'package:get/get.dart';
 import '../controllers/warga_dashboard_controller.dart';
 import '../views/warga_layout.dart';
 import '../../../theme/app_colors.dart';
+import '../../../widgets/app_drawer.dart';
+import '../../../services/navigation_service.dart';
 
 class WargaProfileView extends GetView<WargaDashboardController> {
   const WargaProfileView({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final navigationService = Get.find<NavigationService>();
+    navigationService.setNavIndex(2);
     return WargaLayout(
       appBar: AppBar(
         title: const Text('Profil Saya'),
@@ -28,6 +32,14 @@ class WargaProfileView extends GetView<WargaDashboardController> {
             tooltip: 'Edit Profil',
           ),
         ],
+      ),
+      drawer: AppDrawer(
+        onNavItemTapped: (index) {
+          // Handle navigation if needed
+        },
+        onLogout: () {
+          controller.logout();
+        },
       ),
       backgroundColor: Colors.grey.shade100,
       body: RefreshIndicator(

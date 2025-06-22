@@ -30,12 +30,8 @@ class LoginView extends GetView<AuthController> {
           Opacity(
             opacity: 0.03,
             child: Container(
-              decoration: const BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage('assets/images/pattern.png'),
-                  repeat: ImageRepeat.repeat,
-                  scale: 4.0,
-                ),
+              decoration: BoxDecoration(
+                color: Colors.blue[50], // Temporary solid color
               ),
             ),
           ),
@@ -89,7 +85,6 @@ class LoginView extends GetView<AuthController> {
                     _buildHeader(),
                     const SizedBox(height: 40),
                     _buildLoginCard(),
-                    const SizedBox(height: 24),
                     _buildRegisterLink(),
                     const SizedBox(height: 30),
                   ],
@@ -161,7 +156,7 @@ class LoginView extends GetView<AuthController> {
               prefixIcon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
 
             // Password field
             _buildInputLabel('Password'),
@@ -204,7 +199,6 @@ class LoginView extends GetView<AuthController> {
                 ),
               ),
             ),
-            const SizedBox(height: 32),
 
             // Login button
             Obx(

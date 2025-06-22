@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../theme/app_colors_petugas.dart';
@@ -9,32 +10,51 @@ class PetugasTambahAsetView extends GetView<PetugasTambahAsetController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text(
-          'Tambah Aset',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        backgroundColor: AppColorsPetugas.navyBlue,
-        elevation: 0,
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [_buildHeaderSection(), _buildFormSection(context)],
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Obx(() => Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: Text(
+            controller.isEditing.value ? 'Edit Aset' : 'Tambah Aset',
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
+          backgroundColor: AppColorsPetugas.navyBlue,
+          elevation: 0,
+          centerTitle: true,
         ),
-      ),
-      bottomNavigationBar: _buildBottomBar(),
+        body: Stack(
+          children: [
+            SafeArea(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeaderSection(),
+                    _buildFormSection(context),
+                  ],
+                ),
+              ),
+            ),
+            if (controller.isLoading.value)
+              Container(
+                color: Colors.black54,
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColorsPetugas.blueGrotto),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        bottomNavigationBar: _buildBottomBar(),
+      )),
     );
   }
 
   Widget _buildHeaderSection() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.only(top: 10, left: 20, right: 20, bottom: 5),  // Reduced padding
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [AppColorsPetugas.navyBlue, AppColorsPetugas.blueGrotto],
@@ -42,50 +62,8 @@ class PetugasTambahAsetView extends GetView<PetugasTambahAsetController> {
           end: Alignment.bottomCenter,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.inventory_2_outlined,
-                  color: Colors.white,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Informasi Aset Baru',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Isi data dengan lengkap untuk menambahkan aset',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withOpacity(0.8),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
+      child: Container(
+        height: 12,  // Further reduced height
       ),
     );
   }
@@ -131,69 +109,36 @@ class PetugasTambahAsetView extends GetView<PetugasTambahAsetController> {
           _buildImageUploader(),
           const SizedBox(height: 24),
 
-          // Category Section
-          _buildSectionHeader(icon: Icons.category, title: 'Kategori & Status'),
+          // Status Section
+          _buildSectionHeader(icon: Icons.check_circle, title: 'Status'),
           const SizedBox(height: 16),
 
-          // Category and Status as cards
-          Row(
-            children: [
-              Expanded(
-                child: _buildCategorySelect(
-                  title: 'Kategori',
-                  options: controller.categoryOptions,
-                  selectedOption: controller.selectedCategory,
-                  onChanged: controller.setCategory,
-                  icon: Icons.inventory_2,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildCategorySelect(
-                  title: 'Status',
-                  options: controller.statusOptions,
-                  selectedOption: controller.selectedStatus,
-                  onChanged: controller.setStatus,
-                  icon: Icons.check_circle,
-                ),
-              ),
-            ],
+          // Status card
+          _buildCategorySelect(
+            title: 'Status',
+            options: controller.statusOptions,
+            selectedOption: controller.selectedStatus,
+            onChanged: controller.setStatus,
+            icon: Icons.check_circle,
           ),
           const SizedBox(height: 24),
 
           // Quantity Section
           _buildSectionHeader(
             icon: Icons.format_list_numbered,
-            title: 'Kuantitas & Pengukuran',
+            title: 'Kuantitas',
           ),
           const SizedBox(height: 16),
 
-          // Quantity fields
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: _buildTextField(
-                  label: 'Kuantitas',
-                  hint: 'Jumlah aset',
-                  controller: controller.quantityController,
-                  isRequired: true,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  prefixIcon: Icons.numbers,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 3,
-                child: _buildTextField(
-                  label: 'Satuan Ukur',
-                  hint: 'contoh: Unit, Buah',
-                  controller: controller.unitOfMeasureController,
-                  prefixIcon: Icons.straighten,
-                ),
-              ),
-            ],
+          // Quantity field
+          _buildTextField(
+            label: 'Kuantitas',
+            hint: 'Jumlah aset',
+            controller: controller.quantityController,
+            isRequired: true,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            prefixIcon: Icons.numbers,
           ),
           const SizedBox(height: 24),
 
@@ -654,6 +599,114 @@ class PetugasTambahAsetView extends GetView<PetugasTambahAsetController> {
     );
   }
 
+  // Show image source options
+  void _showImageSourceOptions() {
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Text(
+              'Pilih Sumber Gambar',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColorsPetugas.navyBlue,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildImageSourceOption(
+                  icon: Icons.camera_alt,
+                  label: 'Kamera',
+                  onTap: () {
+                    Get.back();
+                    controller.pickImageFromCamera();
+                  },
+                ),
+                _buildImageSourceOption(
+                  icon: Icons.photo_library,
+                  label: 'Galeri',
+                  onTap: () {
+                    Get.back();
+                    controller.pickImageFromGallery();
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () => Get.back(),
+              child: const Text('Batal'),
+            ),
+          ],
+        ),
+      ),
+      isScrollControlled: true,
+    );
+  }
+
+  Widget _buildImageSourceOption({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              color: AppColorsPetugas.babyBlueBright,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 30,
+              color: AppColorsPetugas.blueGrotto,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColorsPetugas.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildImageUploader() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -696,7 +749,7 @@ class PetugasTambahAsetView extends GetView<PetugasTambahAsetController> {
               children: [
                 // Add button
                 GestureDetector(
-                  onTap: () => controller.addSampleImage(),
+                  onTap: _showImageSourceOptions,
                   child: Container(
                     width: 100,
                     height: 100,
@@ -732,69 +785,107 @@ class PetugasTambahAsetView extends GetView<PetugasTambahAsetController> {
                 ),
 
                 // Image previews
-                ...controller.selectedImages.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  return Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: AppColorsPetugas.babyBlueLight,
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 5,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Stack(
-                      children: [
-                        ClipRRect(
+                ...List<Widget>.generate(
+                  controller.selectedImages.length,
+                  (index) => Stack(
+                    children: [
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: Obx(
+                          () {
+                            // Check if we have a network URL for this index
+                            if (index < controller.networkImageUrls.length && 
+                                controller.networkImageUrls[index].isNotEmpty) {
+                              // Display network image
+                              return ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  controller.networkImageUrls[index],
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Center(
+                                      child: Icon(Icons.error_outline, color: Colors.red),
+                                    );
+                                  },
+                                ),
+                              );
+                            } else {
+                              // Display local file
+                              return ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: FutureBuilder<File>(
+                                  future: File(controller.selectedImages[index].path).exists().then((exists) {
+                                    if (exists) {
+                                      return File(controller.selectedImages[index].path);
+                                    } else {
+                                      return File(controller.selectedImages[index].path);
+                                    }
+                                  }),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.hasData && snapshot.data != null) {
+                                      return Image.file(
+                                        snapshot.data!,
+                                        width: double.infinity,
+                                        height: double.infinity,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Container(
+                                            color: Colors.grey[200],
+                                            child: const Icon(Icons.broken_image, color: Colors.grey),
+                                          );
+                                        },
+                                      );
+                                    } else {
+                                      return Container(
+                                        color: Colors.grey[200],
+                                        child: const Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: GestureDetector(
+                          onTap: () => controller.removeImage(index),
                           child: Container(
-                            width: 100,
-                            height: 100,
-                            color: AppColorsPetugas.babyBlueLight,
-                            child: Center(
-                              child: Icon(
-                                Icons.image,
-                                color: AppColorsPetugas.blueGrotto,
-                                size: 40,
-                              ),
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 4,
+                                  offset: Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              size: 16,
+                              color: Colors.red,
                             ),
                           ),
                         ),
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: GestureDetector(
-                            onTap: () => controller.removeImage(index),
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 3,
-                                    offset: const Offset(0, 1),
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                Icons.close,
-                                color: AppColorsPetugas.error,
-                                size: 16,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
+                      ),
+                    ],
+                  ),
+                ).toList(),
               ],
             ),
           ),
@@ -850,7 +941,9 @@ class PetugasTambahAsetView extends GetView<PetugasTambahAsetController> {
                           ),
                         )
                         : const Icon(Icons.save),
-                label: Text(isSubmitting ? 'Menyimpan...' : 'Simpan Aset'),
+                label: Obx(() => Text(
+                  isSubmitting ? 'Menyimpan...' : (controller.isEditing.value ? 'Simpan Perubahan' : 'Simpan Aset'),
+                )),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColorsPetugas.blueGrotto,
                   foregroundColor: Colors.white,

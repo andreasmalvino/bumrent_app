@@ -1,6 +1,11 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../data/providers/aset_provider.dart';
+import '../../../data/models/aset_model.dart';
 
 class PetugasAsetController extends GetxController {
+  final AsetProvider _asetProvider = Get.find<AsetProvider>();
   // Observable lists for asset data
   final asetList = <Map<String, dynamic>>[].obs;
   final filteredAsetList = <Map<String, dynamic>>[].obs;
@@ -27,95 +32,100 @@ class PetugasAsetController extends GetxController {
     loadAsetData();
   }
 
-  // Load sample asset data (would be replaced with API call in production)
+  // Load asset data from AsetProvider
   Future<void> loadAsetData() async {
-    isLoading.value = true;
-
     try {
-      // Simulate API call with a delay
-      await Future.delayed(const Duration(seconds: 1));
+      isLoading.value = true;
+      debugPrint('PetugasAsetController: Starting to load asset data...');
 
-      // Sample assets data
-      final sampleData = [
-        {
-          'id': '1',
-          'nama': 'Meja Rapat',
-          'kategori': 'Furniture',
-          'jenis': 'Sewa', // Added jenis field
-          'harga': 50000,
-          'satuan': 'per hari',
-          'stok': 10,
-          'deskripsi':
-              'Meja rapat kayu jati ukuran besar untuk acara pertemuan',
-          'gambar': 'https://example.com/meja.jpg',
-          'tersedia': true,
-        },
-        {
-          'id': '2',
-          'nama': 'Kursi Taman',
-          'kategori': 'Furniture',
-          'jenis': 'Sewa', // Added jenis field
-          'harga': 10000,
-          'satuan': 'per hari',
-          'stok': 50,
-          'deskripsi': 'Kursi taman plastik yang nyaman untuk acara outdoor',
-          'gambar': 'https://example.com/kursi.jpg',
-          'tersedia': true,
-        },
-        {
-          'id': '3',
-          'nama': 'Proyektor',
-          'kategori': 'Elektronik',
-          'jenis': 'Sewa', // Added jenis field
-          'harga': 100000,
-          'satuan': 'per hari',
-          'stok': 5,
-          'deskripsi': 'Proyektor HD dengan brightness tinggi',
-          'gambar': 'https://example.com/proyektor.jpg',
-          'tersedia': true,
-        },
-        {
-          'id': '4',
-          'nama': 'Sound System',
-          'kategori': 'Elektronik',
-          'jenis': 'Langganan', // Added jenis field
-          'harga': 200000,
-          'satuan': 'per bulan',
-          'stok': 3,
-          'deskripsi': 'Sound system lengkap dengan speaker dan mixer',
-          'gambar': 'https://example.com/sound.jpg',
-          'tersedia': false,
-        },
-        {
-          'id': '5',
-          'nama': 'Mobil Pick Up',
-          'kategori': 'Kendaraan',
-          'jenis': 'Langganan', // Added jenis field
-          'harga': 250000,
-          'satuan': 'per bulan',
-          'stok': 2,
-          'deskripsi': 'Mobil pick up untuk mengangkut barang',
-          'gambar': 'https://example.com/pickup.jpg',
-          'tersedia': true,
-        },
-        {
-          'id': '6',
-          'nama': 'Internet Fiber',
-          'kategori': 'Elektronik',
-          'jenis': 'Langganan', // Added jenis field
-          'harga': 350000,
-          'satuan': 'per bulan',
-          'stok': 15,
-          'deskripsi': 'Paket internet fiber 100Mbps untuk kantor',
-          'gambar': 'https://example.com/internet.jpg',
-          'tersedia': true,
-        },
-      ];
+      // Fetch data using AsetProvider
+      final asetData = await _asetProvider.getSewaAsets();
+      debugPrint(
+        'PetugasAsetController: Fetched ${asetData.length} assets from Supabase',
+      );
 
-      asetList.assignAll(sampleData);
-      applyFilters(); // Apply default filters
-    } catch (e) {
-      print('Error loading asset data: $e');
+      if (asetData.isEmpty) {
+        debugPrint('PetugasAsetController: No assets found in Supabase');
+      }
+
+      final List<Map<String, dynamic>> mappedAsets = [];
+      int index = 0; // Initialize index counter
+      for (var aset in asetData) {
+        String displayKategori = 'Umum'; // Placeholder for descriptive category
+        // Attempt to derive a more specific category from description if needed, or add to AsetModel
+        if (aset.deskripsi.toLowerCase().contains('meja') ||
+            aset.deskripsi.toLowerCase().contains('kursi')) {
+          displayKategori = 'Furniture';
+        } else if (aset.deskripsi.toLowerCase().contains('proyektor') ||
+            aset.deskripsi.toLowerCase().contains('sound') ||
+            aset.deskripsi.toLowerCase().contains('internet')) {
+          displayKategori = 'Elektronik';
+        } else if (aset.deskripsi.toLowerCase().contains('mobil') ||
+            aset.deskripsi.toLowerCase().contains('kendaraan')) {
+          displayKategori = 'Kendaraan';
+        }
+
+        final map = {
+          'id': aset.id,
+          'nama': aset.nama,
+          'deskripsi': aset.deskripsi,
+          'harga':
+              aset.satuanWaktuSewa.isNotEmpty
+                  ? aset.satuanWaktuSewa.first['harga']
+                  : 0,
+          'status': aset.status,
+          'kategori': displayKategori,
+          'jenis': aset.jenis ?? 'Sewa', // Add this line with default value
+          'imageUrl': aset.imageUrl ?? 'https://via.placeholder.com/150',
+          'satuan_waktu':
+              aset.satuanWaktuSewa.isNotEmpty
+                  ? aset.satuanWaktuSewa.first['nama_satuan_waktu'] ?? 'Hari'
+                  : 'Hari',
+          'satuanWaktuSewa': aset.satuanWaktuSewa.toList(),
+        };
+
+        debugPrint('Mapped asset #$index: $map');
+        mappedAsets.add(map);
+        index++;
+        debugPrint('Deskripsi: ${aset.deskripsi}');
+        debugPrint('Kategori (from AsetModel): ${aset.kategori}');
+        debugPrint('Status: ${aset.status}');
+        debugPrint('Mapped Kategori for Petugas View: ${map['kategori']}');
+        debugPrint('Mapped Jenis for Petugas View: ${map['jenis']}');
+        debugPrint('--------------------------------');
+      }
+
+      // Populate asetList with fetched data and apply filters
+      debugPrint(
+        'PetugasAsetController: Mapped ${mappedAsets.length} assets for display',
+      );
+      asetList.assignAll(mappedAsets); // Make data available to UI
+      debugPrint(
+        'PetugasAsetController: asetList now has ${asetList.length} items',
+      );
+
+      applyFilters(); // Apply initial filters
+      debugPrint(
+        'PetugasAsetController: Applied filters. filteredAsetList has ${filteredAsetList.length} items',
+      );
+
+      debugPrint(
+        'PetugasAsetController: Data loading complete. Asset list populated and filters applied.',
+      );
+      debugPrint(
+        'PetugasAsetController: First asset name: ${mappedAsets.isNotEmpty ? mappedAsets[0]['nama'] : 'No assets'}',
+      );
+    } catch (e, stackTrace) {
+      debugPrint('PetugasAsetController: Error loading asset data: $e');
+      debugPrint('PetugasAsetController: StackTrace: $stackTrace');
+      // Optionally, show a snackbar or error message to the user
+      Get.snackbar(
+        'Error Memuat Data',
+        'Gagal mengambil data aset dari server. Silakan coba lagi nanti.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     } finally {
       isLoading.value = false;
     }
@@ -170,8 +180,10 @@ class PetugasAsetController extends GetxController {
   }
 
   // Change tab (Sewa or Langganan)
-  void changeTab(int index) {
+  Future<void> changeTab(int index) async {
     selectedTabIndex.value = index;
+    // Reload data when changing tabs to ensure we have the correct data for the selected tab
+    await loadAsetData();
     applyFilters();
   }
 

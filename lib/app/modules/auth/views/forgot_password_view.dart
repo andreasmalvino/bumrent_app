@@ -26,12 +26,8 @@ class ForgotPasswordView extends GetView<AuthController> {
           Opacity(
             opacity: 0.03,
             child: Container(
-              decoration: const BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage('assets/images/pattern.png'),
-                  repeat: ImageRepeat.repeat,
-                  scale: 4.0,
-                ),
+              decoration: BoxDecoration(
+                color: Colors.blue[50], // Temporary solid color
               ),
             ),
           ),

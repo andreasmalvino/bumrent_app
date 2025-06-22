@@ -88,6 +88,19 @@ class SewaAsetController extends GetxController
   void onReady() {
     super.onReady();
     debugPrint('🚀 SewaAsetController: onReady called');
+    // Set tab index from arguments (if any) after build
+    Future.delayed(Duration.zero, () {
+      final args = Get.arguments;
+      if (args != null && args is Map && args['tab'] != null) {
+        int initialTab =
+            args['tab'] is int
+                ? args['tab']
+                : int.tryParse(args['tab'].toString()) ?? 0;
+        if (tabController.length > initialTab) {
+          tabController.index = initialTab;
+        }
+      }
+    });
   }
 
   @override

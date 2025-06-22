@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../theme/app_colors_petugas.dart';
 import '../controllers/petugas_tambah_paket_controller.dart';
+import 'dart:io';
 
 class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
   const PetugasTambahPaketView({Key? key}) : super(key: key);
@@ -12,9 +13,11 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          'Tambah Paket',
-          style: TextStyle(fontWeight: FontWeight.w600),
+        title: Obx(
+          () => Text(
+            controller.isEditing.value ? 'Edit Paket' : 'Tambah Paket',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
         ),
         backgroundColor: AppColorsPetugas.navyBlue,
         elevation: 0,
@@ -24,69 +27,11 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [_buildHeaderSection(), _buildFormSection(context)],
+            children: [_buildFormSection(context)],
           ),
         ),
       ),
       bottomNavigationBar: _buildBottomBar(),
-    );
-  }
-
-  Widget _buildHeaderSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColorsPetugas.navyBlue, AppColorsPetugas.blueGrotto],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.category,
-                  color: Colors.white,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Informasi Paket Baru',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Isi data dengan lengkap untuk menambahkan paket',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withOpacity(0.8),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -132,22 +77,22 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
           const SizedBox(height: 24),
 
           // Category Section
-          _buildSectionHeader(icon: Icons.category, title: 'Kategori & Status'),
+          _buildSectionHeader(icon: Icons.category, title: 'Status'),
           const SizedBox(height: 16),
 
           // Category and Status as cards
           Row(
             children: [
-              Expanded(
-                child: _buildCategorySelect(
-                  title: 'Kategori',
-                  options: controller.categoryOptions,
-                  selectedOption: controller.selectedCategory,
-                  onChanged: controller.setCategory,
-                  icon: Icons.category,
-                ),
-              ),
-              const SizedBox(width: 12),
+              // Expanded(
+              //   child: _buildCategorySelect(
+              //     title: 'Kategori',
+              //     options: controller.categoryOptions,
+              //     selectedOption: controller.selectedCategory,
+              //     onChanged: controller.setCategory,
+              //     icon: Icons.category,
+              //   ),
+              // ),
+              // const SizedBox(width: 12),
               Expanded(
                 child: _buildCategorySelect(
                   title: 'Status',
@@ -161,24 +106,6 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
           ),
           const SizedBox(height: 24),
 
-          // Price Section
-          _buildSectionHeader(
-            icon: Icons.monetization_on,
-            title: 'Harga Paket',
-          ),
-          const SizedBox(height: 16),
-          _buildTextField(
-            label: 'Harga Paket',
-            hint: 'Masukkan harga paket',
-            controller: controller.priceController,
-            isRequired: true,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            prefixText: 'Rp ',
-            prefixIcon: Icons.payments,
-          ),
-          const SizedBox(height: 24),
-
           // Package Items Section
           _buildSectionHeader(
             icon: Icons.inventory_2,
@@ -186,6 +113,40 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
           ),
           const SizedBox(height: 16),
           _buildPackageItems(),
+          const SizedBox(height: 24),
+          _buildSectionHeader(
+            icon: Icons.schedule,
+            title: 'Opsi Waktu & Harga Sewa',
+          ),
+          const SizedBox(height: 16),
+          _buildTimeOptionsCards(),
+          const SizedBox(height: 16),
+          Obx(
+            () => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (controller.timeOptions['Per Jam']!.value)
+                  _buildPriceCard(
+                    title: 'Harga Per Jam',
+                    icon: Icons.timer,
+                    priceController: controller.pricePerHourController,
+                    maxController: controller.maxHourController,
+                    maxLabel: 'Maksimal Jam',
+                  ),
+                if (controller.timeOptions['Per Jam']!.value &&
+                    controller.timeOptions['Per Hari']!.value)
+                  const SizedBox(height: 16),
+                if (controller.timeOptions['Per Hari']!.value)
+                  _buildPriceCard(
+                    title: 'Harga Per Hari',
+                    icon: Icons.calendar_today,
+                    priceController: controller.pricePerDayController,
+                    maxController: controller.maxDayController,
+                    maxLabel: 'Maksimal Hari',
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: 40),
         ],
       ),
@@ -310,7 +271,7 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
                 const SizedBox(height: 16),
 
                 // Asset dropdown
-                DropdownButtonFormField<int>(
+                DropdownButtonFormField<String>(
                   value: controller.selectedAsset.value,
                   decoration: const InputDecoration(
                     labelText: 'Pilih Aset',
@@ -319,8 +280,8 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
                   hint: const Text('Pilih Aset'),
                   items:
                       controller.availableAssets.map((asset) {
-                        return DropdownMenuItem<int>(
-                          value: asset['id'] as int,
+                        return DropdownMenuItem<String>(
+                          value: asset['id'].toString(),
                           child: Text(
                             '${asset['nama']} (Stok: ${asset['stok']})',
                           ),
@@ -422,7 +383,7 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
                 const SizedBox(height: 16),
 
                 // Asset dropdown
-                DropdownButtonFormField<int>(
+                DropdownButtonFormField<String>(
                   value: controller.selectedAsset.value,
                   decoration: const InputDecoration(
                     labelText: 'Pilih Aset',
@@ -431,8 +392,8 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
                   hint: const Text('Pilih Aset'),
                   items:
                       controller.availableAssets.map((asset) {
-                        return DropdownMenuItem<int>(
-                          value: asset['id'] as int,
+                        return DropdownMenuItem<String>(
+                          value: asset['id'].toString(),
                           child: Text(
                             '${asset['nama']} (Stok: ${asset['stok']})',
                           ),
@@ -757,7 +718,7 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
               children: [
                 // Add button
                 GestureDetector(
-                  onTap: () => controller.addSampleImage(),
+                  onTap: _showImageSourceOptions,
                   child: Container(
                     width: 100,
                     height: 100,
@@ -791,72 +752,183 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
                     ),
                   ),
                 ),
-
                 // Image previews
-                ...controller.selectedImages.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  return Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: AppColorsPetugas.babyBlueLight,
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 5,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Stack(
-                      children: [
-                        ClipRRect(
+                ...List<Widget>.generate(controller.selectedImages.length, (
+                  index,
+                ) {
+                  final img = controller.selectedImages[index];
+                  return Stack(
+                    children: [
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            width: 100,
-                            height: 100,
-                            color: AppColorsPetugas.babyBlueLight,
-                            child: Center(
-                              child: Icon(
-                                Icons.image,
-                                color: AppColorsPetugas.blueGrotto,
-                                size: 40,
-                              ),
-                            ),
-                          ),
+                          border: Border.all(color: Colors.grey[300]!),
                         ),
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: GestureDetector(
-                            onTap: () => controller.removeImage(index),
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 3,
-                                    offset: const Offset(0, 1),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child:
+                              (img is String && img.startsWith('http'))
+                                  ? Image.network(
+                                    img,
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            const Center(
+                                              child: Icon(
+                                                Icons.broken_image,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                  )
+                                  : (img is String)
+                                  ? Container(
+                                    color: Colors.grey[200],
+                                    child: const Icon(
+                                      Icons.broken_image,
+                                      color: Colors.grey,
+                                    ),
+                                  )
+                                  : Image.file(
+                                    File(img.path),
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            const Center(
+                                              child: Icon(
+                                                Icons.broken_image,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
                                   ),
-                                ],
-                              ),
-                              child: Icon(
-                                Icons.close,
-                                color: AppColorsPetugas.error,
-                                size: 16,
-                              ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: InkWell(
+                          onTap: () => controller.removeImage(index),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              size: 18,
+                              color: Colors.red,
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   );
                 }),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showImageSourceOptions() {
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Text(
+              'Pilih Sumber Gambar',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColorsPetugas.navyBlue,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildImageSourceOption(
+                  icon: Icons.camera_alt,
+                  label: 'Kamera',
+                  onTap: () {
+                    Get.back();
+                    controller.pickImageFromCamera();
+                  },
+                ),
+                _buildImageSourceOption(
+                  icon: Icons.photo_library,
+                  label: 'Galeri',
+                  onTap: () {
+                    Get.back();
+                    controller.pickImageFromGallery();
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageSourceOption({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColorsPetugas.babyBlueBright,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: AppColorsPetugas.blueGrotto, size: 28),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColorsPetugas.navyBlue,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -899,31 +971,264 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
               final isSubmitting = controller.isSubmitting.value;
               return ElevatedButton.icon(
                 onPressed:
-                    isValid && !isSubmitting ? controller.savePaket : null,
+                    controller.isFormChanged.value && !isSubmitting
+                        ? controller.savePaket
+                        : null,
                 icon:
                     isSubmitting
-                        ? SizedBox(
-                          height: 20,
-                          width: 20,
+                        ? const SizedBox(
+                          width: 24,
+                          height: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             color: Colors.white,
                           ),
                         )
                         : const Icon(Icons.save),
-                label: Text(isSubmitting ? 'Menyimpan...' : 'Simpan Paket'),
+                label: Text(
+                  isSubmitting
+                      ? 'Menyimpan...'
+                      : (controller.isEditing.value
+                          ? 'Simpan Paket'
+                          : 'Tambah Paket'),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColorsPetugas.blueGrotto,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   disabledBackgroundColor: AppColorsPetugas.textLight,
                 ),
               );
             }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimeOptionsCards() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children:
+            controller.timeOptions.entries.map((entry) {
+              final option = entry.key;
+              final isSelected = entry.value;
+              return Obx(
+                () => Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => controller.toggleTimeOption(option),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color:
+                                  isSelected.value
+                                      ? AppColorsPetugas.blueGrotto.withOpacity(
+                                        0.1,
+                                      )
+                                      : Colors.grey.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              option == 'Per Jam'
+                                  ? Icons.hourglass_bottom
+                                  : Icons.calendar_today,
+                              color:
+                                  isSelected.value
+                                      ? AppColorsPetugas.blueGrotto
+                                      : Colors.grey,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  option,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color:
+                                        isSelected.value
+                                            ? AppColorsPetugas.navyBlue
+                                            : Colors.grey.shade700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  option == 'Per Jam'
+                                      ? 'Sewa paket dengan basis perhitungan per jam'
+                                      : 'Sewa paket dengan basis perhitungan per hari',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Checkbox(
+                            value: isSelected.value,
+                            onChanged:
+                                (_) => controller.toggleTimeOption(option),
+                            activeColor: AppColorsPetugas.blueGrotto,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildPriceCard({
+    required String title,
+    required IconData icon,
+    required TextEditingController priceController,
+    required TextEditingController maxController,
+    required String maxLabel,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColorsPetugas.babyBlue.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 20, color: AppColorsPetugas.blueGrotto),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColorsPetugas.navyBlue,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Harga Sewa',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColorsPetugas.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: priceController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        hintText: 'Masukkan harga',
+                        hintStyle: TextStyle(color: AppColorsPetugas.textLight),
+                        prefixText: 'Rp ',
+                        filled: true,
+                        fillColor: AppColorsPetugas.babyBlueBright,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      maxLabel,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColorsPetugas.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: maxController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        hintText: 'Opsional',
+                        hintStyle: TextStyle(color: AppColorsPetugas.textLight),
+                        filled: true,
+                        fillColor: AppColorsPetugas.babyBlueBright,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

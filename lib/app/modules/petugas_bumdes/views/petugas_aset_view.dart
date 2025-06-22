@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/petugas_aset_controller.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../theme/app_colors_petugas.dart';
 import '../widgets/petugas_bumdes_bottom_navbar.dart';
 import '../widgets/petugas_side_navbar.dart';
@@ -23,26 +24,12 @@ class _PetugasAsetViewState extends State<PetugasAsetView>
   void initState() {
     super.initState();
     controller = Get.find<PetugasAsetController>();
-    _tabController = TabController(length: 2, vsync: this);
-
-    // Listen to tab changes and update controller
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
-        controller.changeTab(_tabController.index);
-      }
-    });
-
-    // Listen to controller tab changes and update TabController
-    ever(controller.selectedTabIndex, (index) {
-      if (_tabController.index != index) {
-        _tabController.animateTo(index);
-      }
-    });
+    // Initialize with default tab (sewa)
+    controller.changeTab(0);
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -82,7 +69,7 @@ class _PetugasAsetViewState extends State<PetugasAsetView>
         body: Column(
           children: [
             _buildSearchBar(),
-            _buildTabBar(),
+            const SizedBox(height: 16),
             Expanded(child: _buildAssetList()),
           ],
         ),
@@ -93,7 +80,13 @@ class _PetugasAsetViewState extends State<PetugasAsetView>
           ),
         ),
         floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => Get.toNamed(Routes.PETUGAS_TAMBAH_ASET),
+          onPressed: () {
+            // Navigate to PetugasTambahAsetView in add mode
+            Get.toNamed(
+              Routes.PETUGAS_TAMBAH_ASET,
+              arguments: {'isEditing': false, 'assetData': null},
+            );
+          },
           backgroundColor: AppColorsPetugas.babyBlueBright,
           icon: Icon(Icons.add, color: AppColorsPetugas.blueGrotto),
           label: Text(
@@ -144,60 +137,19 @@ class _PetugasAsetViewState extends State<PetugasAsetView>
     );
   }
 
-  Widget _buildTabBar() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      decoration: BoxDecoration(
-        color: AppColorsPetugas.babyBlueLight,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: TabBar(
-        controller: _tabController,
-        labelColor: Colors.white,
-        unselectedLabelColor: AppColorsPetugas.textSecondary,
-        indicatorSize: TabBarIndicatorSize.tab,
-        indicator: BoxDecoration(
-          color: AppColorsPetugas.blueGrotto,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        dividerColor: Colors.transparent,
-        tabs: const [
-          Tab(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.shopping_cart, size: 18),
-                  SizedBox(width: 8),
-                  Text('Sewa', style: TextStyle(fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-          ),
-          Tab(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.subscriptions, size: 18),
-                  SizedBox(width: 8),
-                  Text(
-                    'Langganan',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Tab bar has been removed as per requirements
 
   Widget _buildAssetList() {
     return Obx(() {
+      debugPrint('_buildAssetList: isLoading=${controller.isLoading.value}');
+      debugPrint(
+        '_buildAssetList: filteredAsetList length=${controller.filteredAsetList.length}',
+      );
+      if (controller.filteredAsetList.isNotEmpty) {
+        debugPrint(
+          '_buildAssetList: First item name=${controller.filteredAsetList[0]['nama']}',
+        );
+      }
       if (controller.isLoading.value) {
         return Center(
           child: CircularProgressIndicator(
@@ -255,10 +207,15 @@ class _PetugasAsetViewState extends State<PetugasAsetView>
         color: AppColorsPetugas.blueGrotto,
         child: ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: controller.filteredAsetList.length,
+          itemCount: controller.filteredAsetList.length + 1,
           itemBuilder: (context, index) {
-            final aset = controller.filteredAsetList[index];
-            return _buildAssetCard(context, aset);
+            if (index < controller.filteredAsetList.length) {
+              final aset = controller.filteredAsetList[index];
+              return _buildAssetCard(context, aset);
+            } else {
+              // Blank space at the end
+              return const SizedBox(height: 80);
+            }
           },
         ),
       );
@@ -266,7 +223,31 @@ class _PetugasAsetViewState extends State<PetugasAsetView>
   }
 
   Widget _buildAssetCard(BuildContext context, Map<String, dynamic> aset) {
-    final isAvailable = aset['tersedia'] == true;
+    debugPrint('\n--- Building Asset Card ---');
+    debugPrint('Asset data: $aset');
+
+    // Extract and validate all asset properties with proper null safety
+    final status =
+        aset['status']?.toString().toLowerCase() ?? 'tidak_diketahui';
+    final isAvailable = status == 'tersedia';
+    final imageUrl = aset['imageUrl']?.toString() ?? '';
+    final harga =
+        aset['harga'] is int
+            ? aset['harga'] as int
+            : (int.tryParse(aset['harga']?.toString() ?? '0') ?? 0);
+    final satuanWaktu =
+        aset['satuan_waktu']?.toString().capitalizeFirst ?? 'Hari';
+    final nama = aset['nama']?.toString().trim() ?? 'Nama tidak tersedia';
+    final kategori = aset['kategori']?.toString().trim() ?? 'Umum';
+    final orderId = aset['order_id']?.toString() ?? '';
+
+    // Debug prints for development
+    debugPrint('Image URL: $imageUrl');
+    debugPrint('Harga: $harga');
+    debugPrint('Satuan Waktu: $satuanWaktu');
+    debugPrint('Nama: $nama');
+    debugPrint('Kategori: $kategori');
+    debugPrint('Status: $status (Available: $isAvailable)');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -290,21 +271,46 @@ class _PetugasAsetViewState extends State<PetugasAsetView>
             child: Row(
               children: [
                 // Asset image
-                Container(
+                SizedBox(
                   width: 80,
                   height: 80,
-                  decoration: BoxDecoration(
-                    color: AppColorsPetugas.babyBlueLight,
+                  child: ClipRRect(
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(12),
                       bottomLeft: Radius.circular(12),
                     ),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      _getAssetIcon(aset['kategori']),
-                      color: AppColorsPetugas.navyBlue,
-                      size: 32,
+                    child: CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder:
+                          (context, url) => Container(
+                            color: AppColorsPetugas.babyBlueLight,
+                            child: Center(
+                              child: Icon(
+                                _getAssetIcon(
+                                  kategori,
+                                ), // Show category icon as placeholder
+                                color: AppColorsPetugas.navyBlue.withOpacity(
+                                  0.5,
+                                ),
+                                size: 32,
+                              ),
+                            ),
+                          ),
+                      errorWidget:
+                          (context, url, error) => Container(
+                            color: AppColorsPetugas.babyBlueLight,
+                            child: Center(
+                              child: Icon(
+                                Icons
+                                    .broken_image, // Or your preferred error icon
+                                color: AppColorsPetugas.navyBlue.withOpacity(
+                                  0.5,
+                                ),
+                                size: 32,
+                              ),
+                            ),
+                          ),
                     ),
                   ),
                 ),
@@ -323,8 +329,8 @@ class _PetugasAsetViewState extends State<PetugasAsetView>
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                aset['nama'],
-                                style: TextStyle(
+                                nama,
+                                style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                   color: AppColorsPetugas.navyBlue,
@@ -333,12 +339,63 @@ class _PetugasAsetViewState extends State<PetugasAsetView>
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                '${controller.formatPrice(aset['harga'])} ${aset['satuan']}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColorsPetugas.textSecondary,
-                                ),
+                              // Harga dan satuan waktu (multi-line, tampilkan semua dari satuanWaktuSewa)
+                              Builder(
+                                builder: (context) {
+                                  final satuanWaktuList =
+                                      (aset['satuanWaktuSewa'] is List)
+                                          ? List<Map<String, dynamic>>.from(
+                                            aset['satuanWaktuSewa'],
+                                          )
+                                          : [];
+                                  final validSatuanWaktu =
+                                      satuanWaktuList
+                                          .where(
+                                            (sw) =>
+                                                (sw['harga'] ?? 0) > 0 &&
+                                                (sw['nama_satuan_waktu'] !=
+                                                        null &&
+                                                    (sw['nama_satuan_waktu']
+                                                            as String)
+                                                        .isNotEmpty),
+                                          )
+                                          .toList();
+
+                                  if (validSatuanWaktu.isNotEmpty) {
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children:
+                                          validSatuanWaktu.map((sw) {
+                                            final harga = sw['harga'] ?? 0;
+                                            final satuan =
+                                                sw['nama_satuan_waktu'] ?? '';
+                                            return Text(
+                                              '${controller.formatPrice(harga)} / $satuan',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color:
+                                                    AppColorsPetugas
+                                                        .textSecondary,
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            );
+                                          }).toList(),
+                                    );
+                                  } else {
+                                    // fallback: harga tunggal
+                                    return Text(
+                                      '${controller.formatPrice(aset['harga'] ?? 0)} / ${aset['satuan_waktu']?.toString().capitalizeFirst ?? 'Hari'}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColorsPetugas.textSecondary,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    );
+                                  }
+                                },
                               ),
                             ],
                           ),
@@ -383,11 +440,36 @@ class _PetugasAsetViewState extends State<PetugasAsetView>
                           children: [
                             // Edit icon
                             GestureDetector(
-                              onTap:
-                                  () => _showAddEditAssetDialog(
-                                    context,
-                                    aset: aset,
-                                  ),
+                              onTap: () {
+                                // Navigate to PetugasTambahAsetView in edit mode with only the asset ID
+                                final assetId =
+                                    aset['id']?.toString() ??
+                                    ''; // Changed from 'id_aset' to 'id'
+                                debugPrint(
+                                  '[DEBUG] Navigating to edit asset with ID: $assetId',
+                                );
+                                debugPrint(
+                                  '[DEBUG] Full asset data: $aset',
+                                ); // Log full asset data for debugging
+
+                                if (assetId.isEmpty) {
+                                  debugPrint('[ERROR] Asset ID is empty!');
+                                  Get.snackbar(
+                                    'Error',
+                                    'ID Aset tidak valid',
+                                    snackPosition: SnackPosition.BOTTOM,
+                                  );
+                                  return;
+                                }
+
+                                Get.toNamed(
+                                  Routes.PETUGAS_TAMBAH_ASET,
+                                  arguments: {
+                                    'isEditing': true,
+                                    'assetId': assetId,
+                                  },
+                                );
+                              },
                               child: Container(
                                 padding: const EdgeInsets.all(5),
                                 decoration: BoxDecoration(

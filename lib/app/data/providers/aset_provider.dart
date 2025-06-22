@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,6 +8,8 @@ import '../models/foto_aset_model.dart';
 import '../models/satuan_waktu_model.dart';
 import '../models/satuan_waktu_sewa_model.dart';
 import 'package:intl/intl.dart';
+import '../models/paket_model.dart';
+import '../providers/auth_provider.dart';
 
 class AsetProvider extends GetxService {
   late final SupabaseClient client;
@@ -24,8 +28,16 @@ class AsetProvider extends GetxService {
           .from('aset')
           .select('*')
           .eq('kategori', 'sewa')
-          .eq('status', 'tersedia') // Hanya yang tersedia
-          .order('nama', ascending: true); // Urutan berdasarkan nama
+          .ilike('status', 'tersedia') // Hanya yang tersedia
+          .order('nama', ascending: true) // Urutan berdasarkan nama
+          .withConverter<List<Map<String, dynamic>>>(
+            (data) =>
+                data.map<Map<String, dynamic>>((item) {
+                  // Ensure 'jenis' is set to 'Sewa' for sewa assets
+                  item['jenis'] = 'Sewa';
+                  return item;
+                }).toList(),
+          );
 
       debugPrint('Fetched ${response.length} aset');
 
@@ -56,8 +68,16 @@ class AsetProvider extends GetxService {
           .from('aset')
           .select('*')
           .eq('kategori', 'langganan')
-          .eq('status', 'tersedia') // Hanya yang tersedia
-          .order('nama', ascending: true); // Urutan berdasarkan nama
+          .ilike('status', 'tersedia') // Hanya yang tersedia
+          .order('nama', ascending: true) // Urutan berdasarkan nama
+          .withConverter<List<Map<String, dynamic>>>(
+            (data) =>
+                data.map<Map<String, dynamic>>((item) {
+                  // Ensure 'jenis' is set to 'Langganan' for langganan assets
+                  item['jenis'] = 'Langganan';
+                  return item;
+                }).toList(),
+          );
 
       debugPrint('Fetched ${response.length} langganan aset');
 
@@ -120,9 +140,26 @@ class AsetProvider extends GetxService {
   Future<void> loadAssetPhotos(AsetModel aset) async {
     try {
       final photos = await getAsetPhotos(aset.id);
-      if (photos.isNotEmpty &&
-          (aset.imageUrl == null || aset.imageUrl!.isEmpty)) {
-        aset.imageUrl = photos.first.fotoAset;
+      if (photos.isNotEmpty) {
+        // Clear existing images
+        aset.imageUrls.clear();
+
+        // Add all photos to the imageUrls list
+        for (final photo in photos) {
+          if (photo.fotoAset != null && photo.fotoAset!.isNotEmpty) {
+            aset.addImageUrl(photo.fotoAset);
+          }
+        }
+
+        // Set the main image URL if it's not already set
+        if ((aset.imageUrl == null || aset.imageUrl!.isEmpty) &&
+            aset.imageUrls.isNotEmpty) {
+          aset.imageUrl = aset.imageUrls.first;
+        }
+
+        debugPrint(
+          '✅ Loaded ${aset.imageUrls.length} photos for asset ${aset.id}',
+        );
       }
     } catch (e) {
       debugPrint('Error loading asset photos for ID ${aset.id}: $e');
@@ -169,6 +206,376 @@ class AsetProvider extends GetxService {
     } catch (e) {
       debugPrint('Error fetching photos for aset ID $asetId: $e');
       return [];
+    }
+  }
+
+  // Create a new asset
+  Future<Map<String, dynamic>?> createAset(
+    Map<String, dynamic> asetData,
+  ) async {
+    try {
+      debugPrint('🔄 Creating new aset with data:');
+      asetData.forEach((key, value) {
+        debugPrint('   $key: $value');
+      });
+
+      final response =
+          await client.from('aset').insert(asetData).select().single();
+
+      debugPrint('✅ Aset created successfully with ID: ${response['id']}');
+      return response;
+    } catch (e) {
+      debugPrint('❌ Error creating aset: $e');
+      debugPrint('❌ Stack trace: ${StackTrace.current}');
+      return null;
+    }
+  }
+
+  // Update an existing asset
+  Future<bool> updateAset(String asetId, Map<String, dynamic> asetData) async {
+    try {
+      debugPrint('🔄 Updating aset with ID: $asetId');
+      asetData.forEach((key, value) {
+        debugPrint('   $key: $value');
+      });
+
+      final response = await client
+          .from('aset')
+          .update(asetData)
+          .eq('id', asetId);
+
+      debugPrint('✅ Aset updated successfully');
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error updating aset: $e');
+      debugPrint('❌ Stack trace: ${StackTrace.current}');
+      return false;
+    }
+  }
+
+  /// Adds a photo URL to the foto_aset table for a specific asset
+  Future<bool> addFotoAset({
+    required String asetId,
+    required String fotoUrl,
+  }) async {
+    try {
+      debugPrint('💾 Attempting to save foto to database:');
+      debugPrint('   - asetId: $asetId');
+      debugPrint('   - fotoUrl: $fotoUrl');
+
+      final data = {
+        'id_aset': asetId,
+        'foto_aset': fotoUrl,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+
+      debugPrint('📤 Inserting into foto_aset table...');
+      final response = await client.from('foto_aset').insert(data).select();
+
+      debugPrint('📝 Database insert response: $response');
+
+      if (response == null) {
+        debugPrint('❌ Failed to insert into foto_aset: Response is null');
+        return false;
+      }
+
+      if (response is List && response.isNotEmpty) {
+        debugPrint('✅ Successfully added foto for aset ID: $asetId');
+        return true;
+      } else {
+        debugPrint('❌ Failed to add foto: Empty or invalid response');
+        return false;
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error adding foto aset: $e');
+      debugPrint('Stack trace: $stackTrace');
+      return false;
+    }
+  }
+
+  /// Add satuan waktu sewa for an asset
+  Future<bool> addSatuanWaktuSewa({
+    required String asetId,
+    required String satuanWaktu,
+    required int harga,
+    required int maksimalWaktu,
+  }) async {
+    try {
+      // First, get the satuan_waktu_id from the satuan_waktu table
+      final response =
+          await client
+              .from('satuan_waktu')
+              .select('id')
+              .ilike('nama_satuan_waktu', satuanWaktu)
+              .maybeSingle();
+
+      if (response == null) {
+        debugPrint('❌ Satuan waktu "$satuanWaktu" not found in the database');
+        return false;
+      }
+
+      final satuanWaktuId = response['id'] as String;
+
+      final data = {
+        'aset_id': asetId,
+        'satuan_waktu_id': satuanWaktuId,
+        'harga': harga,
+        'maksimal_waktu': maksimalWaktu,
+      };
+
+      debugPrint('🔄 Adding satuan waktu sewa:');
+      data.forEach((key, value) {
+        debugPrint('   $key: $value');
+      });
+
+      await client.from('satuan_waktu_sewa').insert(data);
+      debugPrint('✅ Satuan waktu sewa added successfully');
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error adding satuan waktu sewa: $e');
+      debugPrint('❌ Stack trace: ${StackTrace.current}');
+      return false;
+    }
+  }
+
+  // Delete all satuan waktu sewa for an asset
+  Future<bool> deleteSatuanWaktuSewaByAsetId(String asetId) async {
+    try {
+      await client
+          .from('satuan_waktu_sewa')
+          .delete()
+          .eq('aset_id', asetId); // Changed from 'id_aset' to 'aset_id'
+      debugPrint('✅ Deleted satuan waktu sewa for aset ID: $asetId');
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error deleting satuan waktu sewa: $e');
+      return false;
+    }
+  }
+
+  /// Uploads a file to Supabase Storage root
+  /// Returns the public URL of the uploaded file, or null if upload fails
+  Future<String?> uploadFileToStorage(File file) async {
+    try {
+      if (!await file.exists()) {
+        debugPrint('❌ File does not exist: ${file.path}');
+        return null;
+      }
+
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${file.path.split(Platform.pathSeparator).last}';
+      debugPrint('🔄 Preparing to upload file: $fileName');
+
+      final uploadResponse = await client.storage
+          .from('foto.aset')
+          .upload(fileName, file, fileOptions: FileOptions(upsert: true));
+
+      debugPrint('📤 Upload response: $uploadResponse');
+
+      final publicUrl = client.storage.from('foto.aset').getPublicUrl(fileName);
+
+      debugPrint('✅ File uploaded successfully. Public URL: $publicUrl');
+      return publicUrl;
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error uploading file to storage: $e');
+      debugPrint('Stack trace: $stackTrace');
+      return null;
+    }
+  }
+
+  /// Helper method to delete a file from Supabase Storage
+  Future<bool> deleteFileFromStorage(String fileUrl) async {
+    try {
+      debugPrint('🔄 Preparing to delete file from storage');
+
+      // Extract the file path from the full URL
+      final uri = Uri.parse(fileUrl);
+      final pathSegments = uri.pathSegments;
+
+      // Find the index of 'foto.aset' in the path
+      final fotoAsetIndex = pathSegments.indexWhere(
+        (segment) => segment == 'foto.aset',
+      );
+
+      if (fotoAsetIndex == -1 || fotoAsetIndex == pathSegments.length - 1) {
+        debugPrint(
+          '⚠️  Invalid file URL format, cannot extract file path: $fileUrl',
+        );
+        return false;
+      }
+
+      // Get the file path relative to the bucket
+      final filePath = pathSegments.sublist(fotoAsetIndex + 1).join('/');
+
+      debugPrint('🗑️  Deleting file from storage - Path: $filePath');
+
+      // Delete the file from storage
+      await client.storage.from('foto.aset').remove([filePath]);
+
+      debugPrint('✅ Successfully deleted file from storage');
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error deleting file from storage: $e');
+      return false;
+    }
+  }
+
+  /// Updates the photos for an asset
+  /// Handles both local file uploads and existing URLs
+  /// Returns true if all operations were successful
+  Future<bool> updateFotoAset({
+    required String asetId,
+    required List<String> fotoUrls,
+  }) async {
+    if (fotoUrls.isEmpty) {
+      debugPrint('ℹ️ No photos to update for asset: $asetId');
+      return true;
+    }
+
+    try {
+      debugPrint('🔄 Starting photo update for asset: $asetId');
+
+      // 1. Get existing photo URLs before deleting them
+      debugPrint('📋 Fetching existing photos for asset: $asetId');
+      final existingPhotos = await client
+          .from('foto_aset')
+          .select('foto_aset')
+          .eq('id_aset', asetId);
+
+      // 2. Delete files from storage first
+      if (existingPhotos is List && existingPhotos.isNotEmpty) {
+        debugPrint('🗑️  Deleting ${existingPhotos.length} files from storage');
+        for (final photo in existingPhotos) {
+          final url = photo['foto_aset'] as String?;
+          if (url != null && url.isNotEmpty) {
+            await deleteFileFromStorage(url);
+          } else {
+            debugPrint('⚠️  Skipping invalid photo URL: $photo');
+          }
+        }
+      } else {
+        debugPrint('ℹ️  No existing photos found in database');
+      }
+
+      // 3. Remove duplicates from new fotoUrls
+      final uniqueFotoUrls = fotoUrls.toSet().toList();
+      debugPrint(
+        '📸 Processing ${uniqueFotoUrls.length} unique photos (was ${fotoUrls.length})',
+      );
+
+      // 4. Delete existing photo records from database
+      debugPrint('🗑️ Removing existing photo records from database');
+      try {
+        final deleteResponse = await client
+            .from('foto_aset')
+            .delete()
+            .eq('id_aset', asetId);
+
+        debugPrint('🗑️ Database delete response: $deleteResponse');
+
+        // Verify deletion
+        final remainingPhotos = await client
+            .from('foto_aset')
+            .select()
+            .eq('id_aset', asetId);
+
+        if (remainingPhotos is List && remainingPhotos.isNotEmpty) {
+          debugPrint(
+            '⚠️ Warning: ${remainingPhotos.length} photos still exist in database after delete',
+          );
+        }
+      } catch (e) {
+        debugPrint('❌ Error deleting existing photo records: $e');
+        // Continue with the update even if deletion fails
+      }
+
+      // 5. Process each unique new photo
+      bool allSuccess = true;
+      int processedCount = 0;
+
+      for (final fotoUrl in uniqueFotoUrls) {
+        if (fotoUrl.isEmpty) {
+          debugPrint('⏭️ Skipping empty photo URL');
+          continue;
+        }
+
+        try {
+          debugPrint(
+            '\n🔄 Processing photo ${processedCount + 1}/${uniqueFotoUrls.length}: ${fotoUrl.length > 50 ? '${fotoUrl.substring(0, 50)}...' : fotoUrl}',
+          );
+
+          // Check if it's a local file
+          if (fotoUrl.startsWith('file://') ||
+              fotoUrl.startsWith('/') ||
+              !fotoUrl.startsWith('http')) {
+            final file = File(fotoUrl.replaceFirst('file://', ''));
+            if (!await file.exists()) {
+              debugPrint('❌ File does not exist: ${file.path}');
+              allSuccess = false;
+              continue;
+            }
+
+            debugPrint('📤 Uploading local file...');
+            final uploadedUrl = await uploadFileToStorage(file);
+
+            if (uploadedUrl == null) {
+              debugPrint('❌ Failed to upload file');
+              allSuccess = false;
+              continue;
+            }
+
+            debugPrint('💾 Saving to database...');
+            final success = await addFotoAset(
+              asetId: asetId,
+              fotoUrl: uploadedUrl,
+            );
+
+            if (success) {
+              processedCount++;
+              debugPrint('✅ Successfully saved photo #$processedCount');
+            } else {
+              allSuccess = false;
+              debugPrint('❌ Failed to save photo URL to database');
+            }
+          }
+          // Skip placeholder values
+          else if (fotoUrl == 'pending_upload') {
+            debugPrint('⏭️ Skipping placeholder URL');
+            continue;
+          }
+          // Handle existing URLs
+          else if (fotoUrl.startsWith('http')) {
+            debugPrint('🌐 Processing existing URL...');
+            final success = await addFotoAset(asetId: asetId, fotoUrl: fotoUrl);
+
+            if (success) {
+              processedCount++;
+              debugPrint('✅ Successfully saved URL #$processedCount');
+            } else {
+              allSuccess = false;
+              debugPrint('❌ Failed to save URL to database');
+            }
+          } else {
+            debugPrint('⚠️ Unrecognized URL format, skipping');
+          }
+        } catch (e, stackTrace) {
+          allSuccess = false;
+          debugPrint('❌ Error processing photo: $e');
+          debugPrint('Stack trace: $stackTrace');
+        }
+      }
+
+      debugPrint('\n📊 Photo update complete');
+      debugPrint('✅ Success: $allSuccess');
+      debugPrint(
+        '📸 Processed: $processedCount/${uniqueFotoUrls.length} unique photos',
+      );
+
+      return allSuccess && processedCount > 0;
+    } catch (e) {
+      debugPrint('❌ Error updating foto aset: $e');
+      debugPrint('Stack trace: ${StackTrace.current}');
+      return false;
     }
   }
 
@@ -1061,7 +1468,9 @@ class AsetProvider extends GetxService {
           .order('created_at');
 
       if (response != null && response.isNotEmpty) {
-        return response.map<String>((item) => item['foto_aset'] as String).toList();
+        return response
+            .map<String>((item) => item['foto_aset'] as String)
+            .toList();
       }
       return [];
     } catch (e) {
@@ -1073,11 +1482,11 @@ class AsetProvider extends GetxService {
   // Get items included in a package with additional asset details
   Future<List<Map<String, dynamic>>> getPaketItems(String paketId) async {
     debugPrint('🔄 [1/3] Starting to fetch items for paket ID: $paketId');
-    
+
     try {
       // 1. First, get the basic package items (aset_id and kuantitas)
       debugPrint('🔍 [2/3] Querying paket_item table for paket_id: $paketId');
-      
+
       final response = await client
           .from('paket_item')
           .select('''
@@ -1093,44 +1502,53 @@ class AsetProvider extends GetxService {
         debugPrint('❌ [ERROR] Null response from paket_item query');
         return [];
       }
-      
+
       if (response.isEmpty) {
-        debugPrint('ℹ️ [INFO] No items found in paket_item for paket ID: $paketId');
+        debugPrint(
+          'ℹ️ [INFO] No items found in paket_item for paket ID: $paketId',
+        );
         return [];
       }
-      
-      debugPrint('✅ [SUCCESS] Found ${response.length} items in paket_item');
+
+      debugPrint(
+        '✅ [SUCCESS] Found [1m${response.length}[0m items in paket_item',
+      );
 
       final List<Map<String, dynamic>> enrichedItems = [];
-      
+
       // Process each item to fetch additional details
-      debugPrint('🔄 [3/3] Processing ${response.length} items to fetch asset details');
-      
+      debugPrint(
+        '🔄 [3/3] Processing ${response.length} items to fetch asset details',
+      );
+
       for (var item in response) {
         final String? asetId = item['aset_id']?.toString();
         final int kuantitas = item['kuantitas'] ?? 1;
-        
+
         debugPrint('\n🔍 Processing item:');
         debugPrint('   - Raw item data: $item');
         debugPrint('   - aset_id: $asetId');
         debugPrint('   - kuantitas: $kuantitas');
-        
+
         if (asetId == null || asetId.isEmpty) {
           debugPrint('⚠️ [WARNING] Skipping item with null/empty aset_id');
           continue;
         }
-        
+
         try {
           // 1. Get asset name from aset table
           debugPrint('   - Querying aset table for id: $asetId');
-          final asetResponse = await client
-              .from('aset')
-              .select('id, nama, deskripsi')
-              .eq('id', asetId)
-              .maybeSingle();
-              
-          debugPrint('   - Aset response: ${asetResponse?.toString() ?? 'null'}');
-          
+          final asetResponse =
+              await client
+                  .from('aset')
+                  .select('id, nama, deskripsi')
+                  .eq('id', asetId)
+                  .maybeSingle();
+
+          debugPrint(
+            '   - Aset response: ${asetResponse?.toString() ?? 'null'}',
+          );
+
           if (asetResponse == null) {
             debugPrint('⚠️ [WARNING] No asset found with id: $asetId');
             enrichedItems.add({
@@ -1139,11 +1557,11 @@ class AsetProvider extends GetxService {
               'nama_aset': 'Item tidak diketahui',
               'foto_aset': '',
               'semua_foto': <String>[],
-              'error': 'Asset not found'
+              'error': 'Asset not found',
             });
             continue;
           }
-          
+
           // 2. Get only the first photo from foto_aset table
           debugPrint('   - Querying first photo for id_aset: $asetId');
           final fotoResponse = await client
@@ -1152,10 +1570,10 @@ class AsetProvider extends GetxService {
               .eq('id_aset', asetId)
               .order('created_at', ascending: true)
               .limit(1);
-              
+
           String? fotoUtama = '';
           List<String> semuaFoto = [];
-          
+
           if (fotoResponse.isNotEmpty) {
             final firstFoto = fotoResponse.first['foto_aset']?.toString();
             if (firstFoto != null && firstFoto.isNotEmpty) {
@@ -1168,22 +1586,25 @@ class AsetProvider extends GetxService {
           } else {
             debugPrint('   - No photos found for asset $asetId');
           }
-          
+
           // 4. Combine all data
           final enrichedItem = {
             'aset_id': asetId,
             'kuantitas': kuantitas,
-            'nama_aset': asetResponse['nama']?.toString() ?? 'Nama tidak tersedia',
+            'nama_aset':
+                asetResponse['nama']?.toString() ?? 'Nama tidak tersedia',
             'foto_aset': fotoUtama,
             'semua_foto': semuaFoto,
             'debug': {
               'aset_query': asetResponse,
-              'foto_count': semuaFoto.length
-            }
+              'foto_count': semuaFoto.length,
+            },
           };
-          
+
+          debugPrint('✅ [ENRICHED ITEM] $enrichedItem');
+
           enrichedItems.add(enrichedItem);
-          
+
           // Debug log
           debugPrint('✅ Successfully processed item:');
           debugPrint('   - Aset ID: $asetId');
@@ -1193,7 +1614,6 @@ class AsetProvider extends GetxService {
           if (semuaFoto.isNotEmpty) {
             debugPrint('   - Foto Utama: ${semuaFoto.first}');
           }
-          
         } catch (e) {
           debugPrint('❌ Error processing asset $asetId: $e');
           // Still add the basic item even if we couldn't fetch additional details
@@ -1206,10 +1626,14 @@ class AsetProvider extends GetxService {
           });
         }
       }
-      
-      debugPrint('✅ Successfully fetched ${enrichedItems.length} items with details');
+
+      debugPrint(
+        '✅ Successfully fetched ${enrichedItems.length} items with details:',
+      );
+      for (var item in enrichedItems) {
+        debugPrint('   - $item');
+      }
       return enrichedItems;
-      
     } catch (e, stackTrace) {
       debugPrint('❌ Error getting package items for paket $paketId: $e');
       debugPrint('Stack trace: $stackTrace');
@@ -1221,10 +1645,9 @@ class AsetProvider extends GetxService {
   Future<List<Map<String, dynamic>>> getBankAccounts() async {
     try {
       final response = await client
-          .from('bank_accounts')
+          .from('akun_bank')
           .select('*')
-          .eq('is_active', true)
-          .order('bank_name');
+          .order('nama_bank');
 
       if (response != null && response.isNotEmpty) {
         return List<Map<String, dynamic>>.from(response);
@@ -1234,5 +1657,326 @@ class AsetProvider extends GetxService {
       debugPrint('Error getting bank accounts: $e');
       return [];
     }
+  }
+
+  /// Fetch all packages with their related data (photos and rental time units)
+  Future<List<PaketModel>> getAllPaket() async {
+    final stopwatch = Stopwatch()..start();
+    final String debugId = DateTime.now().millisecondsSinceEpoch
+        .toString()
+        .substring(8);
+
+    void log(String message, {bool isError = false, bool isSection = false}) {
+      final prefix =
+          isError
+              ? '❌'
+              : isSection
+              ? '📌'
+              : '   ';
+      debugPrint('[$debugId] $prefix $message');
+    }
+
+    try {
+      log('🚀 Memulai pengambilan data paket...', isSection: true);
+      log('📡 Mengambil data paket dari database...');
+
+      // 1) Get all packages
+      final paketResponse = await client
+          .from('paket')
+          .select('*')
+          .order('created_at', ascending: false);
+
+      log('📥 Diterima ${paketResponse.length} paket dari database');
+
+      if (paketResponse.isEmpty) {
+        log('ℹ️ Tidak ada paket yang ditemukan');
+        return [];
+      }
+
+      // Convert to list of PaketModel (without relations yet)
+      log('\n🔍 Memproses data paket...');
+      final List<PaketModel> paketList = [];
+      int successCount = 0;
+
+      for (var p in paketResponse) {
+        try {
+          final paket = PaketModel.fromMap(p as Map<String, dynamic>);
+          paketList.add(paket);
+          successCount++;
+          log('   ✅ Berhasil memproses paket: ${paket.id} - ${paket.nama}');
+        } catch (e) {
+          log('⚠️ Gagal memproses paket: $e', isError: true);
+          log('   Data paket: $p');
+        }
+      }
+
+      log('\n📊 Ringkasan Pemrosesan:');
+      log('   - Total data: ${paketResponse.length}');
+      log('   - Berhasil: $successCount');
+      log('   - Gagal: ${paketResponse.length - successCount}');
+
+      if (paketList.isEmpty) {
+        log('ℹ️ Tidak ada paket yang valid setelah diproses');
+        return [];
+      }
+
+      // Kumpulkan semua ID paket
+      final List<String> paketIds = paketList.map((p) => p.id).toList();
+      log('\n📦 Mengambil data tambahan untuk ${paketList.length} paket...');
+      log('   ID Paket: ${paketIds.join(', ')}');
+
+      // 2) Ambil semua foto untuk paket-paket ini
+      log('\n🖼️ Mengambil data foto...');
+
+      final fotoResp = await client
+          .from('foto_aset')
+          .select('id_paket, foto_aset')
+          .inFilter('id_paket', paketIds);
+
+      log('   Ditemukan ${fotoResp.length} foto');
+
+      // Map packageId -> List<String> photos
+      final Map<String, List<String>> mapFoto = {};
+      int fotoCount = 0;
+
+      for (var row in fotoResp) {
+        try {
+          final pid = row['id_paket']?.toString() ?? '';
+          final url = row['foto_aset']?.toString() ?? '';
+          if (pid.isNotEmpty && url.isNotEmpty) {
+            mapFoto.putIfAbsent(pid, () => []).add(url);
+            fotoCount++;
+          } else {
+            log('   ⚠️ Data foto tidak valid: ${row.toString()}');
+          }
+        } catch (e) {
+          log('⚠️ Gagal memproses data foto: $e', isError: true);
+        }
+      }
+
+      log('   Berhasil memetakan $fotoCount foto ke ${mapFoto.length} paket');
+
+      // 3) Get all satuan_waktu_sewa for these packages
+      log('\n⏱️ Mengambil data satuan waktu sewa...');
+
+      final swsResp = await client
+          .from('satuan_waktu_sewa')
+          .select('paket_id, satuan_waktu_id, harga, maksimal_waktu')
+          .inFilter('paket_id', paketIds);
+
+      log('   Ditemukan ${swsResp.length} entri satuan waktu sewa');
+
+      // Process satuan waktu sewa
+      final Map<String, List<Map<String, dynamic>>> paketSatuanWaktu = {};
+      int swsCount = 0;
+
+      for (var row in swsResp) {
+        try {
+          final pid = row['paket_id']?.toString() ?? '';
+          if (pid.isNotEmpty) {
+            final swsData = {
+              'satuan_waktu_id': row['satuan_waktu_id'],
+              'harga': row['harga'],
+              'maksimal_waktu': row['maksimal_waktu'],
+            };
+            paketSatuanWaktu.putIfAbsent(pid, () => []).add(swsData);
+            swsCount++;
+          }
+        } catch (e) {
+          log('⚠️ Gagal memproses satuan waktu sewa: $e', isError: true);
+          log('   Data: $row');
+        }
+      }
+
+      log(
+        '   Berhasil memetakan $swsCount satuan waktu ke ${paketSatuanWaktu.length} paket',
+      );
+
+      // 4) Gabungkan semua data
+      log('\n🔗 Menggabungkan data...');
+      final List<PaketModel> result = [];
+      int combinedCount = 0;
+
+      for (var paket in paketList) {
+        final pid = paket.id;
+        log('\n📦 Memproses paket: ${paket.nama} ($pid)');
+
+        try {
+          final updatedPaket = paket.copyWith();
+
+          // Lampirkan foto
+          if (mapFoto.containsKey(pid)) {
+            final fotoList = mapFoto[pid]!;
+            updatedPaket.images = List<String>.from(fotoList);
+
+            // Set foto utama jika belum ada
+            if (updatedPaket.images!.isNotEmpty &&
+                updatedPaket.foto_paket == null) {
+              updatedPaket.foto_paket = updatedPaket.images!.first;
+              log('   📷 Menambahkan ${fotoList.length} foto');
+              log('   🖼️ Foto utama: ${updatedPaket.foto_paket}');
+            }
+          } else {
+            log('   ℹ️ Tidak ada foto untuk paket ini');
+          }
+
+          // Lampirkan satuan waktu sewa
+          if (paketSatuanWaktu.containsKey(pid)) {
+            final swsList = List<Map<String, dynamic>>.from(
+              paketSatuanWaktu[pid] ?? [],
+            );
+            updatedPaket.satuanWaktuSewa = swsList;
+            log('   ⏱️ Menambahkan ${swsList.length} satuan waktu sewa');
+
+            // Log detail harga
+            for (var sws in swsList.take(2)) {
+              // Tampilkan maksimal 2 harga
+              log(
+                '     - ${sws['harga']} / satuan waktu (ID: ${sws['satuan_waktu_id']})',
+              );
+            }
+            if (swsList.length > 2) {
+              log('     - ...dan ${swsList.length - 2} lainnya');
+            }
+          } else {
+            log('   ℹ️ Tidak ada satuan waktu sewa untuk paket ini');
+          }
+
+          result.add(updatedPaket);
+          combinedCount++;
+          log('   ✅ Berhasil memproses paket $pid');
+        } catch (e) {
+          log('⚠️ Gagal memproses paket $pid: $e', isError: true);
+          // Tetap tambahkan paket asli jika gagal diproses
+          result.add(paket);
+        }
+      }
+
+      // Ringkasan eksekusi
+      stopwatch.stop();
+      log('\n🎉 Selesai!', isSection: true);
+      log('📊 Ringkasan Eksekusi:');
+      log('   - Total paket: ${paketList.length}');
+      log('   - Berhasil diproses: $combinedCount/${paketList.length}');
+      log('   - Total foto: $fotoCount');
+      log('   - Total satuan waktu: $swsCount');
+      log('   - Waktu eksekusi: ${stopwatch.elapsedMilliseconds}ms');
+      log('   - ID Debug: $debugId');
+
+      return result;
+    } catch (e, stackTrace) {
+      log('\n❌ ERROR KRITIS', isError: true);
+      log('Pesan error: $e', isError: true);
+      log('Stack trace: $stackTrace', isError: true);
+      log('ID Debug: $debugId', isError: true);
+      rethrow;
+      debugPrint('❌ [getAllPaket] Error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  // Update tagihan_dibayar and insert pembayaran
+  Future<bool> processPembayaranTagihan({
+    required String tagihanSewaId,
+    required int nominal,
+    required String metodePembayaran,
+  }) async {
+    try {
+      // 1. Get current tagihan_dibayar
+      final tagihan =
+          await client
+              .from('tagihan_sewa')
+              .select('tagihan_dibayar')
+              .eq('id', tagihanSewaId)
+              .maybeSingle();
+      int currentDibayar = 0;
+      if (tagihan != null && tagihan['tagihan_dibayar'] != null) {
+        currentDibayar =
+            int.tryParse(tagihan['tagihan_dibayar'].toString()) ?? 0;
+      }
+      final newDibayar = currentDibayar + nominal;
+
+      // 2. Update tagihan_dibayar
+      await client
+          .from('tagihan_sewa')
+          .update({'tagihan_dibayar': newDibayar})
+          .eq('id', tagihanSewaId);
+
+      // 3. Insert pembayaran
+      final authProvider = Get.find<AuthProvider>();
+      final idPetugas = authProvider.getCurrentUserId();
+      final pembayaranData = {
+        'tagihan_sewa_id': tagihanSewaId,
+        'metode_pembayaran': metodePembayaran,
+        'total_pembayaran': nominal,
+        'status': 'lunas',
+        'created_at': DateTime.now().toIso8601String(),
+        'id_petugas': idPetugas,
+      };
+      await client.from('pembayaran').insert(pembayaranData);
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error processing pembayaran tagihan: $e');
+      return false;
+    }
+  }
+
+  // Update status of sewa_aset by ID
+  Future<bool> updateSewaAsetStatus({
+    required String sewaAsetId,
+    required String status,
+  }) async {
+    try {
+      debugPrint('🔄 Updating status of sewa_aset ID: $sewaAsetId to $status');
+      final response = await client
+          .from('sewa_aset')
+          .update({'status': status})
+          .eq('id', sewaAsetId);
+      debugPrint('✅ Status updated for sewa_aset ID: $sewaAsetId');
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error updating sewa_aset status: $e');
+      return false;
+    }
+  }
+
+  // Get all payment proof image URLs for a sewa_aset (by tagihan_sewa)
+  Future<List<String>> getFotoPembayaranUrlsByTagihanSewaId(
+    String sewaAsetId,
+  ) async {
+    try {
+      // 1. Get tagihan_sewa by sewaAsetId
+      final tagihan = await getTagihanSewa(sewaAsetId);
+      if (tagihan == null || tagihan['id'] == null) return [];
+      final tagihanSewaId = tagihan['id'];
+      // 2. Fetch all foto_pembayaran for this tagihan_sewa_id
+      final List<dynamic> response = await client
+          .from('foto_pembayaran')
+          .select('foto_pembayaran')
+          .eq('tagihan_sewa_id', tagihanSewaId)
+          .order('created_at', ascending: false);
+      // 3. Extract URLs
+      return response
+          .map<String>((row) => row['foto_pembayaran']?.toString() ?? '')
+          .where((url) => url.isNotEmpty)
+          .toList();
+    } catch (e) {
+      debugPrint('❌ Error fetching foto pembayaran: $e');
+      return [];
+    }
+  }
+
+  Future<int> countSewaAsetByStatus(List<String> statuses) async {
+    // Supabase expects the IN filter as a comma-separated string in parentheses
+    final statusString = '(${statuses.map((s) => '"$s"').join(',')})';
+    final response = await client
+        .from('sewa_aset')
+        .select('id')
+        .filter('status', 'in', statusString);
+    if (response is List) {
+      return response.length;
+    }
+    return 0;
   }
 }

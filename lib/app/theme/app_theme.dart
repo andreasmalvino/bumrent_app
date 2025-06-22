@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 /// App theme configuration
@@ -19,13 +20,16 @@ class AppTheme {
       ),
       scaffoldBackgroundColor: AppColors.background,
 
+      // Set Lato as the default font for the entire app
+      fontFamily: GoogleFonts.lato().fontFamily,
+
       // App bar theme
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
-        titleTextStyle: const TextStyle(
+        titleTextStyle: GoogleFonts.lato(
           color: Colors.white,
           fontSize: 18,
           fontWeight: FontWeight.w600,
@@ -50,7 +54,10 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          textStyle: GoogleFonts.lato(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
 
@@ -62,7 +69,10 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          textStyle: GoogleFonts.lato(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
 
@@ -70,7 +80,10 @@ class AppTheme {
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primary,
           padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          textStyle: GoogleFonts.lato(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
 
@@ -98,8 +111,8 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: AppColors.error, width: 1.5),
         ),
-        hintStyle: TextStyle(color: AppColors.textLight),
-        labelStyle: TextStyle(color: AppColors.textSecondary),
+        hintStyle: GoogleFonts.lato(color: AppColors.textLight),
+        labelStyle: GoogleFonts.lato(color: AppColors.textSecondary),
       ),
 
       // Checkbox theme
@@ -115,21 +128,21 @@ class AppTheme {
 
       // Text themes
       textTheme: TextTheme(
-        displayLarge: TextStyle(color: AppColors.textPrimary),
-        displayMedium: TextStyle(color: AppColors.textPrimary),
-        displaySmall: TextStyle(color: AppColors.textPrimary),
-        headlineLarge: TextStyle(color: AppColors.textPrimary),
-        headlineMedium: TextStyle(color: AppColors.textPrimary),
-        headlineSmall: TextStyle(color: AppColors.textPrimary),
-        titleLarge: TextStyle(color: AppColors.textPrimary),
-        titleMedium: TextStyle(color: AppColors.textPrimary),
-        titleSmall: TextStyle(color: AppColors.textPrimary),
-        bodyLarge: TextStyle(color: AppColors.textPrimary),
-        bodyMedium: TextStyle(color: AppColors.textPrimary),
-        bodySmall: TextStyle(color: AppColors.textSecondary),
-        labelLarge: TextStyle(color: AppColors.textPrimary),
-        labelMedium: TextStyle(color: AppColors.textSecondary),
-        labelSmall: TextStyle(color: AppColors.textLight),
+        displayLarge: GoogleFonts.lato(color: AppColors.textPrimary),
+        displayMedium: GoogleFonts.lato(color: AppColors.textPrimary),
+        displaySmall: GoogleFonts.lato(color: AppColors.textPrimary),
+        headlineLarge: GoogleFonts.lato(color: AppColors.textPrimary),
+        headlineMedium: GoogleFonts.lato(color: AppColors.textPrimary),
+        headlineSmall: GoogleFonts.lato(color: AppColors.textPrimary),
+        titleLarge: GoogleFonts.lato(color: AppColors.textPrimary),
+        titleMedium: GoogleFonts.lato(color: AppColors.textPrimary),
+        titleSmall: GoogleFonts.lato(color: AppColors.textPrimary),
+        bodyLarge: GoogleFonts.lato(color: AppColors.textPrimary),
+        bodyMedium: GoogleFonts.lato(color: AppColors.textPrimary),
+        bodySmall: GoogleFonts.lato(color: AppColors.textSecondary),
+        labelLarge: GoogleFonts.lato(color: AppColors.textPrimary),
+        labelMedium: GoogleFonts.lato(color: AppColors.textSecondary),
+        labelSmall: GoogleFonts.lato(color: AppColors.textLight),
       ),
 
       // Divider theme

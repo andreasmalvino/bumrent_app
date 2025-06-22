@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../theme/app_colors.dart';
+import '../../../theme/app_colors_petugas.dart';
 import '../controllers/petugas_bumdes_dashboard_controller.dart';
 
 class PetugasSideNavbar extends StatelessWidget {
@@ -11,7 +12,7 @@ class PetugasSideNavbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Drawer(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColorsPetugas.babyBlueLight,
       elevation: 0,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
@@ -32,24 +33,46 @@ class PetugasSideNavbar extends StatelessWidget {
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
-      color: AppColors.primary,
+      color: AppColorsPetugas.navyBlue,
       width: double.infinity,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                child: CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Colors.white,
-                  child: Icon(Icons.person, color: AppColors.primary, size: 36),
-                ),
-              ),
+              Obx(() {
+                final avatar = controller.avatarUrl.value;
+                if (avatar.isNotEmpty) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: CircleAvatar(
+                      radius: 30,
+                      backgroundColor: Colors.white,
+                      backgroundImage: NetworkImage(avatar),
+                      onBackgroundImageError: (error, stackTrace) {},
+                    ),
+                  );
+                } else {
+                  return Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: CircleAvatar(
+                      radius: 30,
+                      backgroundColor: Colors.white,
+                      child: Icon(
+                        Icons.person,
+                        color: AppColors.primary,
+                        size: 36,
+                      ),
+                    ),
+                  );
+                }
+              }),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(

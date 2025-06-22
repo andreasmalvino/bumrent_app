@@ -117,6 +117,7 @@ class SewaAsetView extends GetView<SewaAsetController> {
                     ),
                   ],
                 ),
+                dividerColor: Colors.transparent,
                 labelColor: Colors.white,
                 unselectedLabelColor: const Color(
                   0xFF718093,

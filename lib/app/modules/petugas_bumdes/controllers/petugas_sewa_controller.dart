@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../services/sewa_service.dart';
+import '../../../data/models/rental_booking_model.dart';
+import '../../../data/providers/aset_provider.dart';
 
 class PetugasSewaController extends GetxController {
   // Reactive variables
@@ -7,7 +10,7 @@ class PetugasSewaController extends GetxController {
   final searchQuery = ''.obs;
   final orderIdQuery = ''.obs;
   final selectedStatusFilter = 'Semua'.obs;
-  final filteredSewaList = <Map<String, dynamic>>[].obs;
+  final filteredSewaList = <SewaModel>[].obs;
 
   // Filter options
   final List<String> statusFilters = [
@@ -15,13 +18,19 @@ class PetugasSewaController extends GetxController {
     'Menunggu Pembayaran',
     'Periksa Pembayaran',
     'Diterima',
+    'Aktif',
     'Dikembalikan',
     'Selesai',
     'Dibatalkan',
   ];
 
   // Mock data for sewa list
-  final RxList<Map<String, dynamic>> sewaList = <Map<String, dynamic>>[].obs;
+  final RxList<SewaModel> sewaList = <SewaModel>[].obs;
+
+  // Payment option state (per sewa)
+  final Map<String, RxBool> isFullPaymentMap = {};
+  final Map<String, TextEditingController> nominalControllerMap = {};
+  final Map<String, RxString> paymentMethodMap = {};
 
   @override
   void onInit() {
@@ -41,25 +50,21 @@ class PetugasSewaController extends GetxController {
   void _updateFilteredList() {
     filteredSewaList.value =
         sewaList.where((sewa) {
-          // Apply search filter
-          final matchesSearch = sewa['nama_warga']
-              .toString()
-              .toLowerCase()
-              .contains(searchQuery.value.toLowerCase());
-
-          // Apply order ID filter if provided
-          final matchesOrderId =
-              orderIdQuery.value.isEmpty ||
-              sewa['order_id'].toString().toLowerCase().contains(
-                orderIdQuery.value.toLowerCase(),
-              );
+          final query = searchQuery.value.toLowerCase();
+          // Apply search filter: nama warga, id pesanan, atau asetId
+          final matchesSearch =
+              sewa.wargaNama.toLowerCase().contains(query) ||
+              sewa.id.toLowerCase().contains(query) ||
+              (sewa.asetId != null &&
+                  sewa.asetId!.toLowerCase().contains(query));
 
           // Apply status filter if not 'Semua'
           final matchesStatus =
               selectedStatusFilter.value == 'Semua' ||
-              sewa['status'] == selectedStatusFilter.value;
+              sewa.status.toUpperCase() ==
+                  selectedStatusFilter.value.toUpperCase();
 
-          return matchesSearch && matchesOrderId && matchesStatus;
+          return matchesSearch && matchesStatus;
         }).toList();
   }
 
@@ -68,100 +73,8 @@ class PetugasSewaController extends GetxController {
     isLoading.value = true;
 
     try {
-      // Simulate API call delay
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      // Populate with mock data
-      sewaList.assignAll([
-        {
-          'id': '1',
-          'order_id': 'SWA-001',
-          'nama_warga': 'Sukimin',
-          'nama_aset': 'Mobil Pickup',
-          'tanggal_mulai': '2025-02-05',
-          'tanggal_selesai': '2025-02-10',
-          'total_biaya': 45000,
-          'status': 'Diterima',
-          'photo_url': 'https://example.com/photo1.jpg',
-        },
-        {
-          'id': '2',
-          'order_id': 'SWA-002',
-          'nama_warga': 'Sukimin',
-          'nama_aset': 'Mobil Pickup',
-          'tanggal_mulai': '2025-02-15',
-          'tanggal_selesai': '2025-02-20',
-          'total_biaya': 30000,
-          'status': 'Selesai',
-          'photo_url': 'https://example.com/photo2.jpg',
-        },
-        {
-          'id': '3',
-          'order_id': 'SWA-003',
-          'nama_warga': 'Sukimin',
-          'nama_aset': 'Mobil Pickup',
-          'tanggal_mulai': '2025-02-25',
-          'tanggal_selesai': '2025-03-01',
-          'total_biaya': 35000,
-          'status': 'Menunggu Pembayaran',
-          'photo_url': 'https://example.com/photo3.jpg',
-        },
-        {
-          'id': '4',
-          'order_id': 'SWA-004',
-          'nama_warga': 'Sukimin',
-          'nama_aset': 'Mobil Pickup',
-          'tanggal_mulai': '2025-03-05',
-          'tanggal_selesai': '2025-03-08',
-          'total_biaya': 20000,
-          'status': 'Periksa Pembayaran',
-          'photo_url': 'https://example.com/photo4.jpg',
-        },
-        {
-          'id': '5',
-          'order_id': 'SWA-005',
-          'nama_warga': 'Sukimin',
-          'nama_aset': 'Mobil Pickup',
-          'tanggal_mulai': '2025-03-12',
-          'tanggal_selesai': '2025-03-14',
-          'total_biaya': 15000,
-          'status': 'Dibatalkan',
-          'photo_url': 'https://example.com/photo5.jpg',
-        },
-        {
-          'id': '6',
-          'order_id': 'SWA-006',
-          'nama_warga': 'Sukimin',
-          'nama_aset': 'Mobil Pickup',
-          'tanggal_mulai': '2025-03-18',
-          'tanggal_selesai': '2025-03-20',
-          'total_biaya': 25000,
-          'status': 'Pembayaran Denda',
-          'photo_url': 'https://example.com/photo6.jpg',
-        },
-        {
-          'id': '7',
-          'order_id': 'SWA-007',
-          'nama_warga': 'Sukimin',
-          'nama_aset': 'Mobil Pickup',
-          'tanggal_mulai': '2025-03-25',
-          'tanggal_selesai': '2025-03-28',
-          'total_biaya': 40000,
-          'status': 'Periksa Denda',
-          'photo_url': 'https://example.com/photo7.jpg',
-        },
-        {
-          'id': '8',
-          'order_id': 'SWA-008',
-          'nama_warga': 'Sukimin',
-          'nama_aset': 'Mobil Pickup',
-          'tanggal_mulai': '2025-04-02',
-          'tanggal_selesai': '2025-04-05',
-          'total_biaya': 10000,
-          'status': 'Dikembalikan',
-          'photo_url': 'https://example.com/photo8.jpg',
-        },
-      ]);
+      final data = await SewaService().fetchAllSewa();
+      sewaList.assignAll(data);
     } catch (e) {
       print('Error loading sewa data: $e');
     } finally {
@@ -196,10 +109,11 @@ class PetugasSewaController extends GetxController {
         sewaList.where((sewa) {
           bool matchesStatus =
               selectedStatusFilter.value == 'Semua' ||
-              sewa['status'] == selectedStatusFilter.value;
+              sewa.status.toUpperCase() ==
+                  selectedStatusFilter.value.toUpperCase();
           bool matchesSearch =
               searchQuery.value.isEmpty ||
-              sewa['nama_warga'].toLowerCase().contains(
+              sewa.wargaNama.toLowerCase().contains(
                 searchQuery.value.toLowerCase(),
               );
           return matchesStatus && matchesSearch;
@@ -213,102 +127,367 @@ class PetugasSewaController extends GetxController {
 
   // Get color based on status
   Color getStatusColor(String status) {
-    switch (status) {
-      case 'Menunggu Pembayaran':
-        return Colors.orange;
-      case 'Periksa Pembayaran':
-        return Colors.amber.shade700;
-      case 'Diterima':
-        return Colors.blue;
-      case 'Pembayaran Denda':
-        return Colors.deepOrange;
-      case 'Periksa Denda':
-        return Colors.red.shade600;
-      case 'Dikembalikan':
-        return Colors.teal;
-      case 'Sedang Disewa':
+    switch (status.toUpperCase()) {
+      case 'MENUNGGU PEMBAYARAN':
+        return Colors.orangeAccent;
+      case 'PERIKSA PEMBAYARAN':
+        return Colors.amber;
+      case 'DITERIMA':
+        return Colors.blueAccent;
+      case 'AKTIF':
         return Colors.green;
-      case 'Selesai':
+      case 'PEMBAYARAN DENDA':
+        return Colors.deepOrangeAccent;
+      case 'PERIKSA PEMBAYARAN DENDA':
+        return Colors.redAccent;
+      case 'DIKEMBALIKAN':
+        return Colors.teal;
+      case 'SELESAI':
         return Colors.purple;
-      case 'Dibatalkan':
+      case 'DIBATALKAN':
         return Colors.red;
       default:
         return Colors.grey;
     }
   }
 
+  // Get icon based on status
+  IconData getStatusIcon(String status) {
+    switch (status) {
+      case 'MENUNGGU PEMBAYARAN':
+        return Icons.payments_outlined;
+      case 'PERIKSA PEMBAYARAN':
+        return Icons.fact_check_outlined;
+      case 'DITERIMA':
+        return Icons.check_circle_outlined;
+      case 'AKTIF':
+        return Icons.play_circle_outline;
+      case 'PEMBYARAN DENDA':
+        return Icons.money_off_csred_outlined;
+      case 'PERIKSA PEMBAYARAN DENDA':
+        return Icons.assignment_late_outlined;
+      case 'DIKEMBALIKAN':
+        return Icons.assignment_return_outlined;
+      case 'SELESAI':
+        return Icons.task_alt_outlined;
+      case 'DIBATALKAN':
+        return Icons.cancel_outlined;
+      default:
+        return Icons.help_outline_rounded;
+    }
+  }
+
   // Handle sewa approval (from "Periksa Pembayaran" to "Diterima")
   void approveSewa(String id) {
-    final index = sewaList.indexWhere((sewa) => sewa['id'] == id);
+    final index = sewaList.indexWhere((sewa) => sewa.id == id);
     if (index != -1) {
-      final sewa = Map<String, dynamic>.from(sewaList[index]);
-      final currentStatus = sewa['status'];
-
-      if (currentStatus == 'Periksa Pembayaran') {
-        sewa['status'] = 'Diterima';
-      } else if (currentStatus == 'Periksa Denda') {
-        sewa['status'] = 'Selesai';
-      } else if (currentStatus == 'Menunggu Pembayaran') {
-        sewa['status'] = 'Periksa Pembayaran';
+      final sewa = sewaList[index];
+      final currentStatus = sewa.status;
+      String? newStatus;
+      if (currentStatus == 'PERIKSA PEMBAYARAN') {
+        newStatus = 'DITERIMA';
+      } else if (currentStatus == 'PERIKSA PEMBAYARAN DENDA') {
+        newStatus = 'SELESAI';
+      } else if (currentStatus == 'MENUNGGU PEMBAYARAN') {
+        newStatus = 'PERIKSA PEMBAYARAN';
       }
-
-      sewaList[index] = sewa;
-      sewaList.refresh();
+      if (newStatus != null) {
+        sewaList[index] = SewaModel(
+          id: sewa.id,
+          userId: sewa.userId,
+          status: newStatus,
+          waktuMulai: sewa.waktuMulai,
+          waktuSelesai: sewa.waktuSelesai,
+          tanggalPemesanan: sewa.tanggalPemesanan,
+          tipePesanan: sewa.tipePesanan,
+          kuantitas: sewa.kuantitas,
+          asetId: sewa.asetId,
+          asetNama: sewa.asetNama,
+          asetFoto: sewa.asetFoto,
+          paketId: sewa.paketId,
+          paketNama: sewa.paketNama,
+          paketFoto: sewa.paketFoto,
+          totalTagihan: sewa.totalTagihan,
+          wargaNama: sewa.wargaNama,
+          wargaNoHp: sewa.wargaNoHp,
+          wargaAvatar: sewa.wargaAvatar,
+        );
+        sewaList.refresh();
+      }
     }
   }
 
   // Handle sewa rejection or cancellation
   void rejectSewa(String id) {
-    final index = sewaList.indexWhere((sewa) => sewa['id'] == id);
+    final index = sewaList.indexWhere((sewa) => sewa.id == id);
     if (index != -1) {
-      final sewa = Map<String, dynamic>.from(sewaList[index]);
-      sewa['status'] = 'Dibatalkan';
-      sewaList[index] = sewa;
+      final sewa = sewaList[index];
+      sewaList[index] = SewaModel(
+        id: sewa.id,
+        userId: sewa.userId,
+        status: 'Dibatalkan',
+        waktuMulai: sewa.waktuMulai,
+        waktuSelesai: sewa.waktuSelesai,
+        tanggalPemesanan: sewa.tanggalPemesanan,
+        tipePesanan: sewa.tipePesanan,
+        kuantitas: sewa.kuantitas,
+        asetId: sewa.asetId,
+        asetNama: sewa.asetNama,
+        asetFoto: sewa.asetFoto,
+        paketId: sewa.paketId,
+        paketNama: sewa.paketNama,
+        paketFoto: sewa.paketFoto,
+        totalTagihan: sewa.totalTagihan,
+        wargaNama: sewa.wargaNama,
+        wargaNoHp: sewa.wargaNoHp,
+        wargaAvatar: sewa.wargaAvatar,
+      );
       sewaList.refresh();
     }
   }
 
   // Request payment for penalty
   void requestPenaltyPayment(String id) {
-    final index = sewaList.indexWhere((sewa) => sewa['id'] == id);
+    final index = sewaList.indexWhere((sewa) => sewa.id == id);
     if (index != -1) {
-      final sewa = Map<String, dynamic>.from(sewaList[index]);
-      sewa['status'] = 'Pembayaran Denda';
-      sewaList[index] = sewa;
+      final sewa = sewaList[index];
+      sewaList[index] = SewaModel(
+        id: sewa.id,
+        userId: sewa.userId,
+        status: 'Pembayaran Denda',
+        waktuMulai: sewa.waktuMulai,
+        waktuSelesai: sewa.waktuSelesai,
+        tanggalPemesanan: sewa.tanggalPemesanan,
+        tipePesanan: sewa.tipePesanan,
+        kuantitas: sewa.kuantitas,
+        asetId: sewa.asetId,
+        asetNama: sewa.asetNama,
+        asetFoto: sewa.asetFoto,
+        paketId: sewa.paketId,
+        paketNama: sewa.paketNama,
+        paketFoto: sewa.paketFoto,
+        totalTagihan: sewa.totalTagihan,
+        wargaNama: sewa.wargaNama,
+        wargaNoHp: sewa.wargaNoHp,
+        wargaAvatar: sewa.wargaAvatar,
+      );
       sewaList.refresh();
     }
   }
 
   // Mark penalty payment as requiring inspection
   void markPenaltyForInspection(String id) {
-    final index = sewaList.indexWhere((sewa) => sewa['id'] == id);
+    final index = sewaList.indexWhere((sewa) => sewa.id == id);
     if (index != -1) {
-      final sewa = Map<String, dynamic>.from(sewaList[index]);
-      sewa['status'] = 'Periksa Denda';
-      sewaList[index] = sewa;
+      final sewa = sewaList[index];
+      sewaList[index] = SewaModel(
+        id: sewa.id,
+        userId: sewa.userId,
+        status: 'Periksa Denda',
+        waktuMulai: sewa.waktuMulai,
+        waktuSelesai: sewa.waktuSelesai,
+        tanggalPemesanan: sewa.tanggalPemesanan,
+        tipePesanan: sewa.tipePesanan,
+        kuantitas: sewa.kuantitas,
+        asetId: sewa.asetId,
+        asetNama: sewa.asetNama,
+        asetFoto: sewa.asetFoto,
+        paketId: sewa.paketId,
+        paketNama: sewa.paketNama,
+        paketFoto: sewa.paketFoto,
+        totalTagihan: sewa.totalTagihan,
+        wargaNama: sewa.wargaNama,
+        wargaNoHp: sewa.wargaNoHp,
+        wargaAvatar: sewa.wargaAvatar,
+      );
       sewaList.refresh();
     }
   }
 
   // Handle sewa completion
-  void completeSewa(String id) {
-    final index = sewaList.indexWhere((sewa) => sewa['id'] == id);
+  void completeSewa(String id) async {
+    final index = sewaList.indexWhere((sewa) => sewa.id == id);
     if (index != -1) {
-      final sewa = Map<String, dynamic>.from(sewaList[index]);
-      sewa['status'] = 'Selesai';
-      sewaList[index] = sewa;
+      final sewa = sewaList[index];
+      sewaList[index] = SewaModel(
+        id: sewa.id,
+        userId: sewa.userId,
+        status: 'Selesai',
+        waktuMulai: sewa.waktuMulai,
+        waktuSelesai: sewa.waktuSelesai,
+        tanggalPemesanan: sewa.tanggalPemesanan,
+        tipePesanan: sewa.tipePesanan,
+        kuantitas: sewa.kuantitas,
+        asetId: sewa.asetId,
+        asetNama: sewa.asetNama,
+        asetFoto: sewa.asetFoto,
+        paketId: sewa.paketId,
+        paketNama: sewa.paketNama,
+        paketFoto: sewa.paketFoto,
+        totalTagihan: sewa.totalTagihan,
+        wargaNama: sewa.wargaNama,
+        wargaNoHp: sewa.wargaNoHp,
+        wargaAvatar: sewa.wargaAvatar,
+      );
       sewaList.refresh();
+      // Update status in database
+      final asetProvider = Get.find<AsetProvider>();
+      await asetProvider.updateSewaAsetStatus(
+        sewaAsetId: id,
+        status: 'SELESAI',
+      );
     }
   }
 
   // Mark rental as returned
-  void markAsReturned(String id) {
-    final index = sewaList.indexWhere((sewa) => sewa['id'] == id);
+  Future<void> markAsReturned(String id) async {
+    final index = sewaList.indexWhere((sewa) => sewa.id == id);
     if (index != -1) {
-      final sewa = Map<String, dynamic>.from(sewaList[index]);
-      sewa['status'] = 'Dikembalikan';
-      sewaList[index] = sewa;
+      final sewa = sewaList[index];
+      sewaList[index] = SewaModel(
+        id: sewa.id,
+        userId: sewa.userId,
+        status: 'Dikembalikan',
+        waktuMulai: sewa.waktuMulai,
+        waktuSelesai: sewa.waktuSelesai,
+        tanggalPemesanan: sewa.tanggalPemesanan,
+        tipePesanan: sewa.tipePesanan,
+        kuantitas: sewa.kuantitas,
+        asetId: sewa.asetId,
+        asetNama: sewa.asetNama,
+        asetFoto: sewa.asetFoto,
+        paketId: sewa.paketId,
+        paketNama: sewa.paketNama,
+        paketFoto: sewa.paketFoto,
+        totalTagihan: sewa.totalTagihan,
+        wargaNama: sewa.wargaNama,
+        wargaNoHp: sewa.wargaNoHp,
+        wargaAvatar: sewa.wargaAvatar,
+      );
       sewaList.refresh();
+      // Update status in database
+      final asetProvider = Get.find<AsetProvider>();
+      final result = await asetProvider.updateSewaAsetStatus(
+        sewaAsetId: id,
+        status: 'DIKEMBALIKAN',
+      );
+      if (!result) {
+        Get.snackbar(
+          'Gagal',
+          'Gagal mengubah status sewa di database',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    }
+  }
+
+  // Ambil detail item paket (nama aset & kuantitas)
+  Future<List<Map<String, dynamic>>> getPaketItems(String paketId) async {
+    final asetProvider = Get.find<AsetProvider>();
+    debugPrint('[DEBUG] getPaketItems called with paketId: $paketId');
+    try {
+      final items = await asetProvider.getPaketItems(paketId);
+      debugPrint('[DEBUG] getPaketItems result for paketId $paketId:');
+      for (var item in items) {
+        debugPrint('  - item: ${item.toString()}');
+      }
+      return items;
+    } catch (e, stack) {
+      debugPrint('[ERROR] getPaketItems failed for paketId $paketId: $e');
+      debugPrint('[ERROR] Stacktrace: $stack');
+      return [];
+    }
+  }
+
+  RxBool getIsFullPayment(String sewaId) {
+    if (!isFullPaymentMap.containsKey(sewaId)) {
+      isFullPaymentMap[sewaId] = false.obs;
+    }
+    return isFullPaymentMap[sewaId]!;
+  }
+
+  TextEditingController getNominalController(String sewaId) {
+    if (!nominalControllerMap.containsKey(sewaId)) {
+      final controller = TextEditingController(text: '0');
+      nominalControllerMap[sewaId] = controller;
+    }
+    return nominalControllerMap[sewaId]!;
+  }
+
+  void setFullPayment(String sewaId, bool value, num totalTagihan) {
+    getIsFullPayment(sewaId).value = value;
+    if (value) {
+      getNominalController(sewaId).text = totalTagihan.toString();
+    }
+  }
+
+  RxString getPaymentMethod(String sewaId) {
+    if (!paymentMethodMap.containsKey(sewaId)) {
+      paymentMethodMap[sewaId] = 'Tunai'.obs;
+    }
+    return paymentMethodMap[sewaId]!;
+  }
+
+  void setPaymentMethod(String sewaId, String method) {
+    getPaymentMethod(sewaId).value = method;
+  }
+
+  Future<String?> getTagihanSewaIdBySewaAsetId(String sewaAsetId) async {
+    final asetProvider = Get.find<AsetProvider>();
+    final tagihan = await asetProvider.getTagihanSewa(sewaAsetId);
+    if (tagihan != null && tagihan['id'] != null) {
+      return tagihan['id'] as String;
+    }
+    return null;
+  }
+
+  Future<void> confirmPembayaranTagihan({
+    required String sewaAsetId,
+    required int nominal,
+    required String metodePembayaran,
+  }) async {
+    final tagihanSewaId = await getTagihanSewaIdBySewaAsetId(sewaAsetId);
+    if (tagihanSewaId == null) {
+      Get.snackbar(
+        'Gagal',
+        'Tagihan sewa tidak ditemukan',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+    final asetProvider = Get.find<AsetProvider>();
+    // Cek status sewa_aset saat ini
+    final sewaAsetData = await asetProvider.getSewaAsetWithAsetData(sewaAsetId);
+    if (sewaAsetData != null &&
+        (sewaAsetData['status']?.toString()?.toUpperCase() ==
+            'PERIKSA PEMBAYARAN')) {
+      // Ubah status menjadi MENUNGGU PEMBAYARAN
+      await asetProvider.updateSewaAsetStatus(
+        sewaAsetId: sewaAsetId,
+        status: 'MENUNGGU PEMBAYARAN',
+      );
+    }
+    final result = await asetProvider.processPembayaranTagihan(
+      tagihanSewaId: tagihanSewaId,
+      nominal: nominal,
+      metodePembayaran: metodePembayaran,
+    );
+    if (result) {
+      Get.snackbar(
+        'Sukses',
+        'Pembayaran berhasil diproses',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+    } else {
+      Get.snackbar(
+        'Gagal',
+        'Pembayaran gagal diproses',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     }
   }
 }

@@ -6,6 +6,7 @@ import '../views/warga_layout.dart';
 import '../../../services/navigation_service.dart';
 import '../../../widgets/app_drawer.dart';
 import '../../../theme/app_colors.dart';
+import 'dart:async';
 
 class WargaSewaView extends GetView<WargaSewaController> {
   const WargaSewaView({super.key});
@@ -50,6 +51,7 @@ class WargaSewaView extends GetView<WargaSewaController> {
                 _buildPendingTab(),
                 _buildDiterimaTab(),
                 _buildAktifTab(),
+                _buildDikembalikanTab(),
                 _buildSelesaiTab(),
                 _buildDibatalkanTab(),
               ],
@@ -119,6 +121,7 @@ class WargaSewaView extends GetView<WargaSewaController> {
           _buildTab(text: 'Pending', icon: Icons.pending_outlined),
           _buildTab(text: 'Diterima', icon: Icons.check_circle_outline),
           _buildTab(text: 'Aktif', icon: Icons.play_circle_outline),
+          _buildTab(text: 'Dikembalikan', icon: Icons.assignment_return),
           _buildTab(text: 'Selesai', icon: Icons.task_alt_outlined),
           _buildTab(text: 'Dibatalkan', icon: Icons.cancel_outlined),
         ],
@@ -142,28 +145,29 @@ class WargaSewaView extends GetView<WargaSewaController> {
       ),
     );
   }
-  
+
   Widget _buildPendingTab() {
     return Obx(() {
       // Show loading indicator while fetching data
       if (controller.isLoadingPending.value) {
-        return const Center(
-          child: CircularProgressIndicator(),
-        );
+        return const Center(child: CircularProgressIndicator());
       }
-      
+
       // Check if there is any data to display
       if (controller.pendingRentals.isNotEmpty) {
         return SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.all(20),
           child: Column(
-            children: controller.pendingRentals
-                .map((rental) => Padding(
-                      padding: const EdgeInsets.only(bottom: 16.0),
-                      child: _buildUnpaidRentalCard(rental),
-                    ))
-                .toList(),
+            children:
+                controller.pendingRentals
+                    .map(
+                      (rental) => Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: _buildUnpaidRentalCard(rental),
+                      ),
+                    )
+                    .toList(),
           ),
         );
       }
@@ -179,51 +183,194 @@ class WargaSewaView extends GetView<WargaSewaController> {
       );
     });
   }
-  
+
   Widget _buildAktifTab() {
     return Obx(() {
-      // Show loading indicator while fetching data
-      if (controller.isLoading.value) {
-        return const Center(
-          child: CircularProgressIndicator(),
+      if (controller.isLoadingActive.value) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      if (controller.activeRentals.isEmpty) {
+        return _buildTabContent(
+          icon: Icons.play_circle_outline,
+          title: 'Tidak ada sewa aktif',
+          subtitle: 'Sewa yang sedang berlangsung akan muncul di sini',
+          buttonText: 'Sewa Sekarang',
+          onButtonPressed: () => controller.navigateToRentals(),
+          color: Colors.blue,
         );
       }
-      
-      // Placeholder content for the Aktif tab
-      return const Center(
+      return SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(20),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.play_circle_filled,
-              size: 80,
-              color: Colors.grey,
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Tab Aktif',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Konten tab Aktif akan ditampilkan di sini',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ],
+          children:
+              controller.activeRentals
+                  .map(
+                    (rental) => Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: _buildAktifRentalCard(rental),
+                    ),
+                  )
+                  .toList(),
         ),
       );
     });
+  }
+
+  Widget _buildAktifRentalCard(Map<String, dynamic> rental) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header section with status
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.info.withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Icon(Icons.play_circle_fill, size: 18, color: AppColors.info),
+                const SizedBox(width: 8),
+                Text(
+                  rental['status'] ?? 'AKTIF',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.info,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Asset details
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    rental['imageUrl'] ?? '',
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.cover,
+                    errorBuilder:
+                        (context, error, stackTrace) => Container(
+                          width: 80,
+                          height: 80,
+                          color: Colors.grey[200],
+                          child: const Icon(
+                            Icons.broken_image,
+                            color: Colors.grey,
+                          ),
+                        ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        rental['name'] ?? 'Aset',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        icon: Icons.inventory_2_outlined,
+                        text: '${rental['jumlahUnit'] ?? 0} Unit',
+                      ),
+                      const SizedBox(height: 6),
+                      _buildInfoRow(
+                        icon: Icons.calendar_today_outlined,
+                        text: rental['tanggalSewa'] ?? '',
+                      ),
+                      const SizedBox(height: 6),
+                      _buildInfoRow(
+                        icon: Icons.schedule,
+                        text: rental['rentangWaktu'] ?? '',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade100),
+          // Price section
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    Text(
+                      rental['totalPrice'] ?? 'Rp 0',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildActionButton(
+                        icon: Icons.info_outline,
+                        label: 'Lihat Detail',
+                        onPressed: () => controller.viewRentalDetail(rental),
+                        iconColor: AppColors.info,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildBelumBayarTab() {
     return Obx(() {
       // Show loading indicator while fetching data
       if (controller.isLoading.value) {
-        return const Center(
-          child: CircularProgressIndicator(),
-        );
+        return const Center(child: CircularProgressIndicator());
       }
-      
+
       // Check if there is any data to display
       if (controller.rentals.isNotEmpty) {
         return SingleChildScrollView(
@@ -232,12 +379,16 @@ class WargaSewaView extends GetView<WargaSewaController> {
           child: Column(
             children: [
               // Build a card for each rental item
-              ...controller.rentals.map((rental) => Column(
-                children: [
-                  _buildUnpaidRentalCard(rental),
-                  const SizedBox(height: 20),
-                ],
-              )).toList(),
+              ...controller.rentals
+                  .map(
+                    (rental) => Column(
+                      children: [
+                        _buildUnpaidRentalCard(rental),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  )
+                  .toList(),
               _buildTipsSection(),
             ],
           ),
@@ -259,8 +410,9 @@ class WargaSewaView extends GetView<WargaSewaController> {
   Widget _buildUnpaidRentalCard(Map<String, dynamic> rental) {
     // Determine status color based on status
     final bool isPembayaranDenda = rental['status'] == 'PEMBAYARAN DENDA';
-    final Color statusColor = isPembayaranDenda ? AppColors.error : AppColors.warning;
-    
+    final Color statusColor =
+        isPembayaranDenda ? AppColors.error : AppColors.warning;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -289,7 +441,9 @@ class WargaSewaView extends GetView<WargaSewaController> {
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 Icon(
-                  isPembayaranDenda ? Icons.warning_amber_rounded : Icons.access_time_rounded,
+                  isPembayaranDenda
+                      ? Icons.warning_amber_rounded
+                      : Icons.access_time_rounded,
                   size: 18,
                   color: statusColor,
                 ),
@@ -315,49 +469,52 @@ class WargaSewaView extends GetView<WargaSewaController> {
                 // Asset image with rounded corners
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: rental['imageUrl'] != null && rental['imageUrl'].toString().startsWith('http')
-                    ? Image.network(
-                        rental['imageUrl'],
-                        width: 90,
-                        height: 90,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
+                  child:
+                      rental['imageUrl'] != null &&
+                              rental['imageUrl'].toString().startsWith('http')
+                          ? Image.network(
+                            rental['imageUrl'],
                             width: 90,
                             height: 90,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 36,
-                              color: Colors.grey.shade400,
-                            ),
-                          );
-                        },
-                      )
-                    : Image.asset(
-                        rental['imageUrl'] ?? 'assets/images/gambar_pendukung.jpg',
-                        width: 90,
-                        height: 90,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 90,
+                                height: 90,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.image_not_supported_outlined,
+                                  size: 36,
+                                  color: Colors.grey.shade400,
+                                ),
+                              );
+                            },
+                          )
+                          : Image.asset(
+                            rental['imageUrl'] ??
+                                'assets/images/gambar_pendukung.jpg',
                             width: 90,
                             height: 90,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 36,
-                              color: Colors.grey.shade400,
-                            ),
-                          );
-                        },
-                      ),
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 90,
+                                height: 90,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.image_not_supported_outlined,
+                                  size: 36,
+                                  color: Colors.grey.shade400,
+                                ),
+                              );
+                            },
+                          ),
                 ),
                 const SizedBox(width: 16),
                 // Asset details
@@ -389,40 +546,12 @@ class WargaSewaView extends GetView<WargaSewaController> {
                         text: rental['rentangWaktu'] ?? '',
                       ),
                       const SizedBox(height: 12),
-                      // Countdown timer
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
+                      if ((rental['status'] ?? '').toString().toUpperCase() ==
+                              'MENUNGGU PEMBAYARAN' &&
+                          rental['updated_at'] != null)
+                        CountdownTimerWidget(
+                          updatedAt: DateTime.parse(rental['updated_at']),
                         ),
-                        decoration: BoxDecoration(
-                          color: AppColors.error.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: AppColors.error.withOpacity(0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.timer_outlined,
-                              size: 14,
-                              color: AppColors.error,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Bayar dalam ${rental['countdown'] ?? '00:59:59'}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.error,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -465,7 +594,10 @@ class WargaSewaView extends GetView<WargaSewaController> {
                 ElevatedButton(
                   onPressed: () {},
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: rental['status'] == 'PEMBAYARAN DENDA' ? AppColors.error : AppColors.warning,
+                    backgroundColor:
+                        rental['status'] == 'PEMBAYARAN DENDA'
+                            ? AppColors.error
+                            : AppColors.warning,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(
@@ -477,8 +609,13 @@ class WargaSewaView extends GetView<WargaSewaController> {
                     ),
                   ),
                   child: Text(
-                    rental['status'] == 'PEMBAYARAN DENDA' ? 'Bayar Denda' : 'Bayar Sekarang',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    rental['status'] == 'PEMBAYARAN DENDA'
+                        ? 'Bayar Denda'
+                        : 'Bayar Sekarang',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
               ],
@@ -502,14 +639,18 @@ class WargaSewaView extends GetView<WargaSewaController> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: _buildActionButton(
-                    icon: Icons.cancel_outlined,
-                    label: 'Batalkan',
-                    onPressed: () => controller.cancelRental(rental['id']),
-                    iconColor: AppColors.error,
+                if ((rental['status'] ?? '').toString().toUpperCase() !=
+                        'PEMBAYARAN DENDA' &&
+                    (rental['status'] ?? '').toString().toUpperCase() !=
+                        'PERIKSA PEMBAYARAN DENDA')
+                  Expanded(
+                    child: _buildActionButton(
+                      icon: Icons.cancel_outlined,
+                      label: 'Batalkan',
+                      onPressed: () => controller.cancelRental(rental['id']),
+                      iconColor: AppColors.error,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -560,11 +701,9 @@ class WargaSewaView extends GetView<WargaSewaController> {
     return Obx(() {
       // Show loading indicator while fetching data
       if (controller.isLoadingAccepted.value) {
-        return const Center(
-          child: CircularProgressIndicator(),
-        );
+        return const Center(child: CircularProgressIndicator());
       }
-      
+
       // Check if there is any data to display
       if (controller.acceptedRentals.isNotEmpty) {
         return SingleChildScrollView(
@@ -573,12 +712,16 @@ class WargaSewaView extends GetView<WargaSewaController> {
           child: Column(
             children: [
               // Build a card for each accepted rental item
-              ...controller.acceptedRentals.map((rental) => Column(
-                children: [
-                  _buildDiterimaRentalCard(rental),
-                  const SizedBox(height: 20),
-                ],
-              )).toList(),
+              ...controller.acceptedRentals
+                  .map(
+                    (rental) => Column(
+                      children: [
+                        _buildDiterimaRentalCard(rental),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  )
+                  .toList(),
               _buildTipsSectionDiterima(),
             ],
           ),
@@ -652,49 +795,52 @@ class WargaSewaView extends GetView<WargaSewaController> {
                 // Asset image with rounded corners
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: rental['imageUrl'] != null && rental['imageUrl'].toString().startsWith('http')
-                    ? Image.network(
-                        rental['imageUrl'],
-                        width: 90,
-                        height: 90,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
+                  child:
+                      rental['imageUrl'] != null &&
+                              rental['imageUrl'].toString().startsWith('http')
+                          ? Image.network(
+                            rental['imageUrl'],
                             width: 90,
                             height: 90,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 36,
-                              color: Colors.grey.shade400,
-                            ),
-                          );
-                        },
-                      )
-                    : Image.asset(
-                        rental['imageUrl'] ?? 'assets/images/gambar_pendukung.jpg',
-                        width: 90,
-                        height: 90,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 90,
+                                height: 90,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.image_not_supported_outlined,
+                                  size: 36,
+                                  color: Colors.grey.shade400,
+                                ),
+                              );
+                            },
+                          )
+                          : Image.asset(
+                            rental['imageUrl'] ??
+                                'assets/images/gambar_pendukung.jpg',
                             width: 90,
                             height: 90,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 36,
-                              color: Colors.grey.shade400,
-                            ),
-                          );
-                        },
-                      ),
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 90,
+                                height: 90,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.image_not_supported_outlined,
+                                  size: 36,
+                                  color: Colors.grey.shade400,
+                                ),
+                              );
+                            },
+                          ),
                 ),
                 const SizedBox(width: 16),
                 // Asset details
@@ -826,12 +972,15 @@ class WargaSewaView extends GetView<WargaSewaController> {
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.all(20),
         child: Column(
-          children: controller.completedRentals
-              .map((rental) => Padding(
-                    padding: const EdgeInsets.only(bottom: 16.0),
-                    child: _buildSelesaiRentalCard(rental),
-                  ))
-              .toList(),
+          children:
+              controller.completedRentals
+                  .map(
+                    (rental) => Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: _buildSelesaiRentalCard(rental),
+                    ),
+                  )
+                  .toList(),
         ),
       );
     });
@@ -888,49 +1037,52 @@ class WargaSewaView extends GetView<WargaSewaController> {
                 // Asset image with rounded corners
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: rental['imageUrl'] != null && rental['imageUrl'].toString().startsWith('http')
-                    ? Image.network(
-                        rental['imageUrl'],
-                        width: 90,
-                        height: 90,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
+                  child:
+                      rental['imageUrl'] != null &&
+                              rental['imageUrl'].toString().startsWith('http')
+                          ? Image.network(
+                            rental['imageUrl'],
                             width: 90,
                             height: 90,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 36,
-                              color: Colors.grey.shade400,
-                            ),
-                          );
-                        },
-                      )
-                    : Image.asset(
-                        rental['imageUrl'] ?? 'assets/images/gambar_pendukung.jpg',
-                        width: 90,
-                        height: 90,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 90,
+                                height: 90,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.image_not_supported_outlined,
+                                  size: 36,
+                                  color: Colors.grey.shade400,
+                                ),
+                              );
+                            },
+                          )
+                          : Image.asset(
+                            rental['imageUrl'] ??
+                                'assets/images/gambar_pendukung.jpg',
                             width: 90,
                             height: 90,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 36,
-                              color: Colors.grey.shade400,
-                            ),
-                          );
-                        },
-                      ),
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 90,
+                                height: 90,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.image_not_supported_outlined,
+                                  size: 36,
+                                  color: Colors.grey.shade400,
+                                ),
+                              );
+                            },
+                          ),
                 ),
                 const SizedBox(width: 16),
                 // Asset details
@@ -972,11 +1124,7 @@ class WargaSewaView extends GetView<WargaSewaController> {
           ),
 
           // Divider
-          Divider(
-            color: Colors.grey.shade200,
-            thickness: 1,
-            height: 1,
-          ),
+          Divider(color: Colors.grey.shade200, thickness: 1, height: 1),
 
           // Price section
           Padding(
@@ -1047,12 +1195,15 @@ class WargaSewaView extends GetView<WargaSewaController> {
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.all(20),
         child: Column(
-          children: controller.cancelledRentals
-              .map((rental) => Padding(
-                    padding: const EdgeInsets.only(bottom: 16.0),
-                    child: _buildDibatalkanRentalCard(rental),
-                  ))
-              .toList(),
+          children:
+              controller.cancelledRentals
+                  .map(
+                    (rental) => Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: _buildDibatalkanRentalCard(rental),
+                    ),
+                  )
+                  .toList(),
         ),
       );
     });
@@ -1109,49 +1260,52 @@ class WargaSewaView extends GetView<WargaSewaController> {
                 // Asset image with rounded corners
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: rental['imageUrl'] != null && rental['imageUrl'].toString().startsWith('http')
-                    ? Image.network(
-                        rental['imageUrl'],
-                        width: 90,
-                        height: 90,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
+                  child:
+                      rental['imageUrl'] != null &&
+                              rental['imageUrl'].toString().startsWith('http')
+                          ? Image.network(
+                            rental['imageUrl'],
                             width: 90,
                             height: 90,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 36,
-                              color: Colors.grey.shade400,
-                            ),
-                          );
-                        },
-                      )
-                    : Image.asset(
-                        rental['imageUrl'] ?? 'assets/images/gambar_pendukung.jpg',
-                        width: 90,
-                        height: 90,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 90,
+                                height: 90,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.image_not_supported_outlined,
+                                  size: 36,
+                                  color: Colors.grey.shade400,
+                                ),
+                              );
+                            },
+                          )
+                          : Image.asset(
+                            rental['imageUrl'] ??
+                                'assets/images/gambar_pendukung.jpg',
                             width: 90,
                             height: 90,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 36,
-                              color: Colors.grey.shade400,
-                            ),
-                          );
-                        },
-                      ),
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 90,
+                                height: 90,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.image_not_supported_outlined,
+                                  size: 36,
+                                  color: Colors.grey.shade400,
+                                ),
+                              );
+                            },
+                          ),
                 ),
                 const SizedBox(width: 16),
                 // Asset details
@@ -1185,7 +1339,8 @@ class WargaSewaView extends GetView<WargaSewaController> {
                         icon: Icons.access_time,
                         text: rental['duration'] ?? '-',
                       ),
-                      if (rental['alasanPembatalan'] != null && rental['alasanPembatalan'] != '-')
+                      if (rental['alasanPembatalan'] != null &&
+                          rental['alasanPembatalan'] != '-')
                         Padding(
                           padding: const EdgeInsets.only(top: 8.0),
                           child: _buildInfoRow(
@@ -1201,11 +1356,7 @@ class WargaSewaView extends GetView<WargaSewaController> {
           ),
 
           // Divider
-          Divider(
-            color: Colors.grey.shade200,
-            thickness: 1,
-            height: 1,
-          ),
+          Divider(color: Colors.grey.shade200, thickness: 1, height: 1),
 
           // Price section
           Padding(
@@ -1241,15 +1392,6 @@ class WargaSewaView extends GetView<WargaSewaController> {
                         label: 'Lihat Detail',
                         onPressed: () => controller.viewRentalDetail(rental),
                         iconColor: AppColors.info,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildActionButton(
-                        icon: Icons.refresh,
-                        label: 'Pesan Kembali',
-                        onPressed: () {},
-                        iconColor: AppColors.success,
                       ),
                     ),
                   ],
@@ -1485,6 +1627,263 @@ class WargaSewaView extends GetView<WargaSewaController> {
             title: 'Pengembalian Tepat Waktu',
             description:
                 'Lakukan pengembalian aset sebelum waktu sewa berakhir agar tidak dikenakan denda.',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDikembalikanTab() {
+    return Obx(() {
+      if (controller.isLoadingReturned.value) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(20.0),
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+      if (controller.returnedRentals.isEmpty) {
+        return _buildTabContent(
+          icon: Icons.assignment_return,
+          title: 'Belum Ada Sewa Dikembalikan',
+          subtitle: 'Sewa yang sudah dikembalikan akan muncul di sini',
+          buttonText: 'Lihat Aset',
+          onButtonPressed: () => Get.toNamed('/warga-aset'),
+          color: Colors.deepPurple,
+        );
+      }
+      return SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children:
+              controller.returnedRentals
+                  .map(
+                    (rental) => Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: _buildDikembalikanRentalCard(rental),
+                    ),
+                  )
+                  .toList(),
+        ),
+      );
+    });
+  }
+
+  Widget _buildDikembalikanRentalCard(Map<String, dynamic> rental) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header section with status
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.info.withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Icon(Icons.assignment_return, size: 18, color: AppColors.info),
+                const SizedBox(width: 8),
+                Text(
+                  rental['status'] ?? 'DIKEMBALIKAN',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.info,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Asset details
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    rental['imageUrl'] ?? '',
+                    width: 64,
+                    height: 64,
+                    fit: BoxFit.cover,
+                    errorBuilder:
+                        (context, error, stackTrace) => Container(
+                          width: 64,
+                          height: 64,
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.image, color: Colors.grey),
+                        ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        rental['name'] ?? 'Aset',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        icon: Icons.inventory_2_outlined,
+                        text: '${rental['jumlahUnit'] ?? 0} Unit',
+                      ),
+                      const SizedBox(height: 6),
+                      _buildInfoRow(
+                        icon: Icons.calendar_today_outlined,
+                        text: rental['tanggalSewa'] ?? '',
+                      ),
+                      const SizedBox(height: 6),
+                      _buildInfoRow(
+                        icon: Icons.schedule,
+                        text: rental['rentangWaktu'] ?? '',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade100),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    Text(
+                      rental['totalPrice'] ?? 'Rp 0',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: _buildActionButton(
+                    icon: Icons.info_outline,
+                    label: 'Lihat Detail',
+                    onPressed: () => controller.viewRentalDetail(rental),
+                    iconColor: AppColors.info,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CountdownTimerWidget extends StatefulWidget {
+  final DateTime updatedAt;
+  final VoidCallback? onTimeout;
+  const CountdownTimerWidget({
+    required this.updatedAt,
+    this.onTimeout,
+    Key? key,
+  }) : super(key: key);
+  @override
+  State<CountdownTimerWidget> createState() => _CountdownTimerWidgetState();
+}
+
+class _CountdownTimerWidgetState extends State<CountdownTimerWidget> {
+  late Duration remaining;
+  Timer? timer;
+  @override
+  void initState() {
+    super.initState();
+    updateRemaining();
+    timer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => updateRemaining(),
+    );
+    print('DEBUG updated_at: ${widget.updatedAt}');
+  }
+
+  void updateRemaining() {
+    final now = DateTime.now();
+    final deadline = widget.updatedAt.add(const Duration(hours: 1));
+    setState(() {
+      remaining = deadline.difference(now);
+      if (remaining.isNegative) {
+        remaining = Duration.zero;
+        timer?.cancel();
+        widget.onTimeout?.call();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (remaining.inSeconds <= 0) {
+      return Text('Waktu habis', style: TextStyle(color: Colors.red));
+    }
+    final h = remaining.inHours;
+    final m = remaining.inMinutes % 60;
+    final s = remaining.inSeconds % 60;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.red.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.red.withOpacity(0.3), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.timer_outlined, size: 14, color: Colors.red),
+          const SizedBox(width: 4),
+          Text(
+            'Bayar dalam ${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.red,
+            ),
           ),
         ],
       ),

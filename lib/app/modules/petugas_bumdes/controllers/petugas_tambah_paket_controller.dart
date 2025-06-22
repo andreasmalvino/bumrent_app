@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bumrent_app/app/data/models/paket_model.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:bumrent_app/app/data/providers/aset_provider.dart';
+import 'dart:io';
+import 'package:uuid/uuid.dart';
 
 class PetugasTambahPaketController extends GetxController {
   // Form controllers
@@ -10,14 +16,14 @@ class PetugasTambahPaketController extends GetxController {
 
   // Dropdown and toggle values
   final selectedCategory = 'Bulanan'.obs;
-  final selectedStatus = 'Aktif'.obs;
+  final selectedStatus = 'Tersedia'.obs;
 
   // Category options
   final categoryOptions = ['Bulanan', 'Tahunan', 'Premium', 'Bisnis'];
-  final statusOptions = ['Aktif', 'Nonaktif'];
+  final statusOptions = ['Tersedia', 'Pemeliharaan'];
 
   // Images
-  final selectedImages = <String>[].obs;
+  final selectedImages = <dynamic>[].obs;
 
   // For package name and description
   final packageNameController = TextEditingController();
@@ -31,21 +37,85 @@ class PetugasTambahPaketController extends GetxController {
   // For asset selection
   final RxList<Map<String, dynamic>> availableAssets =
       <Map<String, dynamic>>[].obs;
-  final Rx<int?> selectedAsset = Rx<int?>(null);
+  final Rx<String?> selectedAsset = Rx<String?>(null);
   final RxBool isLoadingAssets = false.obs;
 
   // Form validation
   final isFormValid = false.obs;
   final isSubmitting = false.obs;
 
+  // New RxBool for editing
+  final isEditing = false.obs;
+
+  final timeOptions = {'Per Jam': true.obs, 'Per Hari': false.obs};
+  final pricePerHourController = TextEditingController();
+  final maxHourController = TextEditingController();
+  final pricePerDayController = TextEditingController();
+  final maxDayController = TextEditingController();
+
+  final _picker = ImagePicker();
+
+  final isFormChanged = false.obs;
+  Map<String, dynamic> initialFormData = {};
+
+  final AsetProvider _asetProvider = Get.put(AsetProvider());
+
   @override
   void onInit() {
     super.onInit();
 
+    // Ambil flag isEditing dari arguments
+    isEditing.value =
+        Get.arguments != null && Get.arguments['isEditing'] == true;
+
+    if (isEditing.value) {
+      final paketArg = Get.arguments['paket'];
+      String? paketId;
+      if (paketArg != null) {
+        if (paketArg is Map && paketArg['id'] != null) {
+          paketId = paketArg['id'].toString();
+        } else if (paketArg is PaketModel && paketArg.id != null) {
+          paketId = paketArg.id.toString();
+        }
+      }
+      if (paketId != null) {
+        fetchPaketDetail(paketId);
+      }
+    }
+
     // Listen to field changes for validation
-    nameController.addListener(validateForm);
-    descriptionController.addListener(validateForm);
-    priceController.addListener(validateForm);
+    nameController.addListener(() {
+      validateForm();
+      checkFormChanged();
+    });
+    descriptionController.addListener(() {
+      validateForm();
+      checkFormChanged();
+    });
+    priceController.addListener(() {
+      validateForm();
+      checkFormChanged();
+    });
+    itemQuantityController.addListener(() {
+      validateForm();
+      checkFormChanged();
+    });
+    pricePerHourController.addListener(() {
+      validateForm();
+      checkFormChanged();
+    });
+    maxHourController.addListener(() {
+      validateForm();
+      checkFormChanged();
+    });
+    pricePerDayController.addListener(() {
+      validateForm();
+      checkFormChanged();
+    });
+    maxDayController.addListener(() {
+      validateForm();
+      checkFormChanged();
+    });
 
     // Load available assets when the controller initializes
     fetchAvailableAssets();
@@ -61,6 +131,10 @@ class PetugasTambahPaketController extends GetxController {
     packageNameController.dispose();
     packageDescriptionController.dispose();
     packagePriceController.dispose();
+    pricePerHourController.dispose();
+    maxHourController.dispose();
+    pricePerDayController.dispose();
+    maxDayController.dispose();
     super.onClose();
   }
 
@@ -68,18 +142,21 @@ class PetugasTambahPaketController extends GetxController {
   void setCategory(String category) {
     selectedCategory.value = category;
     validateForm();
+    checkFormChanged();
   }
 
   // Change selected status
   void setStatus(String status) {
     selectedStatus.value = status;
     validateForm();
+    checkFormChanged();
   }
 
   // Add image to the list (in a real app, this would handle file upload)
   void addImage(String imagePath) {
     selectedImages.add(imagePath);
     validateForm();
+    checkFormChanged();
   }
 
   // Remove image from the list
@@ -87,34 +164,43 @@ class PetugasTambahPaketController extends GetxController {
     if (index >= 0 && index < selectedImages.length) {
       selectedImages.removeAt(index);
       validateForm();
+      checkFormChanged();
     }
   }
 
-  // Fetch available assets from the API or local data
-  void fetchAvailableAssets() {
+  // Fetch available assets from Supabase and filter out already selected ones
+  Future<void> fetchAvailableAssets() async {
     isLoadingAssets.value = true;
-
-    // This is a mock implementation - replace with actual API call
-    Future.delayed(const Duration(seconds: 1), () {
-      availableAssets.value = [
-        {'id': 1, 'nama': 'Laptop Dell XPS', 'stok': 5},
-        {'id': 2, 'nama': 'Proyektor Epson', 'stok': 3},
-        {'id': 3, 'nama': 'Meja Kantor', 'stok': 10},
-        {'id': 4, 'nama': 'Kursi Ergonomis', 'stok': 15},
-        {'id': 5, 'nama': 'Printer HP LaserJet', 'stok': 2},
-        {'id': 6, 'nama': 'AC Panasonic 1PK', 'stok': 8},
-      ];
+    try {
+      final allAssets = await _asetProvider.getSewaAsets();
+      final selectedAsetIds =
+          packageItems.map((item) => item['asetId'].toString()).toSet();
+      // Only show assets not yet selected
+      availableAssets.value =
+          allAssets
+              .where((aset) => !selectedAsetIds.contains(aset.id))
+              .map(
+                (aset) => {
+                  'id': aset.id,
+                  'nama': aset.nama,
+                  'stok': aset.kuantitas,
+                },
+              )
+              .toList();
+    } catch (e) {
+      availableAssets.value = [];
+    } finally {
       isLoadingAssets.value = false;
-    });
+    }
   }
 
   // Set the selected asset
-  void setSelectedAsset(int? assetId) {
+  void setSelectedAsset(String? assetId) {
     selectedAsset.value = assetId;
   }
 
   // Get remaining stock for an asset (considering current selections)
-  int getRemainingStock(int assetId) {
+  int getRemainingStock(String assetId) {
     // Find the asset in available assets
     final asset = availableAssets.firstWhere(
       (item) => item['id'] == assetId,
@@ -129,7 +215,7 @@ class PetugasTambahPaketController extends GetxController {
     // Calculate how many of this asset are already in the package
     int alreadySelected = 0;
     for (var item in packageItems) {
-      if (item['asetId'] == assetId) {
+      if (item['asetId'].toString() == assetId) {
         alreadySelected += item['jumlah'] as int;
       }
     }
@@ -204,6 +290,8 @@ class PetugasTambahPaketController extends GetxController {
       backgroundColor: Colors.green,
       colorText: Colors.white,
     );
+
+    checkFormChanged();
   }
 
   // Update an existing package item
@@ -301,11 +389,16 @@ class PetugasTambahPaketController extends GetxController {
       backgroundColor: Colors.green,
       colorText: Colors.white,
     );
+
+    checkFormChanged();
   }
 
   // Remove an item from the package
   void removeItem(int index) {
-    packageItems.removeAt(index);
+    if (index >= 0 && index < packageItems.length) {
+      packageItems.removeAt(index);
+      checkFormChanged();
+    }
     Get.snackbar(
       'Dihapus',
       'Item berhasil dihapus dari paket',
@@ -319,10 +412,7 @@ class PetugasTambahPaketController extends GetxController {
   void validateForm() {
     // Basic validation
     bool basicValid =
-        nameController.text.isNotEmpty &&
-        descriptionController.text.isNotEmpty &&
-        priceController.text.isNotEmpty &&
-        int.tryParse(priceController.text) != null;
+        nameController.text.isNotEmpty && descriptionController.text.isNotEmpty;
 
     // Package should have at least one item
     bool hasItems = packageItems.isNotEmpty;
@@ -337,39 +427,204 @@ class PetugasTambahPaketController extends GetxController {
     isSubmitting.value = true;
 
     try {
-      // In a real app, this would make an API call to save the package
-      await Future.delayed(const Duration(seconds: 1)); // Mock API call
+      final supabase = Supabase.instance.client;
+      if (isEditing.value) {
+        // --- UPDATE LOGIC ---
+        final paketArg = Get.arguments['paket'];
+        final String paketId =
+            paketArg is Map && paketArg['id'] != null
+                ? paketArg['id'].toString()
+                : (paketArg is PaketModel && paketArg.id != null
+                    ? paketArg.id.toString()
+                    : '');
+        if (paketId.isEmpty) throw Exception('ID paket tidak ditemukan');
 
-      // Prepare package data
-      final paketData = {
-        'nama': nameController.text,
-        'deskripsi': descriptionController.text,
-        'kategori': selectedCategory.value,
-        'status': selectedStatus.value == 'Aktif',
-        'harga': int.parse(priceController.text),
-        'gambar': selectedImages,
-        'items': packageItems,
-      };
+        // 1. Update data utama paket
+        await supabase
+            .from('paket')
+            .update({
+              'nama': nameController.text,
+              'deskripsi': descriptionController.text,
+              'status': selectedStatus.value.toLowerCase(),
+            })
+            .eq('id', paketId);
 
-      // Log the data (in a real app, this would be sent to an API)
-      print('Package data: $paketData');
+        // 2. Update paket_item: hapus semua, insert ulang
+        await supabase.from('paket_item').delete().eq('paket_id', paketId);
+        for (var item in packageItems) {
+          await supabase.from('paket_item').insert({
+            'paket_id': paketId,
+            'aset_id': item['asetId'],
+            'kuantitas': item['jumlah'],
+          });
+        }
 
-      // Return to the package list page
-      Get.back();
+        // 3. Update satuan_waktu_sewa: hapus semua, insert ulang
+        await supabase
+            .from('satuan_waktu_sewa')
+            .delete()
+            .eq('paket_id', paketId);
+        // Fetch satuan_waktu UUIDs
+        final satuanWaktuList = await supabase
+            .from('satuan_waktu')
+            .select('id, nama_satuan_waktu');
+        String? jamId;
+        String? hariId;
+        for (var sw in satuanWaktuList) {
+          final nama = (sw['nama_satuan_waktu'] ?? '').toString().toLowerCase();
+          if (nama.contains('jam')) jamId = sw['id'];
+          if (nama.contains('hari')) hariId = sw['id'];
+        }
+        if (timeOptions['Per Jam']?.value == true && jamId != null) {
+          await supabase.from('satuan_waktu_sewa').insert({
+            'paket_id': paketId,
+            'satuan_waktu_id': jamId,
+            'harga': int.tryParse(pricePerHourController.text) ?? 0,
+            'maksimal_waktu': int.tryParse(maxHourController.text) ?? 0,
+          });
+        }
+        if (timeOptions['Per Hari']?.value == true && hariId != null) {
+          await supabase.from('satuan_waktu_sewa').insert({
+            'paket_id': paketId,
+            'satuan_waktu_id': hariId,
+            'harga': int.tryParse(pricePerDayController.text) ?? 0,
+            'maksimal_waktu': int.tryParse(maxDayController.text) ?? 0,
+          });
+        }
 
-      // Show success message
-      Get.snackbar(
-        'Berhasil',
-        'Paket berhasil ditambahkan',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        snackPosition: SnackPosition.BOTTOM,
-      );
+        // 4. Update foto_aset
+        // a. Ambil foto lama dari DB
+        final oldPhotos = await supabase
+            .from('foto_aset')
+            .select('foto_aset')
+            .eq('id_paket', paketId);
+        final oldPhotoUrls =
+            oldPhotos
+                .map((e) => e['foto_aset']?.toString())
+                .whereType<String>()
+                .toSet();
+        final newPhotoUrls =
+            selectedImages
+                .map((img) => img is String ? img : (img.path ?? ''))
+                .where((e) => e.isNotEmpty)
+                .toSet();
+        // b. Hapus foto yang dihapus user (dari DB dan storage)
+        final removedPhotos = oldPhotoUrls.difference(newPhotoUrls);
+        for (final url in removedPhotos) {
+          await supabase
+              .from('foto_aset')
+              .delete()
+              .eq('foto_aset', url)
+              .eq('id_paket', paketId);
+          await _asetProvider.deleteFileFromStorage(url);
+        }
+        // c. Tambah foto baru (upload jika perlu, insert ke DB)
+        for (final img in selectedImages) {
+          String url = '';
+          if (img is String && img.startsWith('http')) {
+            url = img;
+          } else if (img is XFile) {
+            final uploaded = await _asetProvider.uploadFileToStorage(
+              File(img.path),
+            );
+            if (uploaded != null) url = uploaded;
+          }
+          if (url.isNotEmpty && !oldPhotoUrls.contains(url)) {
+            await supabase.from('foto_aset').insert({
+              'id_paket': paketId,
+              'foto_aset': url,
+            });
+          }
+        }
+
+        // Sukses
+        Get.back();
+        Get.snackbar(
+          'Berhasil',
+          'Paket berhasil diperbarui',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      } else {
+        // --- ADD LOGIC ---
+        final uuid = Uuid();
+        final String paketId = uuid.v4();
+        // 1. Insert ke tabel paket
+        await supabase.from('paket').insert({
+          'id': paketId,
+          'nama': nameController.text,
+          'deskripsi': descriptionController.text,
+          'status': selectedStatus.value.toLowerCase(),
+        });
+        // 2. Insert ke paket_item
+        for (var item in packageItems) {
+          await supabase.from('paket_item').insert({
+            'paket_id': paketId,
+            'aset_id': item['asetId'],
+            'kuantitas': item['jumlah'],
+          });
+        }
+        // 3. Insert ke satuan_waktu_sewa (ambil UUID satuan waktu)
+        final satuanWaktuList = await supabase
+            .from('satuan_waktu')
+            .select('id, nama_satuan_waktu');
+        String? jamId;
+        String? hariId;
+        for (var sw in satuanWaktuList) {
+          final nama = (sw['nama_satuan_waktu'] ?? '').toString().toLowerCase();
+          if (nama.contains('jam')) jamId = sw['id'];
+          if (nama.contains('hari')) hariId = sw['id'];
+        }
+        if (timeOptions['Per Jam']?.value == true && jamId != null) {
+          await supabase.from('satuan_waktu_sewa').insert({
+            'paket_id': paketId,
+            'satuan_waktu_id': jamId,
+            'harga': int.tryParse(pricePerHourController.text) ?? 0,
+            'maksimal_waktu': int.tryParse(maxHourController.text) ?? 0,
+          });
+        }
+        if (timeOptions['Per Hari']?.value == true && hariId != null) {
+          await supabase.from('satuan_waktu_sewa').insert({
+            'paket_id': paketId,
+            'satuan_waktu_id': hariId,
+            'harga': int.tryParse(pricePerDayController.text) ?? 0,
+            'maksimal_waktu': int.tryParse(maxDayController.text) ?? 0,
+          });
+        }
+        // 4. Insert ke foto_aset (upload jika perlu)
+        for (final img in selectedImages) {
+          String url = '';
+          if (img is String && img.startsWith('http')) {
+            url = img;
+          } else if (img is XFile) {
+            final uploaded = await _asetProvider.uploadFileToStorage(
+              File(img.path),
+            );
+            if (uploaded != null) url = uploaded;
+          }
+          if (url.isNotEmpty) {
+            await supabase.from('foto_aset').insert({
+              'id_paket': paketId,
+              'foto_aset': url,
+            });
+          }
+        }
+        // Sukses
+        Get.back();
+        Get.snackbar(
+          'Berhasil',
+          'Paket berhasil ditambahkan',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
     } catch (e) {
       // Show error message
       Get.snackbar(
         'Gagal',
-        'Terjadi kesalahan: ${e.toString()}',
+        'Terjadi kesalahan: \\${e.toString()}',
         backgroundColor: Colors.red,
         colorText: Colors.white,
         snackPosition: SnackPosition.BOTTOM,
@@ -389,5 +644,216 @@ class PetugasTambahPaketController extends GetxController {
     // Menambahkan URL gambar dummy untuk keperluan pengembangan
     selectedImages.add('https://example.com/sample_image.jpg');
     validateForm();
+  }
+
+  void toggleTimeOption(String option) {
+    timeOptions[option]?.value = !(timeOptions[option]?.value ?? false);
+    // Ensure at least one option is selected
+    bool anySelected = false;
+    timeOptions.forEach((key, value) {
+      if (value.value) anySelected = true;
+    });
+    if (!anySelected) {
+      timeOptions[option]?.value = true;
+    }
+    validateForm();
+    checkFormChanged();
+  }
+
+  Future<void> fetchPaketDetail(String paketId) async {
+    try {
+      debugPrint('[DEBUG] Fetching paket detail for id: $paketId');
+      final supabase = Supabase.instance.client;
+      // 1) Ambil data paket utama
+      final paketData =
+          await supabase
+              .from('paket')
+              .select('id, nama, deskripsi, status')
+              .eq('id', paketId)
+              .single();
+      debugPrint('[DEBUG] Paket data: ' + paketData.toString());
+
+      // 2) Ambil paket_item
+      final paketItemData = await supabase
+          .from('paket_item')
+          .select('id, paket_id, aset_id, kuantitas')
+          .eq('paket_id', paketId);
+      debugPrint('[DEBUG] Paket item data: ' + paketItemData.toString());
+
+      // 3) Ambil satuan_waktu_sewa
+      final swsData = await supabase
+          .from('satuan_waktu_sewa')
+          .select('id, paket_id, satuan_waktu_id, harga, maksimal_waktu')
+          .eq('paket_id', paketId);
+      debugPrint('[DEBUG] Satuan waktu sewa data: ' + swsData.toString());
+
+      // 4) Ambil semua satuan_waktu_id dari swsData
+      final swIds = swsData.map((e) => e['satuan_waktu_id']).toSet().toList();
+      final swData =
+          swIds.isNotEmpty
+              ? await supabase
+                  .from('satuan_waktu')
+                  .select('id, nama_satuan_waktu')
+                  .inFilter('id', swIds)
+              : [];
+      debugPrint('[DEBUG] Satuan waktu data: ' + swData.toString());
+      final Map satuanWaktuMap = {
+        for (var sw in swData) sw['id']: sw['nama_satuan_waktu'],
+      };
+
+      // 5) Ambil foto_aset
+      final fotoData = await supabase
+          .from('foto_aset')
+          .select('id_paket, foto_aset')
+          .eq('id_paket', paketId);
+      debugPrint('[DEBUG] Foto aset data: ' + fotoData.toString());
+
+      // 6) Kumpulkan semua aset_id dari paketItemData
+      final asetIds = paketItemData.map((e) => e['aset_id']).toSet().toList();
+      final asetData =
+          asetIds.isNotEmpty
+              ? await supabase
+                  .from('aset')
+                  .select('id, nama, kuantitas')
+                  .inFilter('id', asetIds)
+              : [];
+      debugPrint('[DEBUG] Aset data: ' + asetData.toString());
+      final Map asetMap = {for (var a in asetData) a['id']: a};
+
+      // Prefill field controller
+      nameController.text = paketData['nama']?.toString() ?? '';
+      descriptionController.text = paketData['deskripsi']?.toString() ?? '';
+      // Status mapping
+      final statusDb =
+          (paketData['status']?.toString().toLowerCase() ?? 'tersedia');
+      selectedStatus.value =
+          statusDb == 'pemeliharaan' ? 'Pemeliharaan' : 'Tersedia';
+
+      // Foto
+      selectedImages.clear();
+      if (fotoData.isNotEmpty) {
+        for (var foto in fotoData) {
+          final url = foto['foto_aset']?.toString();
+          if (url != null && url.isNotEmpty) {
+            selectedImages.add(url);
+          }
+        }
+      }
+
+      // Item paket
+      packageItems.clear();
+      for (var item in paketItemData) {
+        final aset = asetMap[item['aset_id']];
+        packageItems.add({
+          'asetId': item['aset_id'],
+          'nama': aset != null ? aset['nama'] : '',
+          'jumlah': item['kuantitas'],
+          'stok': aset != null ? aset['kuantitas'] : 0,
+        });
+      }
+
+      // Opsi waktu & harga sewa
+      // Reset
+      timeOptions['Per Jam']?.value = false;
+      timeOptions['Per Hari']?.value = false;
+      pricePerHourController.clear();
+      maxHourController.clear();
+      pricePerDayController.clear();
+      maxDayController.clear();
+      for (var sws in swsData) {
+        final satuanNama =
+            satuanWaktuMap[sws['satuan_waktu_id']]?.toString().toLowerCase() ??
+            '';
+        if (satuanNama.contains('jam')) {
+          timeOptions['Per Jam']?.value = true;
+          pricePerHourController.text = (sws['harga'] ?? '').toString();
+          maxHourController.text = (sws['maksimal_waktu'] ?? '').toString();
+        } else if (satuanNama.contains('hari')) {
+          timeOptions['Per Hari']?.value = true;
+          pricePerDayController.text = (sws['harga'] ?? '').toString();
+          maxDayController.text = (sws['maksimal_waktu'] ?? '').toString();
+        }
+      }
+
+      // Simpan snapshot initialFormData setelah prefill
+      initialFormData = {
+        'nama': nameController.text,
+        'deskripsi': descriptionController.text,
+        'status': selectedStatus.value,
+        'images': List.from(selectedImages),
+        'items': List.from(packageItems),
+        'perJam': timeOptions['Per Jam']?.value ?? false,
+        'perHari': timeOptions['Per Hari']?.value ?? false,
+        'hargaJam': pricePerHourController.text,
+        'maxJam': maxHourController.text,
+        'hargaHari': pricePerDayController.text,
+        'maxHari': maxDayController.text,
+      };
+      isFormChanged.value = false;
+    } catch (e, st) {
+      debugPrint('[ERROR] Gagal fetch paket detail: $e');
+    }
+  }
+
+  Future<void> pickImageFromCamera() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 80,
+        maxWidth: 1024,
+        maxHeight: 1024,
+      );
+      if (image != null) {
+        selectedImages.add(image);
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Gagal mengambil gambar dari kamera: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  Future<void> pickImageFromGallery() async {
+    try {
+      final List<XFile>? images = await _picker.pickMultiImage(
+        imageQuality: 80,
+        maxWidth: 1024,
+        maxHeight: 1024,
+      );
+      if (images != null && images.isNotEmpty) {
+        for (final img in images) {
+          selectedImages.add(img);
+        }
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Gagal memilih gambar dari galeri: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  void checkFormChanged() {
+    final current = {
+      'nama': nameController.text,
+      'deskripsi': descriptionController.text,
+      'status': selectedStatus.value,
+      'images': List.from(selectedImages),
+      'items': List.from(packageItems),
+      'perJam': timeOptions['Per Jam']?.value ?? false,
+      'perHari': timeOptions['Per Hari']?.value ?? false,
+      'hargaJam': pricePerHourController.text,
+      'maxJam': maxHourController.text,
+      'hargaHari': pricePerDayController.text,
+      'maxHari': maxDayController.text,
+    };
+    isFormChanged.value = current.toString() != initialFormData.toString();
   }
 }

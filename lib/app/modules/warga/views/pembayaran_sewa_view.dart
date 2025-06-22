@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../controllers/pembayaran_sewa_controller.dart';
 import 'package:intl/intl.dart';
 import '../../../theme/app_colors.dart';
+import 'dart:async';
 
 class PembayaranSewaView extends GetView<PembayaranSewaController> {
   const PembayaranSewaView({super.key});
@@ -81,6 +82,44 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
               ],
             ),
           ),
+          if ((controller.orderDetails.value['status'] ?? '')
+                      .toString()
+                      .toUpperCase() ==
+                  'MENUNGGU PEMBAYARAN' &&
+              controller.orderDetails.value['updated_at'] != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Obx(() {
+                final status =
+                    (controller.orderDetails.value['status'] ?? '')
+                        .toString()
+                        .toUpperCase();
+                final updatedAtStr =
+                    controller.orderDetails.value['updated_at'];
+                print('DEBUG status: ' + status);
+                print(
+                  'DEBUG updated_at (raw): ' +
+                      (updatedAtStr?.toString() ?? 'NULL'),
+                );
+                if (status == 'MENUNGGU PEMBAYARAN' && updatedAtStr != null) {
+                  try {
+                    final updatedAt = DateTime.parse(updatedAtStr);
+                    print(
+                      'DEBUG updated_at (parsed): ' +
+                          updatedAt.toIso8601String(),
+                    );
+                    return CountdownTimerWidget(updatedAt: updatedAt);
+                  } catch (e) {
+                    print('ERROR parsing updated_at: ' + e.toString());
+                    return Text(
+                      'Format tanggal salah',
+                      style: TextStyle(color: Colors.red),
+                    );
+                  }
+                }
+                return SizedBox.shrink();
+              }),
+            ),
         ],
       ),
     );
@@ -123,36 +162,36 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
               () =>
                   controller.isLoading.value
                       ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(20.0),
-                            child: Column(
-                              children: [
-                                const CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.deepPurple,
-                                  ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Column(
+                            children: [
+                              const CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.deepPurple,
                                 ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Memuat data tagihan...',
-                                  style: TextStyle(
-                                    color: Colors.grey[700],
-                                    fontSize: 14,
-                                  ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Memuat data tagihan...',
+                                style: TextStyle(
+                                  color: Colors.grey[700],
+                                  fontSize: 14,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        )
-                      : Column(
-                          children: [
-                            _buildInvoiceIdCard(),
-                            const SizedBox(height: 16),
-                            _buildTagihanAwalCard(),
-                            const SizedBox(height: 16),
-                            _buildDendaCard(),
-                          ],
                         ),
+                      )
+                      : Column(
+                        children: [
+                          _buildInvoiceIdCard(),
+                          const SizedBox(height: 16),
+                          _buildTagihanAwalCard(),
+                          const SizedBox(height: 16),
+                          _buildDendaCard(),
+                        ],
+                      ),
             ),
           ],
         ),
@@ -174,35 +213,32 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
             _buildPaymentTypeSelection(),
             const SizedBox(height: 24),
             Obx(() {
-              // Show payment method selection only after selecting a payment type
               if (controller.selectedPaymentType.value.isNotEmpty) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildPaymentMethodSelection(),
                     const SizedBox(height: 24),
-                    if (controller.paymentMethod.value == 'transfer')
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildTransferInstructions(),
-                          const SizedBox(height: 24),
-                          _buildPaymentProofUpload(),
-                        ],
-                      )
-                    else if (controller.paymentMethod.value == 'cash')
+                    if (controller.paymentMethod.value == 'transfer') ...[
+                      _buildTransferInstructions(),
+                      const SizedBox(height: 24),
+                      if (controller.selectedPaymentType.value ==
+                          'tagihan_awal')
+                        _buildPaymentProofUploadTagihanAwal(),
+                      if (controller.selectedPaymentType.value == 'denda')
+                        _buildPaymentProofUploadDenda(),
+                    ] else if (controller.paymentMethod.value == 'cash')
                       _buildCashInstructions()
                     else
                       _buildSelectPaymentMethodPrompt(),
                   ],
                 );
               } else {
-                // Prompt to select payment type first
                 return _buildSelectPaymentTypePrompt();
               }
             }),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -272,18 +308,36 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                   'Batas waktu pembayaran: ',
                   style: TextStyle(fontSize: 14, color: Colors.grey),
                 ),
-                Obx(
-                  () => Text(
-                    controller.orderDetails.value['status'] == 'DIBATALKAN'
-                        ? 'Dibatalkan'
-                        : controller.remainingTime.value,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red[700],
-                    ),
-                  ),
-                ),
+                Obx(() {
+                  final status =
+                      (controller.orderDetails.value['status'] ?? '')
+                          .toString()
+                          .toUpperCase();
+                  final updatedAtStr =
+                      controller.orderDetails.value['updated_at'];
+                  print('DEBUG status: ' + status);
+                  print(
+                    'DEBUG updated_at (raw): ' +
+                        (updatedAtStr?.toString() ?? 'NULL'),
+                  );
+                  if (status == 'MENUNGGU PEMBAYARAN' && updatedAtStr != null) {
+                    try {
+                      final updatedAt = DateTime.parse(updatedAtStr);
+                      print(
+                        'DEBUG updated_at (parsed): ' +
+                            updatedAt.toIso8601String(),
+                      );
+                      return CountdownTimerWidget(updatedAt: updatedAt);
+                    } catch (e) {
+                      print('ERROR parsing updated_at: ' + e.toString());
+                      return Text(
+                        'Format tanggal salah',
+                        style: TextStyle(color: Colors.red),
+                      );
+                    }
+                  }
+                  return SizedBox.shrink();
+                }),
               ],
             ),
           ],
@@ -314,28 +368,40 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
         'step': 2,
       },
       {
+        'title': 'Aktif',
+        'description': 'Aset sewa sedang digunakan',
+        'icon': Icons.play_circle_fill,
+        'step': 3,
+      },
+      {
         'title': 'Pengembalian',
         'description': 'Proses pengembalian aset sewa',
         'icon': Icons.assignment_return,
-        'step': 3,
+        'step': 4,
       },
       {
         'title': 'Pembayaran Denda',
         'description': 'Pembayaran denda jika ada kerusakan atau keterlambatan',
         'icon': Icons.money,
-        'step': 4,
+        'step': 5,
       },
       {
-        'title': 'Memeriksa Pembayaran Denda',
+        'title': 'Periksa Pembayaran Denda',
         'description': 'Verifikasi pembayaran denda oleh petugas',
         'icon': Icons.fact_check,
-        'step': 5,
+        'step': 6,
       },
       {
         'title': 'Selesai',
         'description': 'Pesanan sewa telah selesai',
         'icon': Icons.task_alt,
-        'step': 6,
+        'step': 7,
+      },
+      {
+        'title': 'Dibatalkan',
+        'description': 'Pesanan ini telah dibatalkan',
+        'icon': Icons.cancel,
+        'step': 8,
       },
     ];
 
@@ -360,37 +426,69 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
             const SizedBox(height: 20),
             Obx(() {
               final currentStep = controller.currentStep.value;
+              final isCancelled = currentStep == 8;
+              // Filter steps: tampilkan step Dibatalkan hanya jika status DIBATALKAN
+              final visibleSteps =
+                  isCancelled
+                      ? steps
+                      : steps.where((s) => s['step'] != 8).toList();
               return ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: steps.length,
+                itemCount: visibleSteps.length,
                 itemBuilder: (context, index) {
-                  final step = steps[index];
+                  final step = visibleSteps[index];
                   final stepNumber = step['step'] as int;
-                  final isActive = currentStep >= stepNumber;
-                  final isCompleted = currentStep > stepNumber;
-                  final isLast = index == steps.length - 1;
+                  final isActive =
+                      currentStep >= stepNumber &&
+                      (!isCancelled || stepNumber == 8);
+                  final isCompleted =
+                      currentStep > stepNumber &&
+                      (!isCancelled || stepNumber == 8);
+                  final isLast = index == visibleSteps.length - 1;
 
-                  // Determine the appropriate colors
+                  // Custom color for dibatalkan
+                  final bool isCancelledStep = stepNumber == 8;
                   final Color iconColor =
-                      isActive
+                      isCancelledStep
+                          ? Colors.red
+                          : isCancelled
+                          ? Colors.grey[400]!
+                          : isActive
                           ? (isCompleted
                               ? AppColors.success
                               : AppColors.primary)
                           : Colors.grey[300]!;
 
                   final Color lineColor =
-                      isCompleted ? AppColors.success : Colors.grey[300]!;
+                      isCancelledStep
+                          ? Colors.red
+                          : isCancelled
+                          ? Colors.grey[400]!
+                          : isCompleted
+                          ? AppColors.success
+                          : Colors.grey[300]!;
 
                   final Color bgColor =
-                      isActive
+                      isCancelledStep
+                          ? Colors.red.withOpacity(0.1)
+                          : isCancelled
+                          ? Colors.grey[100]!
+                          : isActive
                           ? (isCompleted
                               ? AppColors.successLight
                               : AppColors.primarySoft)
                           : Colors.grey[100]!;
 
+                  // Icon logic: silang untuk step lain jika dibatalkan
+                  final IconData displayIcon =
+                      isCancelled
+                          ? (isCancelledStep ? Icons.cancel : Icons.cancel)
+                          : (isCompleted
+                              ? Icons.check
+                              : step['icon'] as IconData);
+
                   return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Column(
                         children: [
@@ -403,9 +501,7 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                               border: Border.all(color: iconColor, width: 2),
                             ),
                             child: Icon(
-                              isCompleted
-                                  ? Icons.check
-                                  : step['icon'] as IconData,
+                              displayIcon,
                               color: iconColor,
                               size: 18,
                             ),
@@ -425,7 +521,9 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
                                 color:
-                                    isActive
+                                    isCancelledStep
+                                        ? Colors.red
+                                        : isActive
                                         ? AppColors.textPrimary
                                         : AppColors.textSecondary,
                               ),
@@ -434,7 +532,10 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                             Text(
                               step['description'] as String,
                               style: TextStyle(
-                                color: AppColors.textSecondary,
+                                color:
+                                    isCancelledStep
+                                        ? Colors.red
+                                        : AppColors.textSecondary,
                                 fontSize: 12,
                               ),
                             ),
@@ -442,13 +543,18 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                           ],
                         ),
                       ),
-                      if (isCompleted)
+                      if (isCancelled && isCancelledStep)
+                        Icon(Icons.cancel, color: Colors.red, size: 18)
+                      else if (!isCancelled && isCompleted)
                         Icon(
                           Icons.check_circle,
                           color: AppColors.success,
                           size: 18,
                         )
-                      else if (currentStep == stepNumber)
+                      else if (isActive &&
+                          !isCancelledStep &&
+                          !isCompleted &&
+                          !isCancelled)
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -592,19 +698,20 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                     '${controller.sewaAsetDetails.value['kuantitas'] ?? controller.orderDetails.value['quantity'] ?? 0} unit',
                   ),
                   // Waktu Sewa with sub-points for Waktu Mulai and Waktu Selesai
-                  _buildDetailItemWithSubpoints(
-                    'Waktu Sewa',
-                    [
-                      {
-                        'label': 'Waktu Mulai',
-                        'value': _formatDateTime(controller.sewaAsetDetails.value['waktu_mulai']),
-                      },
-                      {
-                        'label': 'Waktu Selesai',
-                        'value': _formatDateTime(controller.sewaAsetDetails.value['waktu_selesai']),
-                      },
-                    ],
-                  ),
+                  _buildDetailItemWithSubpoints('Waktu Sewa', [
+                    {
+                      'label': 'Waktu Mulai',
+                      'value': _formatDateTime(
+                        controller.sewaAsetDetails.value['waktu_mulai'],
+                      ),
+                    },
+                    {
+                      'label': 'Waktu Selesai',
+                      'value': _formatDateTime(
+                        controller.sewaAsetDetails.value['waktu_selesai'],
+                      ),
+                    },
+                  ]),
                   _buildDetailItem(
                     'Durasi',
                     controller.tagihanSewa.value['durasi'] != null
@@ -665,8 +772,9 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
               // Get values from tagihan_sewa table
               final denda = controller.tagihanSewa.value['denda'];
               final keterangan = controller.tagihanSewa.value['keterangan'];
-              final fotoKerusakan = controller.tagihanSewa.value['foto_kerusakan'];
-              
+              final fotoKerusakan =
+                  controller.tagihanSewa.value['foto_kerusakan'];
+
               debugPrint('Tagihan Denda: $denda');
               debugPrint('Tagihan Keterangan: $keterangan');
               debugPrint('Tagihan Foto Kerusakan: $fotoKerusakan');
@@ -748,32 +856,49 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                               onTap: () {
                                 // Show fullscreen image when tapped
                                 // Use the BuildContext from the current widget tree
-                                _showFullScreenImage(Get.context!, fotoKerusakan);
+                                _showFullScreenImage(
+                                  Get.context!,
+                                  fotoKerusakan,
+                                );
                               },
                               child: Hero(
-                                tag: 'damage-photo-${fotoKerusakan ?? 'default'}',
-                                child: fotoKerusakan != null && fotoKerusakan.toString().isNotEmpty && fotoKerusakan.toString().startsWith('http')
-                                  ? Image.network(
-                                      fotoKerusakan.toString(),
-                                      width: double.infinity,
-                                      height: 200,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        debugPrint('Error loading image: $error');
-                                        return Image.asset(
+                                tag:
+                                    'damage-photo-${fotoKerusakan ?? 'default'}',
+                                child:
+                                    fotoKerusakan != null &&
+                                            fotoKerusakan
+                                                .toString()
+                                                .isNotEmpty &&
+                                            fotoKerusakan.toString().startsWith(
+                                              'http',
+                                            )
+                                        ? Image.network(
+                                          fotoKerusakan.toString(),
+                                          width: double.infinity,
+                                          height: 200,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (
+                                            context,
+                                            error,
+                                            stackTrace,
+                                          ) {
+                                            debugPrint(
+                                              'Error loading image: $error',
+                                            );
+                                            return Image.asset(
+                                              'assets/images/gambar_pendukung.jpg',
+                                              width: double.infinity,
+                                              height: 200,
+                                              fit: BoxFit.cover,
+                                            );
+                                          },
+                                        )
+                                        : Image.asset(
                                           'assets/images/gambar_pendukung.jpg',
                                           width: double.infinity,
                                           height: 200,
                                           fit: BoxFit.cover,
-                                        );
-                                      },
-                                    )
-                                  : Image.asset(
-                                      'assets/images/gambar_pendukung.jpg',
-                                      width: double.infinity,
-                                      height: 200,
-                                      fit: BoxFit.cover,
-                                    ),
+                                        ),
                               ),
                             ),
                           ),
@@ -880,12 +1005,13 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
 
   // Show fullscreen image dialog
   void _showFullScreenImage(BuildContext context, dynamic imageUrl) {
-    final String imageSource = (imageUrl != null && 
-                               imageUrl.toString().isNotEmpty && 
-                               imageUrl.toString().startsWith('http'))
-        ? imageUrl.toString()
-        : '';
-    
+    final String imageSource =
+        (imageUrl != null &&
+                imageUrl.toString().isNotEmpty &&
+                imageUrl.toString().startsWith('http'))
+            ? imageUrl.toString()
+            : '';
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -906,27 +1032,30 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                     height: MediaQuery.of(context).size.height,
                     color: Colors.black.withOpacity(0.8),
                     child: Center(
-                      child: imageSource.isNotEmpty
-                          ? Image.network(
-                              imageSource,
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) {
-                                debugPrint('Error loading fullscreen image: $error');
-                                return Image.asset(
-                                  'assets/images/gambar_pendukung.jpg',
-                                  fit: BoxFit.contain,
-                                );
-                              },
-                            )
-                          : Image.asset(
-                              'assets/images/gambar_pendukung.jpg',
-                              fit: BoxFit.contain,
-                            ),
+                      child:
+                          imageSource.isNotEmpty
+                              ? Image.network(
+                                imageSource,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) {
+                                  debugPrint(
+                                    'Error loading fullscreen image: $error',
+                                  );
+                                  return Image.asset(
+                                    'assets/images/gambar_pendukung.jpg',
+                                    fit: BoxFit.contain,
+                                  );
+                                },
+                              )
+                              : Image.asset(
+                                'assets/images/gambar_pendukung.jpg',
+                                fit: BoxFit.contain,
+                              ),
                     ),
                   ),
                 ),
               ),
-              
+
               // Close button at the top right
               Positioned(
                 top: 40,
@@ -1022,7 +1151,7 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                   0;
 
               // Get denda value
-              final denda = controller.sewaAsetDetails.value['denda'] ?? 0;
+              final denda = controller.tagihanSewa.value['denda'] ?? 0;
 
               return Column(
                 children: [
@@ -1042,7 +1171,7 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                     amount: 'Rp ${NumberFormat('#,###').format(denda)}',
                     type: 'denda',
                     description: 'Pembayaran untuk denda yang diberikan',
-                    isDisabled: denda == 0,
+                    isDisabled: denda == null || denda == 0,
                     isSelected: controller.selectedPaymentType.value == 'denda',
                   ),
                 ],
@@ -1316,7 +1445,7 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
             ),
             const SizedBox(height: 16),
             Obx(() {
-              if (controller.bankAccounts.isEmpty) {
+              if (controller.isLoading.value) {
                 return const Center(
                   child: Padding(
                     padding: EdgeInsets.all(16.0),
@@ -1324,21 +1453,33 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                   ),
                 );
               }
-              
+              if (controller.bankAccounts.isEmpty) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text(
+                      'Tidak ada rekening bank yang tersedia.\nSilakan hubungi admin.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                );
+              }
               return Column(
-                children: controller.bankAccounts.map((account) {
-                  return Column(
-                    children: [
-                      _buildBankAccount(
-                        bankName: account['nama_bank'] ?? 'Bank',
-                        accountNumber: account['no_rekening'] ?? '',
-                        accountName: account['nama_akun'] ?? '',
-                        bankLogo: 'assets/images/bank_logo.png',
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                  );
-                }).toList(),
+                children:
+                    controller.bankAccounts.map((account) {
+                      return Column(
+                        children: [
+                          _buildBankAccount(
+                            bankName: account['nama_bank'] ?? 'Bank',
+                            accountNumber: account['no_rekening'] ?? '',
+                            accountName: account['nama_akun'] ?? '',
+                            bankLogo: 'assets/images/bank_logo.png',
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      );
+                    }).toList(),
               );
             }),
             const SizedBox(height: 16),
@@ -1364,13 +1505,6 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
               icon: Icons.check_circle,
               title: 'Tunggu konfirmasi',
               description: 'Pembayaran Anda akan dikonfirmasi oleh petugas',
-            ),
-            _buildTransferStep(
-              icon: Icons.receipt_long,
-              title: 'Dapatkan struk pembayaran',
-              description:
-                  'Setelah dikonfirmasi, akan dibuatkan struk pembayaran',
-              isLast: true,
             ),
           ],
         ),
@@ -1438,7 +1572,7 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
       },
     );
   }
-  
+
   // Bank Account Widget
   Widget _buildBankAccount({
     required String bankName,
@@ -1503,12 +1637,14 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                 onPressed: () {
                   // Copy to clipboard functionality
                   Clipboard.setData(ClipboardData(text: accountNumber));
-                  
+
                   // Show feedback to user
                   final scaffoldMessenger = ScaffoldMessenger.of(Get.context!);
                   scaffoldMessenger.showSnackBar(
                     SnackBar(
-                      content: Text('Nomor rekening $accountNumber disalin ke clipboard'),
+                      content: Text(
+                        'Nomor rekening $accountNumber disalin ke clipboard',
+                      ),
                       duration: const Duration(seconds: 2),
                       backgroundColor: Colors.green[700],
                       behavior: SnackBarBehavior.floating,
@@ -1541,18 +1677,21 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
               GestureDetector(
                 onTap: () {
                   // Get the total price
-                  final totalPrice = controller.orderDetails.value['total_price'] ?? 0;
+                  final totalPrice =
+                      controller.orderDetails.value['total_price'] ?? 0;
                   // Format the total price as a number without 'Rp' prefix
                   final formattedPrice = totalPrice.toString();
-                  
+
                   // Copy to clipboard
                   Clipboard.setData(ClipboardData(text: formattedPrice));
-                  
+
                   // Show feedback to user
                   final scaffoldMessenger = ScaffoldMessenger.of(Get.context!);
                   scaffoldMessenger.showSnackBar(
                     SnackBar(
-                      content: Text('Nominal Rp $formattedPrice disalin ke clipboard'),
+                      content: Text(
+                        'Nominal Rp $formattedPrice disalin ke clipboard',
+                      ),
                       duration: const Duration(seconds: 2),
                       backgroundColor: Colors.green[700],
                       behavior: SnackBarBehavior.floating,
@@ -1570,11 +1709,7 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Icon(
-                      Icons.copy,
-                      size: 14,
-                      color: Colors.deepPurple[300],
-                    ),
+                    Icon(Icons.copy, size: 14, color: Colors.deepPurple[300]),
                   ],
                 ),
               ),
@@ -1635,8 +1770,8 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
     );
   }
 
-  // Payment Proof Upload
-  Widget _buildPaymentProofUpload() {
+  // Payment Proof Upload for Tagihan Awal
+  Widget _buildPaymentProofUploadTagihanAwal() {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1661,48 +1796,55 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  // Display all existing images
                   ...List.generate(
-                    controller.paymentProofImages.length,
-                    (index) => _buildImageItem(index),
+                    controller.paymentProofImagesTagihanAwal.length,
+                    (index) => _buildImageItemTagihanAwal(index),
                   ),
-                  // Add photo button
-                  _buildAddPhotoButton(),
+                  _buildAddPhotoButtonTagihanAwal(),
                 ],
               );
             }),
             const SizedBox(height: 16),
-            // Upload button
             Obx(() {
-              // Disable button if there are no changes or if upload is in progress
-              final bool isDisabled = controller.isUploading.value || !controller.hasUnsavedChanges.value;
-              
+              final bool isDisabled =
+                  controller.isUploading.value ||
+                  !controller.hasUnsavedChangesTagihanAwal.value;
               return ElevatedButton.icon(
-                onPressed: isDisabled ? null : controller.uploadPaymentProof,
-                icon: controller.isUploading.value
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                onPressed:
+                    isDisabled
+                        ? null
+                        : () => controller.uploadPaymentProof(
+                          jenisPembayaran: 'tagihan awal',
                         ),
-                      )
-                    : const Icon(Icons.save),
-                label: Text(controller.isUploading.value 
-                    ? 'Menyimpan...' 
-                    : (controller.hasUnsavedChanges.value ? 'Simpan' : 'Tidak Ada Perubahan')),
+                icon:
+                    controller.isUploading.value
+                        ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                        : const Icon(Icons.save),
+                label: Text(
+                  controller.isUploading.value
+                      ? 'Menyimpan...'
+                      : (controller.hasUnsavedChangesTagihanAwal.value
+                          ? 'Simpan'
+                          : 'Tidak Ada Perubahan'),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
                   foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 48),
-                  // Gray out button when disabled
                   disabledBackgroundColor: Colors.grey[300],
                   disabledForegroundColor: Colors.grey[600],
                 ),
               );
             }),
-            // Upload progress indicator
             Obx(() {
               if (controller.isUploading.value) {
                 return Column(
@@ -1711,7 +1853,9 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                     LinearProgressIndicator(
                       value: controller.uploadProgress.value,
                       backgroundColor: Colors.grey[200],
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[700]!),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.blue[700]!,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -1729,13 +1873,15 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
       ),
     );
   }
-  
-  // Build individual image item with remove button
-  Widget _buildImageItem(int index) {
-    final image = controller.paymentProofImages[index];
+
+  Widget _buildImageItemTagihanAwal(int index) {
+    final image = controller.paymentProofImagesTagihanAwal[index];
+    final status =
+        controller.orderDetails.value['status']?.toString().toUpperCase() ?? '';
+    final canDelete =
+        status == 'MENUNGGU PEMBAYARAN' || status == 'PERIKSA PEMBAYARAN';
     return Stack(
       children: [
-        // Make the container tappable to show full-screen image
         GestureDetector(
           onTap: () => controller.showFullScreenImage(image),
           child: Container(
@@ -1751,28 +1897,27 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
             ),
           ),
         ),
-        // Close/remove button remains the same
-        Positioned(
-          top: 4,
-          right: 4,
-          child: InkWell(
-            onTap: () => controller.removeImage(image),
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
+        if (canDelete)
+          Positioned(
+            top: 4,
+            right: 4,
+            child: InkWell(
+              onTap: () => controller.removeImage(image),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, size: 18, color: Colors.red),
               ),
-              child: const Icon(Icons.close, size: 18, color: Colors.red),
             ),
           ),
-        ),
       ],
     );
   }
-  
-  // Build add photo button
-  Widget _buildAddPhotoButton() {
+
+  Widget _buildAddPhotoButtonTagihanAwal() {
     return InkWell(
       onTap: () => _showImageSourceOptions(Get.context!),
       child: Container(
@@ -1786,11 +1931,183 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.add_a_photo,
-              size: 40,
-              color: Colors.blue[700],
+            Icon(Icons.add_a_photo, size: 40, color: Colors.blue[700]),
+            const SizedBox(height: 8),
+            Text(
+              'Tambah Foto',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.blue[700],
+              ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Payment Proof Upload for Denda
+  Widget _buildPaymentProofUploadDenda() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.photo_camera, size: 24),
+                SizedBox(width: 8),
+                Text(
+                  'Unggah Bukti Pembayaran',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Obx(() {
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  ...List.generate(
+                    controller.paymentProofImagesDenda.length,
+                    (index) => _buildImageItemDenda(index),
+                  ),
+                  _buildAddPhotoButtonDenda(),
+                ],
+              );
+            }),
+            const SizedBox(height: 16),
+            Obx(() {
+              final bool isDisabled =
+                  controller.isUploading.value ||
+                  !controller.hasUnsavedChangesDenda.value;
+              return ElevatedButton.icon(
+                onPressed:
+                    isDisabled
+                        ? null
+                        : () => controller.uploadPaymentProof(
+                          jenisPembayaran: 'denda',
+                        ),
+                icon:
+                    controller.isUploading.value
+                        ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                        : const Icon(Icons.save),
+                label: Text(
+                  controller.isUploading.value
+                      ? 'Menyimpan...'
+                      : (controller.hasUnsavedChangesDenda.value
+                          ? 'Simpan'
+                          : 'Tidak Ada Perubahan'),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 48),
+                  disabledBackgroundColor: Colors.grey[300],
+                  disabledForegroundColor: Colors.grey[600],
+                ),
+              );
+            }),
+            Obx(() {
+              if (controller.isUploading.value) {
+                return Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    LinearProgressIndicator(
+                      value: controller.uploadProgress.value,
+                      backgroundColor: Colors.grey[200],
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.blue[700]!,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Mengunggah bukti pembayaran... ${(controller.uploadProgress.value * 100).toInt()}%',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                );
+              } else {
+                return const SizedBox.shrink();
+              }
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageItemDenda(int index) {
+    final image = controller.paymentProofImagesDenda[index];
+    final status =
+        controller.orderDetails.value['status']?.toString().toUpperCase() ?? '';
+    final canDelete = status != 'SELESAI';
+    return Stack(
+      children: [
+        GestureDetector(
+          onTap: () => controller.showFullScreenImage(image),
+          child: Container(
+            width: 140,
+            height: 140,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: controller.getImageWidget(image),
+            ),
+          ),
+        ),
+        if (canDelete)
+          Positioned(
+            top: 4,
+            right: 4,
+            child: InkWell(
+              onTap: () => controller.removeImage(image),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, size: 18, color: Colors.red),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildAddPhotoButtonDenda() {
+    return InkWell(
+      onTap: () => _showImageSourceOptions(Get.context!),
+      child: Container(
+        width: 140,
+        height: 140,
+        decoration: BoxDecoration(
+          color: Colors.blue[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.blue[200]!),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_a_photo, size: 40, color: Colors.blue[700]),
             const SizedBox(height: 8),
             Text(
               'Tambah Foto',
@@ -1870,13 +2187,6 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
               title: 'Lakukan pembayaran tunai',
               description:
                   'Total: Rp ${controller.orderDetails.value['total_price'] ?? 0}',
-            ),
-            _buildCashStep(
-              number: 4,
-              title: 'Dapatkan struk pembayaran',
-              description:
-                  'Setelah dikonfirmasi, akan dibuatkan struk pembayaran',
-              isLast: true,
             ),
           ],
         ),
@@ -2030,10 +2340,11 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
 
               // Get denda from tagihan_sewa
               final denda = controller.tagihanSewa.value['denda'] ?? 0;
-              
+
               // Get total dibayarkan from tagihan_dibayar
-              final dibayarkan = controller.tagihanSewa.value['tagihan_dibayar'] ?? 0;
-              
+              final dibayarkan =
+                  controller.tagihanSewa.value['tagihan_dibayar'] ?? 0;
+
               debugPrint('Tagihan Awal: $tagihanAwal');
               debugPrint('Denda: $denda');
               debugPrint('Total Dibayarkan: $dibayarkan');
@@ -2080,7 +2391,10 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
   }
 
   // Helper method to build detail item with subpoints
-  Widget _buildDetailItemWithSubpoints(String label, List<Map<String, String>> subpoints) {
+  Widget _buildDetailItemWithSubpoints(
+    String label,
+    List<Map<String, String>> subpoints,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -2097,35 +2411,32 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
           ),
           const SizedBox(height: 8),
           // Subpoints with indentation
-          ...subpoints.map((subpoint) => Padding(
-                padding: const EdgeInsets.only(left: 16, bottom: 6),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        subpoint['label'] ?? '',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[600],
-                        ),
-                      ),
+          ...subpoints.map(
+            (subpoint) => Padding(
+              padding: const EdgeInsets.only(left: 16, bottom: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      subpoint['label'] ?? '',
+                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                     ),
-                    Expanded(
-                      flex: 3,
-                      child: Text(
-                        subpoint['value'] ?? '-',
-                        style: const TextStyle(
-                          fontSize: 13,
-                        ),
-                        textAlign: TextAlign.right,
-                      ),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      subpoint['value'] ?? '-',
+                      style: const TextStyle(fontSize: 13),
+                      textAlign: TextAlign.right,
                     ),
-                  ],
-                ),
-              )),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -2150,5 +2461,87 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
       debugPrint('❌ Error formatting date time: $e');
       return dateTimeStr;
     }
+  }
+}
+
+class CountdownTimerWidget extends StatefulWidget {
+  final DateTime updatedAt;
+  final VoidCallback? onTimeout;
+  const CountdownTimerWidget({
+    required this.updatedAt,
+    this.onTimeout,
+    Key? key,
+  }) : super(key: key);
+  @override
+  State<CountdownTimerWidget> createState() => _CountdownTimerWidgetState();
+}
+
+class _CountdownTimerWidgetState extends State<CountdownTimerWidget> {
+  late Duration remaining;
+  Timer? timer;
+  @override
+  void initState() {
+    super.initState();
+    print(
+      'DEBUG [CountdownTimerWidget] updatedAt: ' +
+          widget.updatedAt.toIso8601String(),
+    );
+    updateRemaining();
+    timer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => updateRemaining(),
+    );
+  }
+
+  void updateRemaining() {
+    final now = DateTime.now();
+    final end = widget.updatedAt.add(const Duration(hours: 1));
+    setState(() {
+      remaining = end.difference(now);
+      if (remaining.isNegative) {
+        remaining = Duration.zero;
+        timer?.cancel();
+        widget.onTimeout?.call();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (remaining.inSeconds <= 0) {
+      return Text('Waktu habis', style: TextStyle(color: Colors.red));
+    }
+    final h = remaining.inHours;
+    final m = remaining.inMinutes % 60;
+    final s = remaining.inSeconds % 60;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.red.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.red.withOpacity(0.3), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.timer_outlined, size: 14, color: Colors.red),
+          const SizedBox(width: 4),
+          Text(
+            'Bayar dalam ${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.red,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

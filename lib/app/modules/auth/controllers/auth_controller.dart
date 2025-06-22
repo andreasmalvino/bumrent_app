@@ -8,6 +8,10 @@ class AuthController extends GetxController {
 
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+  final formKey = GlobalKey<FormState>();
+  final nameController = TextEditingController();
+  final confirmPasswordController = TextEditingController();
+  final RxBool isConfirmPasswordVisible = false.obs;
 
   // Form fields for registration
   final RxString email = ''.obs;
@@ -15,6 +19,7 @@ class AuthController extends GetxController {
   final RxString nik = ''.obs;
   final RxString phoneNumber = ''.obs;
   final RxString selectedRole = 'WARGA'.obs; // Default role
+  final RxString alamatLengkap = ''.obs;
 
   // Form status
   final RxBool isLoading = false.obs;
@@ -26,6 +31,10 @@ class AuthController extends GetxController {
 
   void togglePasswordVisibility() {
     isPasswordVisible.value = !isPasswordVisible.value;
+  }
+
+  void toggleConfirmPasswordVisibility() {
+    isConfirmPasswordVisible.value = !isConfirmPasswordVisible.value;
   }
 
   // Change role selection
@@ -172,6 +181,8 @@ class AuthController extends GetxController {
   void onClose() {
     emailController.dispose();
     passwordController.dispose();
+    nameController.dispose();
+    confirmPasswordController.dispose();
     super.onClose();
   }
 
@@ -181,7 +192,8 @@ class AuthController extends GetxController {
     if (email.value.isEmpty ||
         password.value.isEmpty ||
         nik.value.isEmpty ||
-        phoneNumber.value.isEmpty) {
+        phoneNumber.value.isEmpty ||
+        alamatLengkap.value.isEmpty) {
       errorMessage.value = 'Semua field harus diisi';
       return;
     }
@@ -222,6 +234,7 @@ class AuthController extends GetxController {
         data: {
           'nik': nik.value.trim(),
           'phone_number': phoneNumber.value.trim(),
+          'alamat_lengkap': alamatLengkap.value.trim(),
           'role': selectedRole.value,
         },
       );

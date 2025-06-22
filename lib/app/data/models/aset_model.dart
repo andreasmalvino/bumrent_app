@@ -5,6 +5,7 @@ class AsetModel {
   final String nama;
   final String deskripsi;
   final String kategori;
+  final String jenis; // Add this line
   final int harga;
   final int? denda;
   final String status;
@@ -14,17 +15,21 @@ class AsetModel {
   final int? kuantitasTerpakai;
   final String? satuanUkur;
 
-  // Untuk menampung URL gambar pertama dari tabel foto_aset
+  // URL gambar utama (untuk backward compatibility)
   String? imageUrl;
+  
+  // List untuk menyimpan semua URL gambar aset
+  final RxList<String> imageUrls = <String>[].obs;
 
   // Menggunakan RxList untuk membuatnya mutable dan reaktif
-  RxList<Map<String, dynamic>> satuanWaktuSewa = <Map<String, dynamic>>[].obs;
+  final RxList<Map<String, dynamic>> satuanWaktuSewa = <Map<String, dynamic>>[].obs;
 
   AsetModel({
     required this.id,
     required this.nama,
     required this.deskripsi,
     required this.kategori,
+    this.jenis = 'Sewa', // Add this line with default value
     required this.harga,
     this.denda,
     required this.status,
@@ -42,31 +47,69 @@ class AsetModel {
     }
   }
 
+  // Menambahkan URL gambar dari JSON
+  void addImageUrl(String? url) {
+    if (url != null && url.isNotEmpty && !imageUrls.contains(url)) {
+      imageUrls.add(url);
+      // Update imageUrl untuk backward compatibility
+      if (imageUrl == null) {
+        imageUrl = url;
+      }
+    }
+  }
+
+  // Menghapus URL gambar
+  bool removeImageUrl(String url) {
+    final removed = imageUrls.remove(url);
+    if (removed && imageUrl == url) {
+      imageUrl = imageUrls.isNotEmpty ? imageUrls.first : null;
+    }
+    return removed;
+  }
+
   factory AsetModel.fromJson(Map<String, dynamic> json) {
-    return AsetModel(
+    final model = AsetModel(
       id: json['id'] ?? '',
       nama: json['nama'] ?? '',
       deskripsi: json['deskripsi'] ?? '',
       kategori: json['kategori'] ?? '',
+      jenis: json['jenis'] ?? 'Sewa',
       harga: json['harga'] ?? 0,
       denda: json['denda'],
       status: json['status'] ?? '',
-      createdAt:
-          json['created_at'] != null
-              ? DateTime.parse(json['created_at'])
-              : null,
-      updatedAt:
-          json['updated_at'] != null
-              ? DateTime.parse(json['updated_at'])
-              : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
+          : null,
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'])
+          : null,
       kuantitas: json['kuantitas'],
       kuantitasTerpakai: json['kuantitas_terpakai'],
       satuanUkur: json['satuan_ukur'],
+      imageUrl: json['foto_aset'],
+      initialSatuanWaktuSewa: json['satuan_waktu_sewa'] != null
+          ? List<Map<String, dynamic>>.from(json['satuan_waktu_sewa'])
+          : null,
     );
+    
+    // Add the main image URL to the list if it exists
+    if (json['foto_aset'] != null) {
+      model.addImageUrl(json['foto_aset']);
+    }
+    
+    // Add any additional image URLs if they exist in the JSON
+    if (json['foto_aset_tambahan'] != null) {
+      final additionalImages = List<String>.from(json['foto_aset_tambahan']);
+      for (final url in additionalImages) {
+        model.addImageUrl(url);
+      }
+    }
+    
+    return model;
   }
 
   Map<String, dynamic> toJson() {
-    return {
+    final data = <String, dynamic>{
       'id': id,
       'nama': nama,
       'deskripsi': deskripsi,
@@ -80,5 +123,23 @@ class AsetModel {
       'kuantitas_terpakai': kuantitasTerpakai,
       'satuan_ukur': satuanUkur,
     };
+
+    // Add image URLs if they exist
+    if (imageUrls.isNotEmpty) {
+      data['foto_aset'] = imageUrl;
+      
+      // Add additional images (excluding the main image)
+      final additionalImages = imageUrls.where((url) => url != imageUrl).toList();
+      if (additionalImages.isNotEmpty) {
+        data['foto_aset_tambahan'] = additionalImages;
+      }
+    }
+
+    // Add rental time units if they exist
+    if (satuanWaktuSewa.isNotEmpty) {
+      data['satuan_waktu_sewa'] = satuanWaktuSewa.toList();
+    }
+
+    return data;
   }
 }

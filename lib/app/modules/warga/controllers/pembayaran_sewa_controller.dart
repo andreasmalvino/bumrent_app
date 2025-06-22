@@ -15,7 +15,7 @@ import '../../../services/navigation_service.dart';
 class WebImageFile {
   final String imageUrl;
   String id = ''; // Database ID for the foto_pembayaran record (UUID string)
-  
+
   WebImageFile(this.imageUrl);
 }
 
@@ -24,7 +24,7 @@ class PembayaranSewaController extends GetxController
   // Dependencies
   final NavigationService navigationService = Get.find<NavigationService>();
   final AsetProvider asetProvider = Get.find<AsetProvider>();
-  
+
   // Direct access to Supabase client for storage operations
   final SupabaseClient client = Supabase.instance.client;
 
@@ -47,18 +47,22 @@ class PembayaranSewaController extends GetxController
   final isLoading = false.obs;
   final currentStep = 0.obs;
 
-  // Payment proof images - now a list to support multiple images (both File and WebImageFile)
-  final RxList<dynamic> paymentProofImages = <dynamic>[].obs;
-  
+  // Payment proof images for tagihan awal
+  final RxList<dynamic> paymentProofImagesTagihanAwal = <dynamic>[].obs;
+  // Payment proof images for denda
+  final RxList<dynamic> paymentProofImagesDenda = <dynamic>[].obs;
+
   // Track original images loaded from database
   final RxList<WebImageFile> originalImages = <WebImageFile>[].obs;
-  
+
   // Track images marked for deletion
-  final RxList<WebImageFile> imagesToDelete = <WebImageFile>[].obs;
-  
+  final RxList<WebImageFile> imagesToDeleteTagihanAwal = <WebImageFile>[].obs;
+  final RxList<WebImageFile> imagesToDeleteDenda = <WebImageFile>[].obs;
+
   // Flag to track if there are changes that need to be saved
-  final RxBool hasUnsavedChanges = false.obs;
-  
+  final RxBool hasUnsavedChangesTagihanAwal = false.obs;
+  final RxBool hasUnsavedChangesDenda = false.obs;
+
   // Get image widget for a specific image
   Widget getImageWidget(dynamic imageFile) {
     // Check if it's a WebImageFile (for existing images loaded from URLs)
@@ -95,15 +99,10 @@ class PembayaranSewaController extends GetxController
           );
         },
       );
-    } 
+    }
     // For mobile with a File object
     else if (imageFile is File) {
-      return Image.file(
-        imageFile,
-        height: 120,
-        width: 120,
-        fit: BoxFit.cover,
-      );
+      return Image.file(imageFile, height: 120, width: 120, fit: BoxFit.cover);
     }
     // Fallback for any other type
     else {
@@ -115,28 +114,36 @@ class PembayaranSewaController extends GetxController
       );
     }
   }
-  
+
   // Remove an image from the list
   void removeImage(dynamic image) {
-    // If this is an existing image (WebImageFile), add it to imagesToDelete
-    if (image is WebImageFile && image.id.isNotEmpty) {
-      imagesToDelete.add(image);
-      debugPrint('🗑️ Marked image for deletion: ${image.imageUrl} (ID: ${image.id})');
+    if (selectedPaymentType.value == 'denda') {
+      // Untuk denda
+      if (image is WebImageFile && image.id.isNotEmpty) {
+        imagesToDeleteDenda.add(image);
+        debugPrint(
+          '🗑️ Marked image for deletion (denda): \\${image.imageUrl} (ID: \\${image.id})',
+        );
+      }
+      paymentProofImagesDenda.remove(image);
+    } else {
+      // Default/tagihan awal
+      if (image is WebImageFile && image.id.isNotEmpty) {
+        imagesToDeleteTagihanAwal.add(image);
+        debugPrint(
+          '🗑️ Marked image for deletion: \\${image.imageUrl} (ID: \\${image.id})',
+        );
+      }
+      paymentProofImagesTagihanAwal.remove(image);
     }
-    
-    // Remove from the current list
-    paymentProofImages.remove(image);
-    
-    // Check if we have any changes (additions or deletions)
     _checkForChanges();
-    
     update();
   }
-  
+
   // Show image in full screen when tapped
   void showFullScreenImage(dynamic image) {
     String imageUrl;
-    
+
     if (image is WebImageFile) {
       imageUrl = image.imageUrl;
     } else if (image is File) {
@@ -145,9 +152,9 @@ class PembayaranSewaController extends GetxController
       debugPrint('❌ Cannot display image: Unknown image type');
       return;
     }
-    
+
     debugPrint('📷 Showing full screen image: $imageUrl');
-    
+
     // Show full screen image dialog
     Get.dialog(
       Dialog(
@@ -161,22 +168,25 @@ class PembayaranSewaController extends GetxController
               panEnabled: true,
               minScale: 0.5,
               maxScale: 4,
-              child: kIsWeb
-                  ? Image.network(
-                      imageUrl,
-                      fit: BoxFit.contain,
-                      height: Get.height,
-                      width: Get.width,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(child: Text('Error loading image'));
-                      },
-                    )
-                  : Image.file(
-                      File(imageUrl),
-                      fit: BoxFit.contain,
-                      height: Get.height,
-                      width: Get.width,
-                    ),
+              child:
+                  kIsWeb
+                      ? Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        height: Get.height,
+                        width: Get.width,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Center(
+                            child: Text('Error loading image'),
+                          );
+                        },
+                      )
+                      : Image.file(
+                        File(imageUrl),
+                        fit: BoxFit.contain,
+                        height: Get.height,
+                        width: Get.width,
+                      ),
             ),
             // Close button
             Positioned(
@@ -193,38 +203,36 @@ class PembayaranSewaController extends GetxController
       barrierDismissible: true,
     );
   }
-  
+
   // Check if there are any changes to save (new images added or existing images removed)
   void _checkForChanges() {
-    // We have changes if:
-    // 1. We have images marked for deletion
-    // 2. We have new images (files) added
-    // 3. The current list differs from the original list
-    
-    bool hasChanges = false;
-    
-    // Check if any images are marked for deletion
-    if (imagesToDelete.isNotEmpty) {
-      hasChanges = true;
+    bool hasChangesTagihanAwal = false;
+    bool hasChangesDenda = false;
+    if (imagesToDeleteTagihanAwal.isNotEmpty) {
+      hasChangesTagihanAwal = true;
     }
-    
-    // Check if any new images have been added
-    for (dynamic image in paymentProofImages) {
+    if (imagesToDeleteDenda.isNotEmpty) {
+      hasChangesDenda = true;
+    }
+    for (dynamic image in paymentProofImagesTagihanAwal) {
       if (image is File) {
-        // This is a new image
-        hasChanges = true;
+        hasChangesTagihanAwal = true;
         break;
       }
     }
-    
-    // Check if the number of images has changed
-    if (paymentProofImages.length != originalImages.length) {
-      hasChanges = true;
+    for (dynamic image in paymentProofImagesDenda) {
+      if (image is File) {
+        hasChangesDenda = true;
+        break;
+      }
     }
-    
-    hasUnsavedChanges.value = hasChanges;
-    debugPrint('💾 Has unsaved changes: $hasChanges');
+    hasUnsavedChangesTagihanAwal.value = hasChangesTagihanAwal;
+    hasUnsavedChangesDenda.value = hasChangesDenda;
+    debugPrint(
+      '💾 Has unsaved changes (tagihan awal): $hasChangesTagihanAwal, (denda): $hasChangesDenda',
+    );
   }
+
   final isUploading = false.obs;
   final uploadProgress = 0.0.obs;
 
@@ -233,7 +241,7 @@ class PembayaranSewaController extends GetxController
   Timer? _countdownTimer;
   final int paymentTimeLimit = 3600; // 1 hour in seconds
   final timeRemaining = 0.obs;
-  
+
   // Bank accounts for transfer
   final bankAccounts = RxList<Map<String, dynamic>>([]);
 
@@ -246,12 +254,12 @@ class PembayaranSewaController extends GetxController
     if (Get.arguments != null) {
       if (Get.arguments['orderId'] != null) {
         orderId.value = Get.arguments['orderId'];
-        
+
         // If rental data is passed, use it directly
         if (Get.arguments['rentalData'] != null) {
           Map<String, dynamic> rentalData = Get.arguments['rentalData'];
           debugPrint('Received rental data: $rentalData');
-          
+
           // Pre-populate order details with rental data
           orderDetails.value = {
             'id': rentalData['id'] ?? '',
@@ -260,8 +268,16 @@ class PembayaranSewaController extends GetxController
             'rental_period': rentalData['waktuSewa'] ?? '',
             'duration': rentalData['duration'] ?? '',
             'price_per_unit': 0, // This might not be available in rental data
-            'total_price': rentalData['totalPrice'] != null ? 
-                          int.tryParse(rentalData['totalPrice'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0 : 0,
+            'total_price':
+                rentalData['totalPrice'] != null
+                    ? int.tryParse(
+                          rentalData['totalPrice'].toString().replaceAll(
+                            RegExp(r'[^0-9]'),
+                            '',
+                          ),
+                        ) ??
+                        0
+                    : 0,
             'status': rentalData['status'] ?? 'MENUNGGU PEMBAYARAN',
             'created_at': DateTime.now().toString(),
             'denda': 0, // Default value
@@ -271,12 +287,12 @@ class PembayaranSewaController extends GetxController
             'waktu_selesai': rentalData['waktuSelesai'],
             'rentang_waktu': rentalData['rentangWaktu'],
           };
-          
+
           // Still load additional details from the database
           checkSewaAsetTableStructure();
           loadTagihanSewaDetails().then((_) {
             // Load existing payment proof images after tagihan_sewa details are loaded
-            loadExistingPaymentProofImages();
+            loadExistingPaymentProofImages(jenisPembayaran: 'tagihan awal');
           });
           loadSewaAsetDetails();
           loadBankAccounts(); // Load bank accounts data
@@ -286,7 +302,7 @@ class PembayaranSewaController extends GetxController
           loadOrderDetails();
           loadTagihanSewaDetails().then((_) {
             // Load existing payment proof images after tagihan_sewa details are loaded
-            loadExistingPaymentProofImages();
+            loadExistingPaymentProofImages(jenisPembayaran: 'tagihan awal');
           });
           loadSewaAsetDetails();
           loadBankAccounts(); // Load bank accounts data
@@ -382,18 +398,19 @@ class PembayaranSewaController extends GetxController
               }
               val?['quantity'] = data['kuantitas'] ?? 1;
               val?['denda'] =
-                  data['denda'] ??
-                  0; // Use data from API or default to 0
-              val?['keterangan'] =
-                  data['keterangan'] ??
-                  ''; // Use data from API or default to empty string
-              
-              // Update status if it exists in the data
-              if (data['status'] != null && data['status'].toString().isNotEmpty) {
+                  data['denda'] ?? 0; // Use data from API or default to 0
+              val?['keterangan'] = data['keterangan'] ?? '';
+              if (data['status'] != null &&
+                  data['status'].toString().isNotEmpty) {
                 val?['status'] = data['status'];
-                debugPrint('📊 Order status from sewa_aset: ${data['status']}');
+                debugPrint(
+                  '📊 Order status from sewa_aset: \\${data['status']}',
+                );
               }
-
+              // Tambahkan mapping updated_at
+              if (data['updated_at'] != null) {
+                val?['updated_at'] = data['updated_at'];
+              }
               // Format rental period
               if (data['waktu_mulai'] != null &&
                   data['waktu_selesai'] != null) {
@@ -401,12 +418,12 @@ class PembayaranSewaController extends GetxController
                   final startTime = DateTime.parse(data['waktu_mulai']);
                   final endTime = DateTime.parse(data['waktu_selesai']);
                   val?['rental_period'] =
-                      '${startTime.day}/${startTime.month}/${startTime.year}, ${startTime.hour}:${startTime.minute.toString().padLeft(2, '0')} - ${endTime.hour}:${endTime.minute.toString().padLeft(2, '0')}';
+                      '\\${startTime.day}/\\${startTime.month}/\\${startTime.year}, \\${startTime.hour}:\\${startTime.minute.toString().padLeft(2, '0')} - \\${endTime.hour}:\\${endTime.minute.toString().padLeft(2, '0')}';
                   debugPrint(
-                    '✅ Successfully formatted rental period: ${val?['rental_period']}',
+                    '✅ Successfully formatted rental period: \\${val?['rental_period']}',
                   );
                 } catch (e) {
-                  debugPrint('❌ Error parsing date: $e');
+                  debugPrint('❌ Error parsing date: \\${e}');
                 }
               } else {
                 debugPrint(
@@ -414,7 +431,7 @@ class PembayaranSewaController extends GetxController
                 );
               }
             });
-            
+
             // Update the current step based on the status
             updateCurrentStepBasedOnStatus();
           } else {
@@ -456,13 +473,13 @@ class PembayaranSewaController extends GetxController
           if (data != null) {
             tagihanSewa.value = data;
             debugPrint('✅ Tagihan sewa loaded: ${tagihanSewa.value['id']}');
-            
+
             // Debug the tagihan_sewa data
             debugPrint('📋 TAGIHAN SEWA DETAILS:');
             data.forEach((key, value) {
               debugPrint('  $key: $value');
             });
-            
+
             // Specifically debug denda, keterangan, and foto_kerusakan
             debugPrint('💰 DENDA DETAILS:');
             debugPrint('  denda: ${data['denda']}');
@@ -547,6 +564,11 @@ class PembayaranSewaController extends GetxController
   // Select payment type (tagihan_awal or denda)
   void selectPaymentType(String type) {
     selectedPaymentType.value = type;
+    if (type == 'tagihan_awal') {
+      loadExistingPaymentProofImages(jenisPembayaran: 'tagihan awal');
+    } else if (type == 'denda') {
+      loadExistingPaymentProofImages(jenisPembayaran: 'denda');
+    }
     update();
   }
 
@@ -558,21 +580,20 @@ class PembayaranSewaController extends GetxController
         source: ImageSource.camera,
         imageQuality: 80,
       );
-
       if (image != null) {
-        // Add to the list of images instead of replacing
-        paymentProofImages.add(File(image.path));
-        
-        // Check for changes
+        if (selectedPaymentType.value == 'denda') {
+          paymentProofImagesDenda.add(File(image.path));
+        } else {
+          paymentProofImagesTagihanAwal.add(File(image.path));
+        }
         _checkForChanges();
-        
         update();
       }
     } catch (e) {
       debugPrint('❌ Error taking photo: $e');
       Get.snackbar(
         'Error',
-        'Gagal mengambil foto: ${e.toString()}',
+        'Gagal mengambil foto: \\${e.toString()}',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
@@ -588,17 +609,20 @@ class PembayaranSewaController extends GetxController
         source: ImageSource.gallery,
         imageQuality: 80,
       );
-
       if (image != null) {
-        // Add to the list of images instead of replacing
-        paymentProofImages.add(File(image.path));
+        if (selectedPaymentType.value == 'denda') {
+          paymentProofImagesDenda.add(File(image.path));
+        } else {
+          paymentProofImagesTagihanAwal.add(File(image.path));
+        }
+        _checkForChanges();
         update();
       }
     } catch (e) {
       debugPrint('❌ Error selecting photo from gallery: $e');
       Get.snackbar(
         'Error',
-        'Gagal memilih foto dari galeri: ${e.toString()}',
+        'Gagal memilih foto dari galeri: \\${e.toString()}',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
@@ -607,7 +631,19 @@ class PembayaranSewaController extends GetxController
   }
 
   // Upload payment proof to Supabase storage and save to foto_pembayaran table
-  Future<void> uploadPaymentProof() async {
+  Future<void> uploadPaymentProof({required String jenisPembayaran}) async {
+    final paymentProofImages =
+        jenisPembayaran == 'tagihan awal'
+            ? paymentProofImagesTagihanAwal
+            : paymentProofImagesDenda;
+    final imagesToDelete =
+        jenisPembayaran == 'tagihan awal'
+            ? imagesToDeleteTagihanAwal
+            : imagesToDeleteDenda;
+    final hasUnsavedChanges =
+        jenisPembayaran == 'tagihan awal'
+            ? hasUnsavedChangesTagihanAwal
+            : hasUnsavedChangesDenda;
     // If there are no images and none marked for deletion, show error
     if (paymentProofImages.isEmpty && imagesToDelete.isEmpty) {
       Get.snackbar(
@@ -619,7 +655,7 @@ class PembayaranSewaController extends GetxController
       );
       return;
     }
-    
+
     // If there are no changes, no need to do anything
     if (!hasUnsavedChanges.value) {
       Get.snackbar(
@@ -635,17 +671,19 @@ class PembayaranSewaController extends GetxController
     try {
       isUploading.value = true;
       uploadProgress.value = 0.0;
-      
+
       // Set up upload progress listener
       final progressNotifier = StreamController<double>();
       progressNotifier.stream.listen((progress) {
         uploadProgress.value = progress;
       });
-      
+
       // First, delete any images marked for deletion
       if (imagesToDelete.isNotEmpty) {
-        debugPrint('🗑️ Deleting ${imagesToDelete.length} images from database and storage');
-        
+        debugPrint(
+          '🗑️ Deleting ${imagesToDelete.length} images from database and storage',
+        );
+
         for (WebImageFile image in imagesToDelete) {
           // Delete the record from the foto_pembayaran table
           if (image.id.isNotEmpty) {
@@ -656,15 +694,15 @@ class PembayaranSewaController extends GetxController
                   .from('foto_pembayaran')
                   .delete()
                   .eq('id', image.id); // ID is already a string UUID
-                  
+
               debugPrint('🗑️ Delete result: $result');
             } catch (e) {
               debugPrint('❌ Error deleting record: $e');
               throw e; // Re-throw so the main catch block handles it
             }
-            
+
             debugPrint('🗑️ Deleted database record with ID: ${image.id}');
-            
+
             // Extract the file name from the URL to delete from storage
             try {
               // Parse the URL to get the filename more reliably
@@ -672,33 +710,37 @@ class PembayaranSewaController extends GetxController
               String path = uri.path;
               // The filename is the last part of the path after the last '/'
               final String fileName = path.substring(path.lastIndexOf('/') + 1);
-              
-              debugPrint('🗑️ Attempting to delete file from storage: $fileName');
-              
+
+              debugPrint(
+                '🗑️ Attempting to delete file from storage: $fileName',
+              );
+
               // Delete the file from storage
-              await client.storage
-                  .from('bukti.pembayaran')
-                  .remove([fileName]);
-              
-              debugPrint('🗑️ Successfully deleted file from storage: $fileName');
+              await client.storage.from('bukti.pembayaran').remove([fileName]);
+
+              debugPrint(
+                '🗑️ Successfully deleted file from storage: $fileName',
+              );
             } catch (e) {
               debugPrint('⚠️ Error deleting file from storage: $e');
               // Continue even if file deletion fails - we've at least deleted from the database
             }
           }
         }
-        
+
         // Clear the deleted images list
         imagesToDelete.clear();
       }
-      
+
       // Upload each new image to Supabase Storage and save to database
-      debugPrint('🔄 Uploading new payment proof images to Supabase storage...');
-      
+      debugPrint(
+        '🔄 Uploading new payment proof images to Supabase storage...',
+      );
+
       List<String> uploadedUrls = [];
       List<dynamic> newImagesToUpload = [];
       List<String> existingImageUrls = [];
-      
+
       // Separate existing WebImageFile objects from new File objects that need uploading
       for (final image in paymentProofImages) {
         if (image is WebImageFile) {
@@ -709,41 +751,46 @@ class PembayaranSewaController extends GetxController
           newImagesToUpload.add(image);
         }
       }
-      
-      debugPrint('🔄 Found ${existingImageUrls.length} existing images and ${newImagesToUpload.length} new images to upload');
-      
+
+      debugPrint(
+        '🔄 Found ${existingImageUrls.length} existing images and ${newImagesToUpload.length} new images to upload',
+      );
+
       // If there are new images to upload
       if (newImagesToUpload.isNotEmpty) {
         // Calculate progress increment per image
         final double progressIncrement = 1.0 / newImagesToUpload.length;
         double currentProgress = 0.0;
-        
+
         // Upload each new image
         for (int i = 0; i < newImagesToUpload.length; i++) {
           final dynamic imageFile = newImagesToUpload[i];
-          final String fileName = '${DateTime.now().millisecondsSinceEpoch}_${orderId.value}_$i.jpg';
-          
+          final String fileName =
+              '${DateTime.now().millisecondsSinceEpoch}_${orderId.value}_$i.jpg';
+
           // Create a sub-progress tracker for this image
           final subProgressNotifier = StreamController<double>();
           subProgressNotifier.stream.listen((subProgress) {
             // Calculate overall progress
-            progressNotifier.add(currentProgress + (subProgress * progressIncrement));
+            progressNotifier.add(
+              currentProgress + (subProgress * progressIncrement),
+            );
           });
-          
+
           // Upload to Supabase Storage
           final String? imageUrl = await _uploadToSupabaseStorage(
-            imageFile, 
-            fileName, 
+            imageFile,
+            fileName,
             subProgressNotifier,
           );
-          
+
           if (imageUrl == null) {
             throw Exception('Failed to upload image $i to storage');
           }
-          
+
           debugPrint('✅ Image $i uploaded successfully: $imageUrl');
           uploadedUrls.add(imageUrl);
-          
+
           // Update progress for next image
           currentProgress += progressIncrement;
         }
@@ -751,43 +798,59 @@ class PembayaranSewaController extends GetxController
         // If there are only existing images, set progress to 100%
         progressNotifier.add(1.0);
       }
-      
+
       // Save all new URLs to foto_pembayaran table
       for (String imageUrl in uploadedUrls) {
-        await _saveToFotoPembayaranTable(imageUrl);
+        await _saveToFotoPembayaranTable(imageUrl, jenisPembayaran);
       }
-      
+
       // Reload the existing images to get fresh data with new IDs
-      await loadExistingPaymentProofImages();
-      
+      await loadExistingPaymentProofImages(jenisPembayaran: jenisPembayaran);
+
       // Update order status in orderDetails
       orderDetails.update((val) {
-        val?['status'] = 'MEMERIKSA PEMBAYARAN';
+        if (jenisPembayaran == 'denda' &&
+            val?['status'] == 'PEMBAYARAN DENDA') {
+          val?['status'] = 'PERIKSA PEMBAYARAN DENDA';
+        } else {
+          val?['status'] = 'MEMERIKSA PEMBAYARAN';
+        }
       });
-      
+
       // Also update the status in the sewa_aset table
       try {
         // Get the sewa_aset_id from the tagihanSewa data
         final dynamic sewaAsetId = tagihanSewa.value['sewa_aset_id'];
-        
+
         if (sewaAsetId != null && sewaAsetId.toString().isNotEmpty) {
-          debugPrint('🔄 Updating status in sewa_aset table for ID: $sewaAsetId');
-          
+          debugPrint(
+            '🔄 Updating status in sewa_aset table for ID: $sewaAsetId',
+          );
+
           // Update the status in the sewa_aset table
           final updateResult = await client
               .from('sewa_aset')
-              .update({'status': 'PERIKSA PEMBAYARAN'})
+              .update({
+                'status':
+                    (jenisPembayaran == 'denda' &&
+                            orderDetails.value['status'] ==
+                                'PERIKSA PEMBAYARAN DENDA')
+                        ? 'PERIKSA PEMBAYARAN DENDA'
+                        : 'PERIKSA PEMBAYARAN',
+              })
               .eq('id', sewaAsetId.toString());
-              
+
           debugPrint('✅ Status updated in sewa_aset table: $updateResult');
         } else {
-          debugPrint('⚠️ Could not update sewa_aset status: No valid sewa_aset_id found');
+          debugPrint(
+            '⚠️ Could not update sewa_aset status: No valid sewa_aset_id found',
+          );
         }
       } catch (e) {
         // Don't fail the entire operation if this update fails
         debugPrint('❌ Error updating status in sewa_aset table: $e');
       }
-      
+
       // Update current step based on status
       updateCurrentStepBasedOnStatus();
 
@@ -862,12 +925,12 @@ class PembayaranSewaController extends GetxController
       val?['status'] = newStatus;
     });
   }
-  
+
   // Update currentStep based on order status
   void updateCurrentStepBasedOnStatus() {
     final status = orderDetails.value['status']?.toString().toUpperCase() ?? '';
     debugPrint('📊 Updating current step based on status: $status');
-    
+
     switch (status) {
       case 'MENUNGGU PEMBAYARAN':
         currentStep.value = 0;
@@ -878,27 +941,29 @@ class PembayaranSewaController extends GetxController
       case 'DITERIMA':
         currentStep.value = 2;
         break;
-      case 'PENGEMBALIAN':
+      case 'AKTIF':
         currentStep.value = 3;
         break;
-      case 'PEMBAYARAN DENDA':
+      case 'PENGEMBALIAN':
         currentStep.value = 4;
         break;
-      case 'MEMERIKSA PEMBAYARAN DENDA':
+      case 'PEMBAYARAN DENDA':
         currentStep.value = 5;
         break;
-      case 'SELESAI':
+      case 'PERIKSA PEMBAYARAN DENDA':
         currentStep.value = 6;
         break;
+      case 'SELESAI':
+        currentStep.value = 7;
+        break;
       case 'DIBATALKAN':
-        // Special case for canceled orders
-        currentStep.value = 0;
+        currentStep.value = 8;
         break;
       default:
         currentStep.value = 0;
         break;
     }
-    
+
     debugPrint('📊 Current step updated to: ${currentStep.value}');
   }
 
@@ -931,7 +996,7 @@ class PembayaranSewaController extends GetxController
   void cancelPayment() {
     Get.back();
   }
-  
+
   // Debug function to check sewa_aset table structure
   void checkSewaAsetTableStructure() {
     try {
@@ -950,7 +1015,9 @@ class PembayaranSewaController extends GetxController
               debugPrint('Available fields in sewa_aset table:');
 
               record.forEach((key, value) {
-                debugPrint('  $key: (${value != null ? value.runtimeType : 'null'})');
+                debugPrint(
+                  '  $key: (${value != null ? value.runtimeType : 'null'})',
+                );
               });
 
               // Specifically check for time fields
@@ -979,7 +1046,7 @@ class PembayaranSewaController extends GetxController
       debugPrint('❌ Error in checkSewaAsetTableStructure: $e');
     }
   }
-  
+
   // Load bank accounts from akun_bank table
   Future<void> loadBankAccounts() async {
     debugPrint('Loading bank accounts from akun_bank table...');
@@ -987,12 +1054,16 @@ class PembayaranSewaController extends GetxController
       final data = await asetProvider.getBankAccounts();
       if (data.isNotEmpty) {
         bankAccounts.assignAll(data);
-        debugPrint('✅ Bank accounts loaded: ${bankAccounts.length} accounts found');
-        
+        debugPrint(
+          '✅ Bank accounts loaded: ${bankAccounts.length} accounts found',
+        );
+
         // Debug the bank accounts data
         debugPrint('📋 BANK ACCOUNTS DETAILS:');
         for (var account in bankAccounts) {
-          debugPrint('  Bank: ${account['nama_bank']}, Account: ${account['nama_akun']}, Number: ${account['no_rekening']}');
+          debugPrint(
+            '  Bank: ${account['nama_bank']}, Account: ${account['nama_akun']}, Number: ${account['no_rekening']}',
+          );
         }
       } else {
         debugPrint('⚠️ No bank accounts found in akun_bank table');
@@ -1001,23 +1072,27 @@ class PembayaranSewaController extends GetxController
       debugPrint('❌ Error loading bank accounts: $e');
     }
   }
-  
+
   // Helper method to upload image to Supabase storage
-  Future<String?> _uploadToSupabaseStorage(dynamic imageFile, String fileName, StreamController<double> progressNotifier) async {
+  Future<String?> _uploadToSupabaseStorage(
+    dynamic imageFile,
+    String fileName,
+    StreamController<double> progressNotifier,
+  ) async {
     try {
       debugPrint('🔄 Uploading image to Supabase storage: $fileName');
-      
+
       // If it's already a WebImageFile, just return the URL
       if (imageFile is WebImageFile) {
         progressNotifier.add(1.0); // No upload needed
         return imageFile.imageUrl;
       }
-      
+
       // Handle File objects
       if (imageFile is File) {
         // Get file bytes
         List<int> fileBytes = await imageFile.readAsBytes();
-        
+
         // Upload to Supabase Storage
         await client.storage
             .from('bukti.pembayaran')
@@ -1029,16 +1104,18 @@ class PembayaranSewaController extends GetxController
                 upsert: false,
               ),
             );
-        
+
         // Get public URL
-        final String publicUrl = client.storage.from('bukti.pembayaran').getPublicUrl(fileName);
-        
+        final String publicUrl = client.storage
+            .from('bukti.pembayaran')
+            .getPublicUrl(fileName);
+
         debugPrint('✅ Upload successful: $publicUrl');
         progressNotifier.add(1.0); // Upload complete
-        
+
         return publicUrl;
       }
-      
+
       // If we get here, we don't know how to handle this type
       throw Exception('Unsupported image type: ${imageFile.runtimeType}');
     } catch (e) {
@@ -1050,96 +1127,77 @@ class PembayaranSewaController extends GetxController
   }
 
   // Helper method to save image URL to foto_pembayaran table
-  Future<void> _saveToFotoPembayaranTable(String imageUrl) async {
+  Future<void> _saveToFotoPembayaranTable(
+    String imageUrl,
+    String jenisPembayaran,
+  ) async {
     try {
       debugPrint('🔄 Saving image URL to foto_pembayaran table...');
-      
+
       // Get the tagihan_sewa_id from the tagihanSewa object
       final dynamic tagihanSewaId = tagihanSewa.value['id'];
-      
+
       if (tagihanSewaId == null || tagihanSewaId.toString().isEmpty) {
         throw Exception('tagihan_sewa_id not found in tagihanSewa data');
       }
-      
+
       debugPrint('🔄 Using tagihan_sewa_id: $tagihanSewaId');
-      
+
       // Prepare the data to insert
       final Map<String, dynamic> data = {
         'tagihan_sewa_id': tagihanSewaId,
         'foto_pembayaran': imageUrl,
+        'jenis_pembayaran': jenisPembayaran,
         'created_at': DateTime.now().toIso8601String(),
       };
-      
+
       // Insert data into the foto_pembayaran table
-      final response = await client
-          .from('foto_pembayaran')
-          .insert(data)
-          .select()
-          .single();
-      
-      debugPrint('✅ Image URL saved to foto_pembayaran table: ${response['id']}');
+      final response =
+          await client.from('foto_pembayaran').insert(data).select().single();
+
+      debugPrint(
+        '✅ Image URL saved to foto_pembayaran table: ${response['id']}',
+      );
     } catch (e) {
       debugPrint('❌ Error in _saveToFotoPembayaranTable: $e');
       throw Exception('Failed to save image URL to database: $e');
     }
   }
-  
-  // Load existing payment proof images
-  Future<void> loadExistingPaymentProofImages() async {
+
+  // Load existing payment proof images for a specific jenis_pembayaran
+  Future<void> loadExistingPaymentProofImages({
+    required String jenisPembayaran,
+  }) async {
     try {
-      debugPrint('🔄 Loading existing payment proof images for tagihan_sewa_id: ${tagihanSewa.value['id']}');
-      
-      // Check if we have a valid tagihan_sewa_id
+      debugPrint(
+        '🔄 Loading existing payment proof images for tagihan_sewa_id: \\${tagihanSewa.value['id']} dan jenis_pembayaran: $jenisPembayaran',
+      );
       final dynamic tagihanSewaId = tagihanSewa.value['id'];
       if (tagihanSewaId == null || tagihanSewaId.toString().isEmpty) {
         debugPrint('⚠️ No valid tagihan_sewa_id found, skipping image load');
         return;
       }
-      
-      // First, make a test query to see the structure of the response
-      final testResponse = await client
-          .from('foto_pembayaran')
-          .select()
-          .limit(1);
-          
-      // Log the test response structure
-      if (testResponse.isNotEmpty) {
-        debugPrint('💾 DEBUG: Test database response: ${testResponse[0]}');
-        testResponse[0].forEach((key, value) {
-          debugPrint('💾 DEBUG: Field $key = $value (${value?.runtimeType})');
-        });
-      }
-      
-      // Now make the actual query for this tagihan_sewa_id
       final List<dynamic> response = await client
           .from('foto_pembayaran')
           .select()
           .eq('tagihan_sewa_id', tagihanSewaId)
+          .eq('jenis_pembayaran', jenisPembayaran)
           .order('created_at', ascending: false);
-          
-      debugPrint('🔄 Found ${response.length} existing payment proof images');
-      
-      // Clear existing tracking lists
-      paymentProofImages.clear();
-      originalImages.clear();
-      imagesToDelete.clear();
-      hasUnsavedChanges.value = false;
-      
-      // Process each image in the response
+      debugPrint(
+        '🔄 Found \\${response.length} existing payment proof images for $jenisPembayaran',
+      );
+      final targetList =
+          jenisPembayaran == 'tagihan awal'
+              ? paymentProofImagesTagihanAwal
+              : paymentProofImagesDenda;
+      targetList.clear();
       for (final item in response) {
-        // Extract the image URL
         final String imageUrl = item['foto_pembayaran'];
-        
-        // Extract the ID - debug the item structure
-        debugPrint('💾 Image data: $item');
-        
-        // Get the ID field - in Supabase, this is a UUID string
         String imageId = '';
         try {
           if (item.containsKey('id')) {
             final dynamic rawId = item['id'];
             if (rawId != null) {
-              // Store ID as string since it's a UUID
               imageId = rawId.toString();
             }
             debugPrint('🔄 Image ID: $imageId');
@@ -1147,56 +1205,49 @@ class PembayaranSewaController extends GetxController
         } catch (e) {
           debugPrint('❌ Error getting image ID: $e');
         }
-        
-        // Create the WebImageFile object
         final webImageFile = WebImageFile(imageUrl);
         webImageFile.id = imageId;
-        
-        // Add to tracking lists
-        paymentProofImages.add(webImageFile);
-        originalImages.add(webImageFile);
-        
+        targetList.add(webImageFile);
         debugPrint('✅ Added image: $imageUrl with ID: $imageId');
       }
-      
-      // Update the UI
       update();
-      
     } catch (e) {
       debugPrint('❌ Error loading payment proof images: $e');
     }
   }
-  
+
   // Refresh all data
   Future<void> refreshData() async {
     debugPrint('Refreshing payment page data...');
     isLoading.value = true;
-    
+
     try {
       // Reload all data
-      await Future.delayed(const Duration(milliseconds: 500)); // Small delay for better UX
+      await Future.delayed(
+        const Duration(milliseconds: 500),
+      ); // Small delay for better UX
       loadOrderDetails();
       loadTagihanSewaDetails();
       loadSewaAsetDetails();
       loadBankAccounts(); // Load bank accounts data
-      
+
       // Explicitly update the current step based on the status
       // This ensures the progress timeline is always in sync with the actual status
       updateCurrentStepBasedOnStatus();
-      
+
       // Restart countdown timer if needed
       if (orderDetails.value['status'] == 'MENUNGGU PEMBAYARAN') {
         _countdownTimer?.cancel();
         startCountdownTimer();
       }
-      
+
       debugPrint('Data refresh completed');
     } catch (e) {
       debugPrint('Error refreshing data: $e');
     } finally {
       isLoading.value = false;
     }
-    
+
     return Future.value();
   }
 }

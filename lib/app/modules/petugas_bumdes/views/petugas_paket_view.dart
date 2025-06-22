@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../controllers/petugas_paket_controller.dart';
-import '../../../theme/app_colors_petugas.dart';
+import 'package:bumrent_app/app/modules/petugas_bumdes/controllers/petugas_paket_controller.dart';
+import 'package:bumrent_app/app/routes/app_pages.dart';
+import 'package:bumrent_app/app/data/models/paket_model.dart';
 import '../widgets/petugas_bumdes_bottom_navbar.dart';
 import '../widgets/petugas_side_navbar.dart';
 import '../controllers/petugas_bumdes_dashboard_controller.dart';
 import '../../../routes/app_routes.dart';
+import '../../../theme/app_colors_petugas.dart';
 
 class PetugasPaketView extends GetView<PetugasPaketController> {
   const PetugasPaketView({Key? key}) : super(key: key);
@@ -53,7 +55,11 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
           ),
         ),
         floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => Get.toNamed(Routes.PETUGAS_TAMBAH_PAKET),
+          onPressed:
+              () => Get.toNamed(
+                Routes.PETUGAS_TAMBAH_PAKET,
+                arguments: {'isEditing': false},
+              ),
           label: Text(
             'Tambah Paket',
             style: TextStyle(
@@ -115,7 +121,7 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
         );
       }
 
-      if (controller.filteredPaketList.isEmpty) {
+      if (controller.filteredPackages.isEmpty) {
         return Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -136,7 +142,11 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
-                onPressed: () => Get.toNamed(Routes.PETUGAS_TAMBAH_PAKET),
+                onPressed:
+                    () => Get.toNamed(
+                      Routes.PETUGAS_TAMBAH_PAKET,
+                      arguments: {'isEditing': false},
+                    ),
                 icon: const Icon(Icons.add),
                 label: const Text('Tambah Paket'),
                 style: ElevatedButton.styleFrom(
@@ -161,18 +171,192 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
         color: AppColorsPetugas.blueGrotto,
         child: ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: controller.filteredPaketList.length,
+          itemCount: controller.filteredPackages.length + 1,
           itemBuilder: (context, index) {
-            final paket = controller.filteredPaketList[index];
-            return _buildPaketCard(context, paket);
+            if (index < controller.filteredPackages.length) {
+              final paket = controller.filteredPackages[index];
+              return _buildPaketCard(context, paket);
+            } else {
+              // Blank space at the end
+              return const SizedBox(height: 80);
+            }
           },
         ),
       );
     });
   }
 
-  Widget _buildPaketCard(BuildContext context, Map<String, dynamic> paket) {
-    final isAvailable = paket['tersedia'] == true;
+  // Format price helper method
+  String _formatPrice(dynamic price) {
+    if (price == null) return '0';
+    // If price is a string that can be parsed to a number
+    if (price is String) {
+      final number = double.tryParse(price) ?? 0;
+      return number
+          .toStringAsFixed(0)
+          .replaceAllMapped(
+            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+            (Match m) => '${m[1]}.',
+          );
+    }
+    // If price is already a number
+    if (price is num) {
+      return price
+          .toStringAsFixed(0)
+          .replaceAllMapped(
+            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+            (Match m) => '${m[1]}.',
+          );
+    }
+    return '0';
+  }
+
+  // Helper method to get time unit name based on ID
+  String _getTimeUnitName(dynamic unitId) {
+    if (unitId == null) return 'unit';
+
+    // Convert to string in case it's not already
+    final unitIdStr = unitId.toString().toLowerCase();
+
+    // Map of known time unit IDs to their display names
+    final timeUnitMap = {
+      '6eaa32d9-855d-4214-b5b5-5c73d3edd9c5': 'jam',
+      '582b7e66-6869-4495-9856-cef4a46683b0': 'hari',
+      // Add more mappings as needed
+    };
+
+    // If the unitId is a known ID, return the corresponding name
+    if (timeUnitMap.containsKey(unitIdStr)) {
+      return timeUnitMap[unitIdStr]!;
+    }
+
+    // Check if the unit is already a name (like 'jam' or 'hari')
+    final knownUnits = ['jam', 'hari', 'minggu', 'bulan'];
+    if (knownUnits.contains(unitIdStr)) {
+      return unitIdStr;
+    }
+
+    // If the unit is a Map, try to extract the name from common fields
+    if (unitId is Map) {
+      return unitId['nama']?.toString().toLowerCase() ??
+          unitId['name']?.toString().toLowerCase() ??
+          unitId['satuan_waktu']?.toString().toLowerCase() ??
+          'unit';
+    }
+
+    // Default fallback
+    return 'unit';
+  }
+
+  // Helper method to log time unit details
+  void _logTimeUnitDetails(
+    String packageName,
+    List<Map<String, dynamic>> timeUnits,
+  ) {
+    debugPrint('\n📦 [DEBUG] Package: $packageName');
+    debugPrint('🔄 Found ${timeUnits.length} time units:');
+
+    for (var i = 0; i < timeUnits.length; i++) {
+      final unit = timeUnits[i];
+      debugPrint('\n  ⏱️ Time Unit #${i + 1}:');
+
+      // Log all available keys and values
+      debugPrint('  ├─ All fields: $unit');
+
+      // Log specific fields we're interested in
+      unit.forEach((key, value) {
+        debugPrint('  ├─ $key: $value (${value.runtimeType})');
+      });
+
+      // Special handling for satuan_waktu if it's a map
+      if (unit['satuan_waktu'] is Map) {
+        final satuanWaktu = unit['satuan_waktu'] as Map;
+        debugPrint('  └─ satuan_waktu details:');
+        satuanWaktu.forEach((k, v) {
+          debugPrint('     ├─ $k: $v (${v.runtimeType})');
+        });
+      }
+    }
+    debugPrint('\n');
+  }
+
+  Widget _buildPaketCard(BuildContext context, dynamic paket) {
+    // Handle both Map and PaketModel for backward compatibility
+    final isPaketModel = paket is PaketModel;
+
+    debugPrint('\n🔍 [_buildPaketCard] Paket type: ${paket.runtimeType}');
+    debugPrint('📋 Paket data: $paket');
+
+    // Extract status based on type
+    final String status =
+        isPaketModel
+            ? (paket.status?.toString().capitalizeFirst ?? 'Tidak Diketahui')
+            : (paket['status']?.toString().capitalizeFirst ??
+                'Tidak Diketahui');
+
+    debugPrint('🏷️ Extracted status: $status (isPaketModel: $isPaketModel)');
+
+    // Extract availability based on type
+    final bool isAvailable =
+        isPaketModel
+            ? (paket.kuantitas > 0)
+            : ((paket['kuantitas'] as int?) ?? 0) > 0;
+
+    final String nama =
+        isPaketModel
+            ? paket.nama
+            : (paket['nama']?.toString() ?? 'Paket Tanpa Nama');
+
+    // Debug package info
+    debugPrint('\n📦 [PACKAGE] ${paket.runtimeType} - $nama');
+    debugPrint('├─ isPaketModel: $isPaketModel');
+    debugPrint('├─ Available: $isAvailable');
+
+    // Get the first rental time unit price if available, otherwise use the base price
+    final dynamic harga;
+    if (isPaketModel) {
+      if (paket.satuanWaktuSewa.isNotEmpty) {
+        _logTimeUnitDetails(nama, paket.satuanWaktuSewa);
+
+        // Get the first time unit with its price
+        final firstUnit = paket.satuanWaktuSewa.first;
+        final firstUnitPrice = firstUnit['harga'];
+
+        debugPrint('💰 First time unit price: $firstUnitPrice');
+        debugPrint('⏱️ First time unit ID: ${firstUnit['satuan_waktu_id']}');
+        debugPrint('📝 First time unit details: $firstUnit');
+
+        // Always use the first time unit's price if available
+        harga = firstUnitPrice ?? 0;
+      } else {
+        debugPrint('⚠️ No time units found for package: $nama');
+        debugPrint('ℹ️ Using base price: ${paket.harga}');
+        harga = paket.harga;
+      }
+    } else {
+      // For non-PaketModel (Map) data
+      if (isPaketModel && paket.satuanWaktuSewa.isNotEmpty) {
+        final firstUnit = paket.satuanWaktuSewa.first;
+        final firstUnitPrice = firstUnit['harga'];
+        debugPrint('💰 [MAP] First time unit price: $firstUnitPrice');
+        harga = firstUnitPrice ?? 0;
+      } else {
+        debugPrint('⚠️ [MAP] No time units found for package: $nama');
+        debugPrint('ℹ️ [MAP] Using base price: ${paket['harga']}');
+        harga = paket['harga'] ?? 0;
+      }
+    }
+
+    debugPrint('💵 Final price being used: $harga\n');
+
+    // Get the main photo URL
+    final String? foto =
+        isPaketModel
+            ? (paket.images?.isNotEmpty == true
+                ? paket.images!.first
+                : paket.foto_paket)
+            : (paket['foto_paket']?.toString() ??
+                (paket['foto'] is String ? paket['foto'] : null));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -196,22 +380,83 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
             child: Row(
               children: [
                 // Paket image or icon
-                Container(
+                SizedBox(
                   width: 80,
                   height: 80,
-                  decoration: BoxDecoration(
-                    color: AppColorsPetugas.babyBlueLight,
+                  child: ClipRRect(
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(12),
                       bottomLeft: Radius.circular(12),
                     ),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      _getPaketIcon(paket['kategori']),
-                      color: AppColorsPetugas.navyBlue,
-                      size: 32,
-                    ),
+                    child:
+                        foto != null && foto.isNotEmpty
+                            ? Image.network(
+                              foto,
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.cover,
+                              errorBuilder:
+                                  (context, error, stackTrace) => Container(
+                                    color: AppColorsPetugas.babyBlueLight,
+                                    child: Center(
+                                      child: Icon(
+                                        _getPaketIcon(
+                                          _getTimeUnitName(
+                                            isPaketModel
+                                                ? (paket
+                                                        .satuanWaktuSewa
+                                                        .isNotEmpty
+                                                    ? paket
+                                                            .satuanWaktuSewa
+                                                            .first['satuan_waktu_id'] ??
+                                                        'hari'
+                                                    : 'hari')
+                                                : (paket['satuanWaktuSewa'] !=
+                                                            null &&
+                                                        paket['satuanWaktuSewa']
+                                                            .isNotEmpty
+                                                    ? paket['satuanWaktuSewa'][0]['satuan_waktu_id']
+                                                            ?.toString() ??
+                                                        'hari'
+                                                    : 'hari'),
+                                          ),
+                                        ),
+                                        color: AppColorsPetugas.navyBlue
+                                            .withOpacity(0.5),
+                                        size: 32,
+                                      ),
+                                    ),
+                                  ),
+                            )
+                            : Container(
+                              color: AppColorsPetugas.babyBlueLight,
+                              child: Center(
+                                child: Icon(
+                                  _getPaketIcon(
+                                    _getTimeUnitName(
+                                      isPaketModel
+                                          ? (paket.satuanWaktuSewa.isNotEmpty
+                                              ? paket
+                                                      .satuanWaktuSewa
+                                                      .first['satuan_waktu_id'] ??
+                                                  'hari'
+                                              : 'hari')
+                                          : (paket['satuanWaktuSewa'] != null &&
+                                                  paket['satuanWaktuSewa']
+                                                      .isNotEmpty
+                                              ? paket['satuanWaktuSewa'][0]['satuan_waktu_id']
+                                                      ?.toString() ??
+                                                  'hari'
+                                              : 'hari'),
+                                    ),
+                                  ),
+                                  color: AppColorsPetugas.navyBlue.withOpacity(
+                                    0.5,
+                                  ),
+                                  size: 32,
+                                ),
+                              ),
+                            ),
                   ),
                 ),
 
@@ -228,9 +473,10 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
+                              // Package name
                               Text(
-                                paket['nama'],
-                                style: TextStyle(
+                                nama,
+                                style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                   color: AppColorsPetugas.navyBlue,
@@ -239,13 +485,119 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                'Rp ${_formatPrice(paket['harga'])}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColorsPetugas.textSecondary,
-                                ),
+                              // Prices with time units
+                              Builder(
+                                builder: (context) {
+                                  final List<Map<String, dynamic>> timeUnits =
+                                      [];
+
+                                  // Get all time units
+                                  if (isPaketModel &&
+                                      paket.satuanWaktuSewa.isNotEmpty) {
+                                    timeUnits.addAll(paket.satuanWaktuSewa);
+                                  } else if (!isPaketModel &&
+                                      paket['satuanWaktuSewa'] != null &&
+                                      paket['satuanWaktuSewa'].isNotEmpty) {
+                                    timeUnits.addAll(
+                                      List<Map<String, dynamic>>.from(
+                                        paket['satuanWaktuSewa'],
+                                      ),
+                                    );
+                                  }
+
+                                  // If no time units, show nothing
+                                  if (timeUnits.isEmpty)
+                                    return const SizedBox.shrink();
+
+                                  // Filter out time units with price 0 or null
+                                  final validTimeUnits =
+                                      timeUnits.where((unit) {
+                                        final price =
+                                            unit['harga'] is int
+                                                ? unit['harga']
+                                                : int.tryParse(
+                                                      unit['harga']
+                                                              ?.toString() ??
+                                                          '0',
+                                                    ) ??
+                                                    0;
+                                        return price > 0;
+                                      }).toList();
+
+                                  if (validTimeUnits.isEmpty)
+                                    return const SizedBox.shrink();
+
+                                  return Column(
+                                    children:
+                                        validTimeUnits
+                                            .asMap()
+                                            .entries
+                                            .map((entry) {
+                                              final index = entry.key;
+                                              final unit = entry.value;
+                                              final unitPrice =
+                                                  unit['harga'] is int
+                                                      ? unit['harga']
+                                                      : int.tryParse(
+                                                            unit['harga']
+                                                                    ?.toString() ??
+                                                                '0',
+                                                          ) ??
+                                                          0;
+                                              final unitName = _getTimeUnitName(
+                                                unit['satuan_waktu_id'],
+                                              );
+                                              final isFirst = index == 0;
+
+                                              if (unitPrice <= 0)
+                                                return const SizedBox.shrink();
+
+                                              return Row(
+                                                children: [
+                                                  Flexible(
+                                                    child: Text(
+                                                      'Rp ${_formatPrice(unitPrice)}/$unitName',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color:
+                                                            AppColorsPetugas
+                                                                .textSecondary,
+                                                      ),
+                                                      maxLines: 2,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      softWrap: true,
+                                                    ),
+                                                  ),
+                                                ],
+                                              );
+                                            })
+                                            .where(
+                                              (widget) => widget is! SizedBox,
+                                            )
+                                            .toList(),
+                                  );
+                                },
                               ),
+                              if (!isPaketModel &&
+                                  paket['harga'] != null &&
+                                  (paket['harga'] is int
+                                          ? paket['harga']
+                                          : int.tryParse(
+                                                paket['harga']?.toString() ??
+                                                    '0',
+                                              ) ??
+                                              0) >
+                                      0) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Rp ${_formatPrice(paket['harga'])}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColorsPetugas.textSecondary,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -258,25 +610,31 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
                           ),
                           decoration: BoxDecoration(
                             color:
-                                isAvailable
+                                status.toLowerCase() == 'tersedia'
                                     ? AppColorsPetugas.successLight
+                                    : status.toLowerCase() == 'pemeliharaan'
+                                    ? AppColorsPetugas.warningLight
                                     : AppColorsPetugas.errorLight,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color:
-                                  isAvailable
+                                  status.toLowerCase() == 'tersedia'
                                       ? AppColorsPetugas.success
+                                      : status.toLowerCase() == 'pemeliharaan'
+                                      ? AppColorsPetugas.warning
                                       : AppColorsPetugas.error,
                               width: 1,
                             ),
                           ),
                           child: Text(
-                            isAvailable ? 'Aktif' : 'Nonaktif',
+                            status,
                             style: TextStyle(
                               fontSize: 10,
                               color:
-                                  isAvailable
+                                  status.toLowerCase() == 'tersedia'
                                       ? AppColorsPetugas.success
+                                      : status.toLowerCase() == 'pemeliharaan'
+                                      ? AppColorsPetugas.warning
                                       : AppColorsPetugas.error,
                               fontWeight: FontWeight.w500,
                             ),
@@ -290,9 +648,12 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
                             // Edit icon
                             GestureDetector(
                               onTap:
-                                  () => _showAddEditPaketDialog(
-                                    context,
-                                    paket: paket,
+                                  () => Get.toNamed(
+                                    Routes.PETUGAS_TAMBAH_PAKET,
+                                    arguments: {
+                                      'isEditing': true,
+                                      'paket': paket,
+                                    },
                                   ),
                               child: Container(
                                 padding: const EdgeInsets.all(5),
@@ -350,33 +711,42 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
     );
   }
 
-  String _formatPrice(dynamic price) {
-    if (price == null) return '0';
-
-    // Convert the price to string and handle formatting
-    String priceStr = price.toString();
-
-    // Add thousand separators
-    final RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
-    String formatted = priceStr.replaceAllMapped(reg, (Match m) => '${m[1]}.');
-
-    return formatted;
+  // Add this helper method to get color based on status
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'aktif':
+        return AppColorsPetugas.success;
+      case 'tidak aktif':
+      case 'nonaktif':
+        return AppColorsPetugas.error;
+      case 'dalam perbaikan':
+      case 'maintenance':
+        return AppColorsPetugas.warning;
+      case 'tersedia':
+        return AppColorsPetugas.success;
+      case 'pemeliharaan':
+        return AppColorsPetugas.warning;
+      default:
+        return Colors.grey;
+    }
   }
 
-  IconData _getPaketIcon(String? category) {
-    if (category == null) return Icons.category;
+  IconData _getPaketIcon(String? timeUnit) {
+    if (timeUnit == null) return Icons.access_time;
 
-    switch (category.toLowerCase()) {
-      case 'bulanan':
-        return Icons.calendar_month;
-      case 'tahunan':
+    switch (timeUnit.toLowerCase()) {
+      case 'jam':
+        return Icons.access_time;
+      case 'hari':
         return Icons.calendar_today;
-      case 'premium':
-        return Icons.star;
-      case 'bisnis':
-        return Icons.business;
+      case 'minggu':
+        return Icons.date_range;
+      case 'bulan':
+        return Icons.calendar_month;
+      case 'tahun':
+        return Icons.calendar_view_month;
       default:
-        return Icons.category;
+        return Icons.access_time;
     }
   }
 
@@ -426,7 +796,27 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
     );
   }
 
-  void _showPaketDetails(BuildContext context, Map<String, dynamic> paket) {
+  void _showPaketDetails(BuildContext context, dynamic paket) {
+    // Handle both Map and PaketModel for backward compatibility
+    final isPaketModel = paket is PaketModel;
+    final String nama =
+        isPaketModel
+            ? paket.nama
+            : (paket['nama']?.toString() ?? 'Paket Tanpa Nama');
+    final String? deskripsi =
+        isPaketModel ? paket.deskripsi : paket['deskripsi']?.toString();
+    final bool isAvailable =
+        isPaketModel
+            ? (paket.kuantitas > 0)
+            : ((paket['kuantitas'] as int?) ?? 0) > 0;
+    final dynamic harga =
+        isPaketModel
+            ? (paket.satuanWaktuSewa.isNotEmpty
+                ? paket.satuanWaktuSewa.first['harga']
+                : paket.harga)
+            : (paket['harga'] ?? 0);
+    // Items are not part of the PaketModel, so we'll use an empty list
+    final List<Map<String, dynamic>> items = [];
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -448,7 +838,7 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
                 children: [
                   Expanded(
                     child: Text(
-                      paket['nama'],
+                      nama,
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -473,16 +863,15 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildDetailItem('Kategori', paket['kategori']),
                             _buildDetailItem(
                               'Harga',
-                              controller.formatPrice(paket['harga']),
+                              'Rp ${_formatPrice(harga)}',
                             ),
                             _buildDetailItem(
                               'Status',
-                              paket['tersedia'] ? 'Tersedia' : 'Tidak Tersedia',
+                              isAvailable ? 'Tersedia' : 'Tidak Tersedia',
                             ),
-                            _buildDetailItem('Deskripsi', paket['deskripsi']),
+                            _buildDetailItem('Deskripsi', deskripsi ?? '-'),
                           ],
                         ),
                       ),
@@ -502,11 +891,11 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
                       child: ListView.separated(
                         physics: const NeverScrollableScrollPhysics(),
                         shrinkWrap: true,
-                        itemCount: paket['items'].length,
+                        itemCount: items.length,
                         separatorBuilder:
                             (context, index) => const Divider(height: 1),
                         itemBuilder: (context, index) {
-                          final item = paket['items'][index];
+                          final item = items[index];
                           return ListTile(
                             leading: CircleAvatar(
                               backgroundColor: AppColorsPetugas.babyBlue,
@@ -601,10 +990,11 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
     );
   }
 
-  void _showAddEditPaketDialog(
-    BuildContext context, {
-    Map<String, dynamic>? paket,
-  }) {
+  void _showAddEditPaketDialog(BuildContext context, {dynamic paket}) {
+    // Handle both Map and PaketModel for backward compatibility
+    final isPaketModel = paket is PaketModel;
+    final String? id = isPaketModel ? paket.id : paket?['id'];
+    final String title = id == null ? 'Tambah Paket' : 'Edit Paket';
     final isEditing = paket != null;
 
     // This would be implemented with proper form validation in a real app
@@ -613,7 +1003,7 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
       builder: (context) {
         return AlertDialog(
           title: Text(
-            isEditing ? 'Edit Paket' : 'Tambah Paket Baru',
+            title,
             style: TextStyle(color: AppColorsPetugas.navyBlue),
           ),
           content: const Text(
@@ -652,10 +1042,13 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
     );
   }
 
-  void _showDeleteConfirmation(
-    BuildContext context,
-    Map<String, dynamic> paket,
-  ) {
+  void _showDeleteConfirmation(BuildContext context, dynamic paket) {
+    // Handle both Map and PaketModel for backward compatibility
+    final isPaketModel = paket is PaketModel;
+    final String id = isPaketModel ? paket.id : (paket['id']?.toString() ?? '');
+    final String nama =
+        isPaketModel ? paket.nama : (paket['nama']?.toString() ?? 'Paket');
+
     showDialog(
       context: context,
       builder: (context) {
@@ -664,9 +1057,7 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
             'Konfirmasi Hapus',
             style: TextStyle(color: AppColorsPetugas.navyBlue),
           ),
-          content: Text(
-            'Apakah Anda yakin ingin menghapus paket "${paket['nama']}"?',
-          ),
+          content: Text('Apakah Anda yakin ingin menghapus paket "$nama"?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -678,7 +1069,7 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                controller.deletePaket(paket['id']);
+                controller.deletePaket(id);
                 Get.snackbar(
                   'Paket Dihapus',
                   'Paket berhasil dihapus dari sistem',

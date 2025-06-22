@@ -187,7 +187,7 @@ class RegistrationView extends GetView<AuthController> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Pendaftaran hanya dapat dilakukan oleh warga dan mitra yang sudah terverivikasi. Silahkan hubungi petugas atau kunjungi kantor untuk informasi lebih lanjut.',
+                  'Setelah pendaftaran lengkapi data diri untuk dapat melakukan sewa',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textPrimary,
@@ -203,121 +203,32 @@ class RegistrationView extends GetView<AuthController> {
   }
 
   Widget _buildRegistrationForm() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Email Input
-        _buildInputLabel('Email'),
-        const SizedBox(height: 8),
-        _buildEmailField(),
-        const SizedBox(height: 20),
-
-        // Password Input
-        _buildInputLabel('Password'),
-        const SizedBox(height: 8),
-        _buildPasswordField(),
-        const SizedBox(height: 20),
-
-        // NIK Input
-        _buildInputLabel('NIK'),
-        const SizedBox(height: 8),
-        _buildNikField(),
-        const SizedBox(height: 20),
-
-        // Phone Number Input
-        _buildInputLabel('No. Hp'),
-        const SizedBox(height: 8),
-        _buildPhoneField(),
-        const SizedBox(height: 20),
-
-        // Role Selection Dropdown
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Daftar Sebagai',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[300]!, width: 1),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Obx(
-                  () => DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      isExpanded: true,
-                      value: controller.selectedRole.value,
-                      hint: const Text('Pilih Peran'),
-                      items: [
-                        DropdownMenuItem(
-                          value: 'WARGA',
-                          child: const Text('Warga'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'PETUGAS_MITRA',
-                          child: const Text('Mitra'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        controller.setRole(value);
-                      },
-                      icon: const Icon(Icons.arrow_drop_down),
-                      style: const TextStyle(
-                        color: Colors.black87,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-
-        // Error message
-        Obx(
-          () =>
-              controller.errorMessage.value.isNotEmpty
-                  ? Container(
-                    margin: const EdgeInsets.only(top: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.errorLight,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          color: AppColors.error,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            controller.errorMessage.value,
-                            style: TextStyle(
-                              color: AppColors.error,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                  : const SizedBox.shrink(),
-        ),
-      ],
+    return Form(
+      key: controller.formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildInputLabel('Email'),
+          _buildEmailField(),
+          const SizedBox(height: 16),
+          _buildInputLabel('Password'),
+          _buildPasswordField(),
+          const SizedBox(height: 16),
+          _buildInputLabel('Konfirmasi Password'),
+          _buildConfirmPasswordField(),
+          const SizedBox(height: 16),
+          _buildInputLabel('Nama Lengkap'),
+          _buildNameField(),
+          const SizedBox(height: 16),
+          _buildInputLabel('No HP'),
+          _buildPhoneField(),
+          const SizedBox(height: 16),
+          _buildInputLabel('Alamat Lengkap'),
+          _buildAlamatField(),
+          const SizedBox(height: 16),
+          // Removed: NIK, No HP, and Dropdown Daftar Sebagai
+        ],
+      ),
     );
   }
 
@@ -415,78 +326,101 @@ class RegistrationView extends GetView<AuthController> {
     );
   }
 
-  Widget _buildNikField() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: TextField(
-        onChanged: (value) => controller.nik.value = value,
-        keyboardType: TextInputType.number,
-        style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
+  Widget _buildConfirmPasswordField() {
+    return Obx(
+      () => TextFormField(
+        controller: controller.confirmPasswordController,
+        obscureText: !controller.isConfirmPasswordVisible.value,
         decoration: InputDecoration(
-          hintText: 'Masukkan NIK anda',
-          hintStyle: TextStyle(color: AppColors.textLight),
-          prefixIcon: Icon(
-            Icons.credit_card_outlined,
-            color: AppColors.primary,
+          hintText: 'Masukkan ulang password anda',
+          suffixIcon: IconButton(
+            icon: Icon(
+              controller.isConfirmPasswordVisible.value
+                  ? Icons.visibility
+                  : Icons.visibility_off,
+            ),
+            onPressed: controller.toggleConfirmPasswordVisibility,
           ),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 16),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
           ),
         ),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Konfirmasi password tidak boleh kosong';
+          }
+          if (value != controller.passwordController.text) {
+            return 'Password tidak cocok';
+          }
+          return null;
+        },
       ),
     );
   }
 
-  Widget _buildPhoneField() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: TextField(
-        onChanged: (value) => controller.phoneNumber.value = value,
-        keyboardType: TextInputType.phone,
-        style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
-        decoration: InputDecoration(
-          hintText: 'Masukkan nomor HP anda',
-          hintStyle: TextStyle(color: AppColors.textLight),
-          prefixIcon: Icon(Icons.phone_outlined, color: AppColors.primary),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 16),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: AppColors.primary, width: 1.5),
-          ),
+  Widget _buildNameField() {
+    return TextFormField(
+      controller: controller.nameController,
+      decoration: InputDecoration(
+        hintText: 'Masukkan nama lengkap anda',
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
         ),
       ),
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Nama lengkap tidak boleh kosong';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildPhoneField() {
+    return TextFormField(
+      keyboardType: TextInputType.phone,
+      decoration: InputDecoration(
+        hintText: 'Masukkan nomor HP anda',
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+      ),
+      onChanged: (value) => controller.phoneNumber.value = value,
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'No HP tidak boleh kosong';
+        }
+        if (!value.startsWith('08') || value.length < 10) {
+          return 'Nomor HP tidak valid (harus diawali 08 dan minimal 10 digit)';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildAlamatField() {
+    return TextFormField(
+      decoration: InputDecoration(
+        hintText: 'Masukkan alamat lengkap anda',
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+      ),
+      onChanged: (value) => controller.alamatLengkap.value = value,
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Alamat lengkap tidak boleh kosong';
+        }
+        return null;
+      },
     );
   }
 

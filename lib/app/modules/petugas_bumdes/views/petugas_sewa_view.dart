@@ -6,6 +6,7 @@ import '../widgets/petugas_bumdes_bottom_navbar.dart';
 import '../widgets/petugas_side_navbar.dart';
 import '../controllers/petugas_bumdes_dashboard_controller.dart';
 import 'petugas_detail_sewa_view.dart';
+import '../../../data/models/rental_booking_model.dart';
 
 class PetugasSewaView extends StatefulWidget {
   const PetugasSewaView({Key? key}) : super(key: key);
@@ -160,6 +161,10 @@ class _PetugasSewaViewState extends State<PetugasSewaView>
   }
 
   Widget _buildSearchSection() {
+    // Tambahkan controller untuk TextField agar bisa dikosongkan
+    final TextEditingController searchController = TextEditingController(
+      text: controller.searchQuery.value,
+    );
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       decoration: BoxDecoration(
@@ -173,9 +178,9 @@ class _PetugasSewaViewState extends State<PetugasSewaView>
         ],
       ),
       child: TextField(
+        controller: searchController,
         onChanged: (value) {
           controller.setSearchQuery(value);
-          controller.setOrderIdQuery(value);
         },
         decoration: InputDecoration(
           hintText: 'Cari nama warga atau ID pesanan...',
@@ -204,10 +209,21 @@ class _PetugasSewaViewState extends State<PetugasSewaView>
           ),
           contentPadding: EdgeInsets.zero,
           isDense: true,
-          suffixIcon: Icon(
-            Icons.tune_rounded,
-            color: AppColorsPetugas.textSecondary,
-            size: 20,
+          suffixIcon: Obx(
+            () =>
+                controller.searchQuery.value.isNotEmpty
+                    ? IconButton(
+                      icon: Icon(
+                        Icons.close,
+                        color: AppColorsPetugas.textSecondary,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        searchController.clear();
+                        controller.setSearchQuery('');
+                      },
+                    )
+                    : SizedBox.shrink(),
           ),
         ),
       ),
@@ -241,17 +257,44 @@ class _PetugasSewaViewState extends State<PetugasSewaView>
       final filteredList =
           status == 'Semua'
               ? controller.filteredSewaList
+              : status == 'Menunggu Pembayaran'
+              ? controller.sewaList
+                  .where(
+                    (sewa) =>
+                        sewa.status.toUpperCase() == 'MENUNGGU PEMBAYARAN' ||
+                        sewa.status.toUpperCase() == 'PEMBAYARAN DENDA',
+                  )
+                  .toList()
               : status == 'Periksa Pembayaran'
               ? controller.sewaList
                   .where(
                     (sewa) =>
-                        sewa['status'] == 'Periksa Pembayaran' ||
-                        sewa['status'] == 'Pembayaran Denda' ||
-                        sewa['status'] == 'Periksa Denda',
+                        sewa.status.toUpperCase() == 'PERIKSA PEMBAYARAN' ||
+                        sewa.status.toUpperCase() == 'PERIKSA PEMBAYARAN DENDA',
                   )
                   .toList()
+              : status == 'Diterima'
+              ? controller.sewaList
+                  .where((sewa) => sewa.status.toUpperCase() == 'DITERIMA')
+                  .toList()
+              : status == 'Aktif'
+              ? controller.sewaList
+                  .where((sewa) => sewa.status.toUpperCase() == 'AKTIF')
+                  .toList()
+              : status == 'Dikembalikan'
+              ? controller.sewaList
+                  .where((sewa) => sewa.status.toUpperCase() == 'DIKEMBALIKAN')
+                  .toList()
+              : status == 'Selesai'
+              ? controller.sewaList
+                  .where((sewa) => sewa.status.toUpperCase() == 'SELESAI')
+                  .toList()
+              : status == 'Dibatalkan'
+              ? controller.sewaList
+                  .where((sewa) => sewa.status.toUpperCase() == 'DIBATALKAN')
+                  .toList()
               : controller.sewaList
-                  .where((sewa) => sewa['status'] == status)
+                  .where((sewa) => sewa.status == status)
                   .toList();
 
       if (filteredList.isEmpty) {
@@ -313,40 +356,25 @@ class _PetugasSewaViewState extends State<PetugasSewaView>
     });
   }
 
-  Widget _buildSewaCard(BuildContext context, Map<String, dynamic> sewa) {
-    final statusColor = controller.getStatusColor(sewa['status']);
-    final status = sewa['status'];
+  Widget _buildSewaCard(BuildContext context, SewaModel sewa) {
+    final statusColor = controller.getStatusColor(sewa.status);
+    final status = sewa.status;
 
     // Get appropriate icon for status
-    IconData statusIcon;
-    switch (status) {
-      case 'Menunggu Pembayaran':
-        statusIcon = Icons.payments_outlined;
-        break;
-      case 'Periksa Pembayaran':
-        statusIcon = Icons.fact_check_outlined;
-        break;
-      case 'Diterima':
-        statusIcon = Icons.check_circle_outlined;
-        break;
-      case 'Pembayaran Denda':
-        statusIcon = Icons.money_off_csred_outlined;
-        break;
-      case 'Periksa Denda':
-        statusIcon = Icons.assignment_late_outlined;
-        break;
-      case 'Dikembalikan':
-        statusIcon = Icons.assignment_return_outlined;
-        break;
-      case 'Selesai':
-        statusIcon = Icons.task_alt_outlined;
-        break;
-      case 'Dibatalkan':
-        statusIcon = Icons.cancel_outlined;
-        break;
-      default:
-        statusIcon = Icons.help_outline_rounded;
-    }
+    IconData statusIcon = controller.getStatusIcon(status);
+
+    // Flag untuk membedakan tipe pesanan
+    final bool isAset = sewa.tipePesanan == 'tunggal';
+    final bool isPaket = sewa.tipePesanan == 'paket';
+
+    // Pilih nama aset/paket
+    final String namaAsetAtauPaket =
+        isAset
+            ? (sewa.asetNama ?? '-')
+            : (isPaket ? (sewa.paketNama ?? '-') : '-');
+    // Pilih foto aset/paket jika ingin digunakan
+    final String? fotoAsetAtauPaket =
+        isAset ? sewa.asetFoto : (isPaket ? sewa.paketFoto : null);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -370,6 +398,35 @@ class _PetugasSewaViewState extends State<PetugasSewaView>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Status header inside the card
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.12),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Icon(statusIcon, size: 16, color: statusColor),
+                    const SizedBox(width: 8),
+                    Text(
+                      status,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: statusColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                 child: Row(
@@ -378,14 +435,22 @@ class _PetugasSewaViewState extends State<PetugasSewaView>
                     CircleAvatar(
                       radius: 24,
                       backgroundColor: AppColorsPetugas.babyBlueLight,
-                      child: Text(
-                        sewa['nama_warga'].substring(0, 1).toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColorsPetugas.blueGrotto,
-                        ),
-                      ),
+                      backgroundImage:
+                          (sewa.wargaAvatar != null &&
+                                  sewa.wargaAvatar.isNotEmpty)
+                              ? NetworkImage(sewa.wargaAvatar)
+                              : null,
+                      child:
+                          (sewa.wargaAvatar == null || sewa.wargaAvatar.isEmpty)
+                              ? Text(
+                                sewa.wargaNama.substring(0, 1).toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColorsPetugas.blueGrotto,
+                                ),
+                              )
+                              : null,
                     ),
                     const SizedBox(width: 16),
 
@@ -395,55 +460,22 @@ class _PetugasSewaViewState extends State<PetugasSewaView>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            sewa['nama_warga'],
+                            sewa.wargaNama,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: AppColorsPetugas.textPrimary,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: statusColor.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      statusIcon,
-                                      size: 12,
-                                      color: statusColor,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      status,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: statusColor,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '#${sewa['order_id']}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColorsPetugas.textSecondary,
-                                ),
-                              ),
-                            ],
+                          Text(
+                            'Tanggal Pesan: ' +
+                                (sewa.tanggalPemesanan != null
+                                    ? '${sewa.tanggalPemesanan.day.toString().padLeft(2, '0')}-${sewa.tanggalPemesanan.month.toString().padLeft(2, '0')}-${sewa.tanggalPemesanan.year}'
+                                    : '-'),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColorsPetugas.textSecondary,
+                            ),
                           ),
                         ],
                       ),
@@ -460,7 +492,7 @@ class _PetugasSewaViewState extends State<PetugasSewaView>
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        controller.formatPrice(sewa['total_biaya']),
+                        controller.formatPrice(sewa.totalTagihan),
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -481,33 +513,51 @@ class _PetugasSewaViewState extends State<PetugasSewaView>
                 child: Divider(height: 1, color: Colors.grey.shade200),
               ),
 
-              // Asset details
+              // Asset/Paket details
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                 child: Row(
                   children: [
-                    // Asset icon
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColorsPetugas.babyBlueLight,
+                    // Asset/Paket image or icon
+                    if (fotoAsetAtauPaket != null &&
+                        fotoAsetAtauPaket.isNotEmpty)
+                      ClipRRect(
                         borderRadius: BorderRadius.circular(10),
+                        child: Image.network(
+                          fotoAsetAtauPaket,
+                          width: 40,
+                          height: 40,
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (context, error, stackTrace) => Icon(
+                                Icons.inventory_2_outlined,
+                                size: 28,
+                                color: AppColorsPetugas.blueGrotto,
+                              ),
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColorsPetugas.babyBlueLight,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.inventory_2_outlined,
+                          size: 20,
+                          color: AppColorsPetugas.blueGrotto,
+                        ),
                       ),
-                      child: Icon(
-                        Icons.inventory_2_outlined,
-                        size: 20,
-                        color: AppColorsPetugas.blueGrotto,
-                      ),
-                    ),
                     const SizedBox(width: 12),
 
-                    // Asset name and duration
+                    // Asset/Paket name and duration
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            sewa['nama_aset'],
+                            namaAsetAtauPaket,
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
@@ -524,7 +574,7 @@ class _PetugasSewaViewState extends State<PetugasSewaView>
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                '${sewa['tanggal_mulai']} - ${sewa['tanggal_selesai']}',
+                                '${sewa.waktuMulai.toIso8601String().substring(0, 10)} - ${sewa.waktuSelesai.toIso8601String().substring(0, 10)}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: AppColorsPetugas.textSecondary,

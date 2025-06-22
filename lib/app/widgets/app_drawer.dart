@@ -292,34 +292,6 @@ class AppDrawer extends StatelessWidget {
 
                     // Settings Items
                     _buildDrawerItem(
-                      icon: Icons.info_outline_rounded,
-                      title: 'Tentang Aplikasi',
-                      subtitle: 'Informasi dan bantuan',
-                      showTrailing: false,
-                      onTap: () {
-                        Navigator.pop(context);
-                        // Show about dialog
-                        showAboutDialog(
-                          context: context,
-                          applicationName: 'BumRent App',
-                          applicationVersion: '1.0.0',
-                          applicationIcon: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.asset(
-                              'assets/images/logo.png',
-                              width: 40,
-                              height: 40,
-                            ),
-                          ),
-                          children: [
-                            const Text(
-                              'Aplikasi penyewaan dan berlangganan aset milik BUMDes untuk warga desa.',
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                    _buildDrawerItem(
                       icon: Icons.logout_rounded,
                       title: 'Keluar',
                       subtitle: 'Keluar dari aplikasi',

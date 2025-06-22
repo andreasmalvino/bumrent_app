@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 class PaketModel {
   final String id;
@@ -6,12 +7,13 @@ class PaketModel {
   final String deskripsi;
   final double harga;
   final int kuantitas;
-  final List<String> foto;
-  final List<Map<String, dynamic>> satuanWaktuSewa;
+  final String status;
+  List<String> foto;
+  List<Map<String, dynamic>> satuanWaktuSewa;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final String? foto_paket; // Main photo URL
-  final List<String>? images; // List of photo URLs
+  String? foto_paket; // Main photo URL
+  List<String>? images; // List of photo URLs
 
   PaketModel({
     required this.id,
@@ -19,13 +21,47 @@ class PaketModel {
     required this.deskripsi,
     required this.harga,
     required this.kuantitas,
-    required this.foto,
-    required this.satuanWaktuSewa,
+    this.status = 'aktif',
+    required List<String> foto,
+    required List<Map<String, dynamic>> satuanWaktuSewa,
     this.foto_paket,
-    this.images,
+    List<String>? images,
     required this.createdAt,
     required this.updatedAt,
-  });
+  }) : foto = List.from(foto),
+       satuanWaktuSewa = List.from(satuanWaktuSewa),
+       images = images != null ? List.from(images) : [];
+       
+  // Add copyWith method for immutability patterns
+  PaketModel copyWith({
+    String? id,
+    String? nama,
+    String? deskripsi,
+    double? harga,
+    int? kuantitas,
+    String? status,
+    List<String>? foto,
+    List<Map<String, dynamic>>? satuanWaktuSewa,
+    String? foto_paket,
+    List<String>? images,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return PaketModel(
+      id: id ?? this.id,
+      nama: nama ?? this.nama,
+      deskripsi: deskripsi ?? this.deskripsi,
+      harga: harga ?? this.harga,
+      kuantitas: kuantitas ?? this.kuantitas,
+      status: status ?? this.status,
+      foto: foto ?? List.from(this.foto),
+      satuanWaktuSewa: satuanWaktuSewa ?? List.from(this.satuanWaktuSewa),
+      foto_paket: foto_paket ?? this.foto_paket,
+      images: images ?? (this.images != null ? List.from(this.images!) : null),
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 
   // Alias for fromJson to maintain compatibility
   factory PaketModel.fromMap(Map<String, dynamic> json) => PaketModel.fromJson(json);
@@ -63,10 +99,15 @@ class PaketModel {
       }
     }
     
+    developer.log('📦 [PaketModel.fromJson] Raw status: ${json['status']} (type: ${json['status']?.runtimeType})');
+    final status = json['status']?.toString().toLowerCase() ?? 'aktif';
+    developer.log('   🏷️ Processed status: $status');
+    
     return PaketModel(
       id: json['id']?.toString() ?? '',
       nama: json['nama']?.toString() ?? '',
       deskripsi: json['deskripsi']?.toString() ?? '',
+      status: status,
       harga: (json['harga'] is num) ? (json['harga'] as num).toDouble() : 0.0,
       kuantitas: (json['kuantitas'] is num) ? (json['kuantitas'] as num).toInt() : 1,
       foto: fotoList,
@@ -97,35 +138,7 @@ class PaketModel {
     'updated_at': updatedAt.toIso8601String(),
   };
 
-  // Create a copy of the model with some fields updated
-  PaketModel copyWith({
-    String? id,
-    String? nama,
-    String? deskripsi,
-    double? harga,
-    int? kuantitas,
-    List<String>? foto,
-    List<Map<String, dynamic>>? satuanWaktuSewa,
-    String? foto_paket,
-    List<String>? images,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) {
-    return PaketModel(
-      id: id ?? this.id,
-      nama: nama ?? this.nama,
-      deskripsi: deskripsi ?? this.deskripsi,
-      harga: harga ?? this.harga,
-      kuantitas: kuantitas ?? this.kuantitas,
-      foto: foto ?? List.from(this.foto),
-      satuanWaktuSewa: satuanWaktuSewa ?? List.from(this.satuanWaktuSewa),
-      foto_paket: foto_paket ?? this.foto_paket,
-      images: images ?? (this.images != null ? List.from(this.images!) : null),
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
-  }
-  
+
   // Get the first photo URL or a placeholder
   String get firstPhotoUrl => foto.isNotEmpty ? foto.first : '';
   

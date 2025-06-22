@@ -154,10 +154,10 @@ class WargaDashboardView extends GetView<WargaDashboardController> {
         'route': () => controller.navigateToRentals(),
       },
       {
-        'title': 'Bayar',
-        'icon': Icons.payment_outlined,
+        'title': 'Paket',
+        'icon': Icons.widgets_outlined,
         'color': const Color(0xFF2196F3),
-        'route': () => Get.toNamed(Routes.PEMBAYARAN_SEWA),
+        'route': () => controller.toSewaAsetTabPaket(),
       },
     ];
 
@@ -218,32 +218,44 @@ class WargaDashboardView extends GetView<WargaDashboardController> {
           child: Column(
             children: [
               // Sewa Diterima
-              _buildActivityCard(
-                title: 'Sewa Diterima',
-                value: controller.activeRentals.length.toString(),
-                icon: Icons.check_circle_outline,
-                color: AppColors.success,
-                onTap: () => controller.navigateToRentals(),
+              Obx(
+                () => _buildActivityCard(
+                  title: 'Sewa Diterima',
+                  value: controller.diterimaCount.value.toString(),
+                  icon: Icons.check_circle_outline,
+                  color: AppColors.success,
+                  onTap:
+                      () =>
+                          Get.toNamed(Routes.WARGA_SEWA, arguments: {'tab': 2}),
+                ),
               ),
               const SizedBox(height: 12),
 
               // Tagihan Aktif
-              _buildActivityCard(
-                title: 'Tagihan Aktif',
-                value: controller.activeBills.length.toString(),
-                icon: Icons.receipt_long_outlined,
-                color: AppColors.warning,
-                onTap: () => Get.toNamed(Routes.PEMBAYARAN_SEWA),
+              Obx(
+                () => _buildActivityCard(
+                  title: 'Tagihan Aktif',
+                  value: controller.tagihanAktifCount.value.toString(),
+                  icon: Icons.receipt_long_outlined,
+                  color: AppColors.warning,
+                  onTap:
+                      () =>
+                          Get.toNamed(Routes.WARGA_SEWA, arguments: {'tab': 0}),
+                ),
               ),
               const SizedBox(height: 12),
 
               // Denda Aktif
-              _buildActivityCard(
-                title: 'Denda Aktif',
-                value: controller.activePenalties.length.toString(),
-                icon: Icons.warning_amber_outlined,
-                color: AppColors.error,
-                onTap: () => Get.toNamed(Routes.PEMBAYARAN_SEWA),
+              Obx(
+                () => _buildActivityCard(
+                  title: 'Denda Aktif',
+                  value: controller.dendaAktifCount.value.toString(),
+                  icon: Icons.warning_amber_outlined,
+                  color: AppColors.error,
+                  onTap:
+                      () =>
+                          Get.toNamed(Routes.WARGA_SEWA, arguments: {'tab': 0}),
+                ),
               ),
             ],
           ),
@@ -357,7 +369,7 @@ class WargaDashboardView extends GetView<WargaDashboardController> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Sewa Diterima',
+                'Sewa Aktif',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -498,31 +510,34 @@ class WargaDashboardView extends GetView<WargaDashboardController> {
             ),
             child: Row(
               children: [
-                // Asset icon
+                // Asset icon/gambar
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        AppColors.primary.withOpacity(0.7),
-                        AppColors.primary,
-                      ],
-                    ),
                     borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
+                    color: AppColors.primary.withOpacity(0.08),
                   ),
-                  child: const Icon(
-                    Icons.local_shipping,
-                    color: Colors.white,
-                    size: 24,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child:
+                        rental['imageUrl'] != null &&
+                                rental['imageUrl'].toString().isNotEmpty
+                            ? Image.network(
+                              rental['imageUrl'],
+                              fit: BoxFit.cover,
+                              errorBuilder:
+                                  (context, error, stackTrace) => Icon(
+                                    Icons.local_shipping,
+                                    color: AppColors.primary,
+                                    size: 28,
+                                  ),
+                            )
+                            : Icon(
+                              Icons.local_shipping,
+                              color: AppColors.primary,
+                              size: 28,
+                            ),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -533,7 +548,7 @@ class WargaDashboardView extends GetView<WargaDashboardController> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        rental['name'],
+                        rental['name'] ?? '-',
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.bold,
@@ -542,7 +557,7 @@ class WargaDashboardView extends GetView<WargaDashboardController> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        rental['time'],
+                        rental['waktuSewa'] ?? '',
                         style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
@@ -567,7 +582,7 @@ class WargaDashboardView extends GetView<WargaDashboardController> {
                     ),
                   ),
                   child: Text(
-                    rental['price'],
+                    rental['totalPrice'] ?? 'Rp 0',
                     style: TextStyle(
                       color: AppColors.primary,
                       fontWeight: FontWeight.bold,
@@ -591,14 +606,14 @@ class WargaDashboardView extends GetView<WargaDashboardController> {
                       child: _buildInfoItem(
                         icon: Icons.timer_outlined,
                         title: 'Durasi',
-                        value: rental['duration'],
+                        value: rental['duration'] ?? '-',
                       ),
                     ),
                     Expanded(
                       child: _buildInfoItem(
                         icon: Icons.calendar_today_outlined,
                         title: 'Status',
-                        value: 'Diterima',
+                        value: rental['status'] ?? '-',
                         valueColor: AppColors.success,
                       ),
                     ),
@@ -608,7 +623,7 @@ class WargaDashboardView extends GetView<WargaDashboardController> {
                 const SizedBox(height: 16),
 
                 // Action buttons
-                if (rental['can_extend'])
+                if ((rental['can_extend'] ?? false) == true)
                   OutlinedButton.icon(
                     onPressed: () => controller.extendRental(rental['id']),
                     icon: const Icon(Icons.update, size: 18),

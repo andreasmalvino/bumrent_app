@@ -2,64 +2,150 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/petugas_sewa_controller.dart';
 import '../../../theme/app_colors_petugas.dart';
+import '../../../data/models/rental_booking_model.dart';
+import 'package:intl/intl.dart';
+import '../../../data/providers/aset_provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class PetugasDetailSewaView extends StatelessWidget {
-  final Map<String, dynamic> sewa;
-  final PetugasSewaController controller = Get.find<PetugasSewaController>();
-
+class PetugasDetailSewaView extends StatefulWidget {
+  final SewaModel sewa;
   PetugasDetailSewaView({Key? key, required this.sewa}) : super(key: key);
 
   @override
+  State<PetugasDetailSewaView> createState() => _PetugasDetailSewaViewState();
+}
+
+class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
+  late SewaModel sewa;
+  final PetugasSewaController controller = Get.find<PetugasSewaController>();
+  final Rx<File?> selectedDamageImage = Rx<File?>(null);
+  final Rx<bool> hasImage = false.obs;
+
+  @override
+  void initState() {
+    super.initState();
+    sewa = widget.sewa;
+  }
+
+  Future<void> refreshSewaData() async {
+    // Fetch the latest sewa detail from Supabase
+    final updated = await AsetProvider().getSewaAsetWithAsetData(sewa.id);
+    if (updated != null) {
+      // Fetch tagihan_sewa
+      final tagihan = await AsetProvider().getTagihanSewa(sewa.id);
+      // Fetch warga_desa
+      String userId = updated['user_id'] ?? '';
+      Map<String, dynamic>? warga;
+      if (userId.isNotEmpty) {
+        final wargaList =
+            await AsetProvider().client
+                .from('warga_desa')
+                .select('user_id, nama_lengkap, no_hp, avatar')
+                .eq('user_id', userId)
+                .maybeSingle();
+        warga = wargaList;
+      }
+      // Merge all data for SewaModel
+      final merged = <String, dynamic>{
+        ...updated,
+        if (tagihan != null) ...{
+          'total_tagihan': tagihan['total_tagihan'],
+          'denda': tagihan['denda'],
+          'dibayar': tagihan['tagihan_dibayar'],
+        },
+        if (warga != null) ...{
+          'warga_nama': warga['nama_lengkap'],
+          'warga_no_hp': warga['no_hp'],
+          'warga_avatar': warga['avatar'],
+        },
+      };
+      // Ensure asset/package name and image are present
+      if ((merged['tipe_pesanan'] == 'tunggal' ||
+              merged['tipe_pesanan'] == null) &&
+          merged['aset_id'] != null) {
+        final aset = updated['aset_detail'] ?? {};
+        merged['aset_nama'] = aset['nama'] ?? '';
+        // Always fetch foto_aset for aset_id
+        final fotoResp =
+            await AsetProvider().client
+                .from('foto_aset')
+                .select('foto_aset')
+                .eq('id_aset', merged['aset_id'])
+                .limit(1)
+                .maybeSingle();
+        merged['aset_foto'] = fotoResp != null ? fotoResp['foto_aset'] : '';
+      } else if (merged['tipe_pesanan'] == 'paket' &&
+          merged['paket_id'] != null) {
+        // Fetch paket name and photo if missing
+        final paketId = merged['paket_id'];
+        final paketResp =
+            await AsetProvider().client
+                .from('paket')
+                .select('id, nama')
+                .eq('id', paketId)
+                .maybeSingle();
+        merged['paket_nama'] = paketResp != null ? paketResp['nama'] : '';
+        // Fetch first photo for paket
+        final fotoResp =
+            await AsetProvider().client
+                .from('foto_aset')
+                .select('foto_aset')
+                .eq('id_paket', paketId)
+                .limit(1)
+                .maybeSingle();
+        merged['paket_foto'] = fotoResp != null ? fotoResp['foto_aset'] : '';
+      }
+      setState(() {
+        sewa = SewaModel.fromJson(merged);
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final statusColor = controller.getStatusColor(sewa['status']);
-    final status = sewa['status'];
+    final statusColor = controller.getStatusColor(sewa.status);
+    final status = sewa.status;
 
     // Get appropriate icon for status
-    IconData statusIcon;
-    switch (status) {
-      case 'Menunggu Pembayaran':
-        statusIcon = Icons.payments_outlined;
-        break;
-      case 'Periksa Pembayaran':
-        statusIcon = Icons.fact_check_outlined;
-        break;
-      case 'Diterima':
-        statusIcon = Icons.check_circle_outlined;
-        break;
-      case 'Pembayaran Denda':
-        statusIcon = Icons.money_off_csred_outlined;
-        break;
-      case 'Periksa Denda':
-        statusIcon = Icons.assignment_late_outlined;
-        break;
-      case 'Selesai':
-        statusIcon = Icons.task_alt_outlined;
-        break;
-      case 'Dibatalkan':
-        statusIcon = Icons.cancel_outlined;
-        break;
-      default:
-        statusIcon = Icons.help_outline_rounded;
+    IconData statusIcon = controller.getStatusIcon(status);
+
+    // Flag untuk membedakan tipe pesanan
+    final bool isAset = sewa.tipePesanan == 'tunggal';
+    final bool isPaket = sewa.tipePesanan == 'paket';
+
+    // Pilih nama aset/paket
+    final String namaAsetAtauPaket =
+        isAset
+            ? (sewa.asetNama ?? '-')
+            : (isPaket ? (sewa.paketNama ?? '-') : '-');
+    // Pilih foto aset/paket jika ingin digunakan
+    final String? fotoAsetAtauPaket =
+        isAset ? sewa.asetFoto : (isPaket ? sewa.paketFoto : null);
+
+    // Trigger fetch paket detail dan log debug saat halaman dibuka (hanya jika paket)
+    if (isPaket && sewa.paketId != null && sewa.paketId!.isNotEmpty) {
+      controller.getPaketItems(sewa.paketId!).then((items) {
+        debugPrint('[DEBUG] --- Paket Detail (on page open) ---');
+        for (var item in items) {
+          debugPrint(
+            '[DEBUG] Paket Detail Item: nama_aset=${item['nama_aset']}, kuantitas=${item['kuantitas']}',
+          );
+        }
+      });
     }
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: Text(
-          'Detail Sewa #${sewa['order_id']}',
+          'Detail Sewa #${sewa.id}',
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
         ),
         backgroundColor: AppColorsPetugas.navyBlue,
         foregroundColor: Colors.white,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.file_download_outlined),
-            onPressed: () => _showDownloadOptions(context),
-            tooltip: 'Unduh Bukti',
-          ),
-          _buildActionMenu(context),
-        ],
       ),
       body: CustomScrollView(
         slivers: [
@@ -108,7 +194,7 @@ class PetugasDetailSewaView extends StatelessWidget {
 
                     // Price Tag
                     Text(
-                      controller.formatPrice(sewa['total_biaya']),
+                      controller.formatPrice(sewa.totalTagihan),
                       style: TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.bold,
@@ -119,24 +205,24 @@ class PetugasDetailSewaView extends StatelessWidget {
                     const SizedBox(height: 8),
 
                     // Order ID and Date Range
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.calendar_today_rounded,
-                          size: 14,
-                          color: AppColorsPetugas.textSecondary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${sewa['tanggal_mulai']} - ${sewa['tanggal_selesai']}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppColorsPetugas.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
+                    // Row(
+                    //   mainAxisAlignment: MainAxisAlignment.center,
+                    //   children: [
+                    //     Icon(
+                    //       Icons.calendar_today_rounded,
+                    //       size: 14,
+                    //       color: AppColorsPetugas.textSecondary,
+                    //     ),
+                    //     const SizedBox(width: 6),
+                    //     Text(
+                    //       '${sewa.waktuMulai.toIso8601String().substring(0, 10)} - ${sewa.waktuSelesai.toIso8601String().substring(0, 10)}',
+                    //       style: TextStyle(
+                    //         fontSize: 14,
+                    //         color: AppColorsPetugas.textSecondary,
+                    //       ),
+                    //     ),
+                    //   ],
+                    // ),
                   ],
                 ),
               ),
@@ -162,16 +248,28 @@ class PetugasDetailSewaView extends StatelessWidget {
                             CircleAvatar(
                               radius: 24,
                               backgroundColor: AppColorsPetugas.babyBlueLight,
-                              child: Text(
-                                sewa['nama_warga']
-                                    .substring(0, 1)
-                                    .toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColorsPetugas.blueGrotto,
-                                ),
-                              ),
+                              backgroundImage:
+                                  (sewa.wargaAvatar != null &&
+                                          sewa.wargaAvatar.isNotEmpty)
+                                      ? NetworkImage(sewa.wargaAvatar)
+                                      : null,
+                              child:
+                                  (sewa.wargaAvatar == null ||
+                                          sewa.wargaAvatar.isEmpty)
+                                      ? Text(
+                                        (sewa.wargaNama != null &&
+                                                sewa.wargaNama.isNotEmpty)
+                                            ? sewa.wargaNama
+                                                .substring(0, 1)
+                                                .toUpperCase()
+                                            : '-',
+                                        style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColorsPetugas.blueGrotto,
+                                        ),
+                                      )
+                                      : null,
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -179,7 +277,7 @@ class PetugasDetailSewaView extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    sewa['nama_warga'],
+                                    sewa.wargaNama,
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
@@ -196,9 +294,9 @@ class PetugasDetailSewaView extends StatelessWidget {
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        '0812-3456-7890', // Placeholder
+                                        sewa.wargaNoHp,
                                         style: TextStyle(
-                                          fontSize: 13,
+                                          fontSize: 14,
                                           color: AppColorsPetugas.textSecondary,
                                         ),
                                       ),
@@ -218,24 +316,42 @@ class PetugasDetailSewaView extends StatelessWidget {
                         // Asset info
                         Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColorsPetugas.babyBlueLight,
+                            if (fotoAsetAtauPaket != null &&
+                                fotoAsetAtauPaket.isNotEmpty)
+                              ClipRRect(
                                 borderRadius: BorderRadius.circular(10),
+                                child: Image.network(
+                                  fotoAsetAtauPaket,
+                                  width: 40,
+                                  height: 40,
+                                  fit: BoxFit.cover,
+                                  errorBuilder:
+                                      (context, error, stackTrace) => Icon(
+                                        Icons.inventory_2_outlined,
+                                        size: 28,
+                                        color: AppColorsPetugas.blueGrotto,
+                                      ),
+                                ),
+                              )
+                            else
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColorsPetugas.babyBlueLight,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  Icons.inventory_2_outlined,
+                                  size: 20,
+                                  color: AppColorsPetugas.blueGrotto,
+                                ),
                               ),
-                              child: Icon(
-                                Icons.inventory_2_outlined,
-                                size: 20,
-                                color: AppColorsPetugas.blueGrotto,
-                              ),
-                            ),
                             const SizedBox(width: 12),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  sewa['nama_aset'],
+                                  namaAsetAtauPaket,
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -244,7 +360,7 @@ class PetugasDetailSewaView extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '1 unit',
+                                  '${sewa.kuantitas} unit',
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: AppColorsPetugas.textSecondary,
@@ -258,6 +374,102 @@ class PetugasDetailSewaView extends StatelessWidget {
                     ),
                   ),
 
+                  // Jika paket, tampilkan detail paket di bawah asset info card
+                  if (isPaket)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16, bottom: 8),
+                      child: _buildInfoCard(
+                        title: 'Detail Paket',
+                        titleIcon: Icons.inventory_2_outlined,
+                        child: FutureBuilder<List<Map<String, dynamic>>>(
+                          future: controller.getPaketItems(sewa.paketId ?? ''),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              );
+                            }
+                            if (snapshot.hasError) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                child: Text(
+                                  'Gagal memuat detail paket',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              );
+                            }
+                            final items = snapshot.data ?? [];
+                            if (items.isEmpty) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: Text('Tidak ada item dalam paket'),
+                              );
+                            }
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Nama Aset',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColorsPetugas.textPrimary,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Kuantitas',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColorsPetugas.textPrimary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                ...items.map(
+                                  (item) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 6),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            item['nama_aset'] ?? '-',
+                                            style: TextStyle(
+                                              color:
+                                                  AppColorsPetugas
+                                                      .textSecondary,
+                                            ),
+                                          ),
+                                        ),
+                                        Text(
+                                          item['kuantitas'].toString(),
+                                          style: TextStyle(
+                                            color:
+                                                AppColorsPetugas.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+
                   const SizedBox(height: 16),
 
                   // Rental Details Card
@@ -269,23 +481,70 @@ class PetugasDetailSewaView extends StatelessWidget {
                         _buildDetailRow(
                           icon: Icons.calendar_today_rounded,
                           label: 'Tanggal Mulai',
-                          value: sewa['tanggal_mulai'],
+                          value: DateFormat(
+                            'dd-MM-yyyy HH:mm:ss',
+                          ).format(sewa.waktuMulai),
                         ),
                         _buildDetailRow(
                           icon: Icons.event_rounded,
                           label: 'Tanggal Selesai',
-                          value: sewa['tanggal_selesai'],
+                          value: DateFormat(
+                            'dd-MM-yyyy HH:mm:ss',
+                          ).format(sewa.waktuSelesai),
                         ),
-                        _buildDetailRow(
-                          icon: Icons.timer_rounded,
-                          label: 'Durasi',
-                          value: '7 hari', // Placeholder
-                        ),
-                        _buildDetailRow(
-                          icon: Icons.schedule_rounded,
-                          label: 'Status',
-                          value: status,
-                          valueColor: statusColor,
+                        FutureBuilder<Map<String, dynamic>?>(
+                          future: AsetProvider().getTagihanSewa(sewa.id),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8.0,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.timer_rounded,
+                                      size: 16,
+                                      color: AppColorsPetugas.textSecondary,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      'Durasi',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: AppColorsPetugas.textSecondary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: const CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                            if (snapshot.hasError || snapshot.data == null) {
+                              return _buildDetailRow(
+                                icon: Icons.timer_rounded,
+                                label: 'Durasi',
+                                value: '-',
+                              );
+                            }
+                            final tagihan = snapshot.data!;
+                            final durasi = tagihan['durasi']?.toString() ?? '-';
+                            final satuan =
+                                tagihan['satuan_waktu']?.toString() ?? '';
+                            return _buildDetailRow(
+                              icon: Icons.timer_rounded,
+                              label: 'Durasi',
+                              value: durasi != '-' ? '$durasi $satuan' : '-',
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -299,428 +558,429 @@ class PetugasDetailSewaView extends StatelessWidget {
                     titleIcon: Icons.receipt_long_rounded,
                     child: Column(
                       children: [
-                        _buildDetailRow(
-                          icon: Icons.inventory_2_outlined,
-                          label: 'Tagihan Sewa',
-                          value: controller.formatPrice(sewa['total_biaya']),
+                        FutureBuilder<Map<String, dynamic>?>(
+                          future: AsetProvider().getTagihanSewa(sewa.id),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return _buildDetailRow(
+                                icon: Icons.inventory_2_outlined,
+                                label: 'Tagihan Awal',
+                                value: 'Memuat...',
+                              );
+                            }
+                            if (snapshot.hasError ||
+                                !snapshot.hasData ||
+                                snapshot.data == null) {
+                              return _buildDetailRow(
+                                icon: Icons.inventory_2_outlined,
+                                label: 'Tagihan Awal',
+                                value: '-',
+                              );
+                            }
+                            final tagihan = snapshot.data!;
+                            final tagihanAwal = tagihan['tagihan_awal'] ?? 0;
+                            final totalTagihan = tagihan['total_tagihan'] ?? 0;
+                            final dibayar = tagihan['tagihan_dibayar'] ?? 0;
+                            return Column(
+                              children: [
+                                _buildDetailRow(
+                                  icon: Icons.inventory_2_outlined,
+                                  label: 'Tagihan Awal',
+                                  value: controller.formatPrice(tagihanAwal),
+                                ),
+                                _buildDetailRow(
+                                  icon: Icons.warning_amber_rounded,
+                                  label: 'Denda',
+                                  value: controller.formatPrice(
+                                    tagihan['denda'] ?? 0,
+                                  ),
+                                  valueColor: Colors.red[700],
+                                  valueBold: true,
+                                ),
+                                _buildDetailRow(
+                                  icon: Icons.payments,
+                                  label: 'Dibayar',
+                                  value: controller.formatPrice(dibayar),
+                                ),
+                                _buildDetailRow(
+                                  icon: Icons.attach_money,
+                                  label: 'Total Tagihan',
+                                  value: controller.formatPrice(totalTagihan),
+                                ),
+                              ],
+                            );
+                          },
                         ),
-                        _buildDetailRow(
-                          icon: Icons.warning_amber_rounded,
-                          label: 'Denda',
-                          value: controller.formatPrice(sewa['denda'] ?? 0),
-                        ),
-                        _buildDetailRow(
-                          icon: Icons.payments_outlined,
-                          label: 'Tagihan Dibayar',
-                          value: controller.formatPrice(sewa['dibayar'] ?? 0),
-                          valueColor: AppColorsPetugas.blueGrotto,
-                          valueBold: true,
-                        ),
-                        // Add Total row when status is "Menunggu Pembayaran"
-                        if (status == 'Menunggu Pembayaran')
-                          _buildDetailRow(
-                            icon: Icons.summarize_rounded,
-                            label: 'Total',
-                            value: controller.formatPrice(
-                              (sewa['total_biaya'] ?? 0) +
-                                  (sewa['denda'] ?? 0) -
-                                  (sewa['dibayar'] ?? 0),
-                            ),
-                            valueColor: AppColorsPetugas.navyBlue,
-                            valueBold: true,
-                          ),
                       ],
                     ),
                   ),
 
-                  // Payment Options (only for Menunggu Pembayaran status)
-                  if (status == 'Menunggu Pembayaran') ...[
+                  // Pisahkan detail denda
+                  if (sewa.denda != null && sewa.denda != 0) ...[
                     const SizedBox(height: 16),
-                    _buildPaymentOptionsCard(),
+                    FutureBuilder<Map<String, dynamic>?>(
+                      future: AsetProvider().getTagihanSewa(sewa.id),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return _buildInfoCard(
+                            title: 'Detail Denda',
+                            titleIcon: Icons.warning_amber_rounded,
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        }
+                        if (snapshot.hasError ||
+                            !snapshot.hasData ||
+                            snapshot.data == null) {
+                          return _buildInfoCard(
+                            title: 'Detail Denda',
+                            titleIcon: Icons.warning_amber_rounded,
+                            child: const Text('Tidak ada detail denda'),
+                          );
+                        }
+                        final tagihan = snapshot.data!;
+                        return _buildInfoCard(
+                          title: 'Detail Denda',
+                          titleIcon: Icons.warning_amber_rounded,
+                          child: _buildDendaDetailCard(tagihan),
+                        );
+                      },
+                    ),
                   ],
 
-                  // Payment Proof and Options (for Periksa Pembayaran status)
-                  if (status == 'Periksa Pembayaran') ...[
-                    const SizedBox(height: 16),
-                    _buildInfoCard(
-                      title: 'Bukti Pembayaran',
-                      titleIcon: Icons.receipt_rounded,
+                  // Bukti Pembayaran dengan TabBar
+                  const SizedBox(height: 16),
+                  _buildInfoCard(
+                    title: 'Bukti Pembayaran',
+                    titleIcon: Icons.receipt_rounded,
+                    child: DefaultTabController(
+                      length: 2,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const SizedBox(height: 8),
-                          Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: AppColorsPetugas.babyBlue,
+                          Align(
+                            alignment: Alignment.center,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.04),
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
                               ),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.asset(
-                                'assets/images/bukti_transfer.jpg',
-                                fit: BoxFit.cover,
+                              child: TabBar(
+                                isScrollable: true,
+                                labelColor: AppColorsPetugas.navyBlue,
+                                unselectedLabelColor:
+                                    AppColorsPetugas.textSecondary,
+                                indicator: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                    width: 1,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.06),
+                                      blurRadius: 4,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                labelStyle: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                                unselectedLabelStyle: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                ),
+                                indicatorSize: TabBarIndicatorSize.label,
+                                overlayColor: MaterialStateProperty.all(
+                                  Colors.transparent,
+                                ),
+                                padding: EdgeInsets.zero,
+                                tabs: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
+                                      vertical: 8,
+                                    ),
+                                    child: const Text('Sewa'),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
+                                      vertical: 8,
+                                    ),
+                                    child: const Text('Denda'),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          Center(
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                // Open image in fullscreen or larger view
-                                // Implement image viewer here
-                                Get.snackbar(
-                                  'Lihat Bukti Transfer',
-                                  'Membuka bukti transfer dalam tampilan penuh',
-                                  backgroundColor: AppColorsPetugas.blueGrotto,
-                                  colorText: Colors.white,
-                                  snackPosition: SnackPosition.BOTTOM,
-                                );
-                              },
-                              icon: const Icon(Icons.zoom_in),
-                              label: const Text('Lihat Bukti Transfer'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColorsPetugas.babyBlue
-                                    .withOpacity(0.8),
-                                foregroundColor: AppColorsPetugas.navyBlue,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
+                          SizedBox(
+                            height: 180,
+                            child: TabBarView(
+                              children: [
+                                // Tab Sewa: tampilkan foto pembayaran tagihan awal
+                                FutureBuilder<List<String>>(
+                                  future: _fetchBuktiPembayaranSewa(sewa.id),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return const Center(
+                                        child: CircularProgressIndicator(),
+                                      );
+                                    }
+                                    if (snapshot.hasError ||
+                                        !snapshot.hasData ||
+                                        snapshot.data!.isEmpty) {
+                                      return const Center(
+                                        child: Text(
+                                          'Tidak ada bukti pembayaran sewa',
+                                        ),
+                                      );
+                                    }
+                                    final images = snapshot.data!;
+                                    return ListView.separated(
+                                      scrollDirection: Axis.horizontal,
+                                      itemCount: images.length,
+                                      separatorBuilder:
+                                          (_, __) => const SizedBox(width: 12),
+                                      itemBuilder: (context, idx) {
+                                        return ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          child: GestureDetector(
+                                            onTap: () {
+                                              showDialog(
+                                                context: context,
+                                                builder:
+                                                    (_) => Stack(
+                                                      children: [
+                                                        Dialog(
+                                                          backgroundColor:
+                                                              Colors.black,
+                                                          insetPadding:
+                                                              EdgeInsets.zero,
+                                                          child: InteractiveViewer(
+                                                            child: Center(
+                                                              child: Image.network(
+                                                                images[idx],
+                                                                fit:
+                                                                    BoxFit
+                                                                        .contain,
+                                                                errorBuilder:
+                                                                    (
+                                                                      c,
+                                                                      e,
+                                                                      s,
+                                                                    ) => Container(
+                                                                      color:
+                                                                          Colors
+                                                                              .grey[900],
+                                                                      child: const Icon(
+                                                                        Icons
+                                                                            .broken_image,
+                                                                        color:
+                                                                            Colors.white,
+                                                                        size:
+                                                                            80,
+                                                                      ),
+                                                                    ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        Positioned(
+                                                          top: 24,
+                                                          right: 24,
+                                                          child: IconButton(
+                                                            icon: const Icon(
+                                                              Icons.close,
+                                                              color:
+                                                                  Colors.white,
+                                                              size: 32,
+                                                            ),
+                                                            onPressed:
+                                                                () =>
+                                                                    Navigator.of(
+                                                                      context,
+                                                                    ).pop(),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                              );
+                                            },
+                                            child: Image.network(
+                                              images[idx],
+                                              width: 140,
+                                              height: 140,
+                                              fit: BoxFit.cover,
+                                              errorBuilder:
+                                                  (c, e, s) => Container(
+                                                    width: 140,
+                                                    height: 140,
+                                                    color: Colors.grey[200],
+                                                    child: const Icon(
+                                                      Icons.broken_image,
+                                                      size: 40,
+                                                    ),
+                                                  ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  },
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                // Tab Denda: tampilkan foto pembayaran denda
+                                FutureBuilder<List<String>>(
+                                  future: _fetchBuktiPembayaranDenda(sewa.id),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return const Center(
+                                        child: CircularProgressIndicator(),
+                                      );
+                                    }
+                                    if (snapshot.hasError ||
+                                        !snapshot.hasData ||
+                                        snapshot.data!.isEmpty) {
+                                      return const Center(
+                                        child: Text(
+                                          'Tidak ada bukti pembayaran denda',
+                                        ),
+                                      );
+                                    }
+                                    final images = snapshot.data!;
+                                    return ListView.separated(
+                                      scrollDirection: Axis.horizontal,
+                                      itemCount: images.length,
+                                      separatorBuilder:
+                                          (_, __) => const SizedBox(width: 12),
+                                      itemBuilder: (context, idx) {
+                                        return ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          child: GestureDetector(
+                                            onTap: () {
+                                              showDialog(
+                                                context: context,
+                                                builder:
+                                                    (_) => Stack(
+                                                      children: [
+                                                        Dialog(
+                                                          backgroundColor:
+                                                              Colors.black,
+                                                          insetPadding:
+                                                              EdgeInsets.zero,
+                                                          child: InteractiveViewer(
+                                                            child: Center(
+                                                              child: Image.network(
+                                                                images[idx],
+                                                                fit:
+                                                                    BoxFit
+                                                                        .contain,
+                                                                errorBuilder:
+                                                                    (
+                                                                      c,
+                                                                      e,
+                                                                      s,
+                                                                    ) => Container(
+                                                                      color:
+                                                                          Colors
+                                                                              .grey[900],
+                                                                      child: const Icon(
+                                                                        Icons
+                                                                            .broken_image,
+                                                                        color:
+                                                                            Colors.white,
+                                                                        size:
+                                                                            80,
+                                                                      ),
+                                                                    ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        Positioned(
+                                                          top: 24,
+                                                          right: 24,
+                                                          child: IconButton(
+                                                            icon: const Icon(
+                                                              Icons.close,
+                                                              color:
+                                                                  Colors.white,
+                                                              size: 32,
+                                                            ),
+                                                            onPressed:
+                                                                () =>
+                                                                    Navigator.of(
+                                                                      context,
+                                                                    ).pop(),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                              );
+                                            },
+                                            child: Image.network(
+                                              images[idx],
+                                              width: 140,
+                                              height: 140,
+                                              fit: BoxFit.cover,
+                                              errorBuilder:
+                                                  (c, e, s) => Container(
+                                                    width: 140,
+                                                    height: 140,
+                                                    color: Colors.grey[200],
+                                                    child: const Icon(
+                                                      Icons.broken_image,
+                                                      size: 40,
+                                                    ),
+                                                  ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  },
                                 ),
-                              ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
+                  ),
+
+                  // Opsi pembayaran tepat setelah bukti pembayaran jika status MENUNGGU PEMBAYARAN
+                  if (status == 'MENUNGGU PEMBAYARAN') ...[
                     const SizedBox(height: 16),
-                    _buildPaymentOptionsCard(),
+                    _buildPaymentOptionsCard(sewa: sewa),
                   ],
 
-                  // Penalty Details and Payment Options (for Pembayaran Denda status)
-                  if (status == 'Pembayaran Denda') ...[
+                  // Payment Options (for specific statuses selain MENUNGGU PEMBAYARAN)
+                  if (status == 'PERIKSA PEMBAYARAN') ...[
                     const SizedBox(height: 16),
-                    _buildInfoCard(
-                      title: 'Detail Denda',
-                      titleIcon: Icons.warning_amber_rounded,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildDetailRow(
-                            icon: Icons.text_snippet_outlined,
-                            label: 'Alasan Denda',
-                            value: 'Kerusakan pada aset saat pengembalian',
-                          ),
-                          _buildDetailRow(
-                            icon: Icons.calendar_today_rounded,
-                            label: 'Tanggal Pelaporan',
-                            value: '20 Maret 2025',
-                          ),
-                          _buildDetailRow(
-                            icon: Icons.money_outlined,
-                            label: 'Nominal Denda',
-                            value: controller.formatPrice(25000),
-                            valueColor: Colors.deepOrange,
-                            valueBold: true,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Bukti Kerusakan',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColorsPetugas.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: AppColorsPetugas.babyBlue,
-                              ),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.asset(
-                                'assets/images/kerusakan.jpg',
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    height: 150,
-                                    color: AppColorsPetugas.babyBlueBright,
-                                    child: Center(
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.image_not_supported_outlined,
-                                            size: 40,
-                                            color: Colors.grey,
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'Gambar tidak tersedia',
-                                            style: TextStyle(
-                                              color:
-                                                  AppColorsPetugas
-                                                      .textSecondary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Center(
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                Get.snackbar(
-                                  'Lihat Bukti Kerusakan',
-                                  'Membuka gambar dalam tampilan penuh',
-                                  backgroundColor: AppColorsPetugas.blueGrotto,
-                                  colorText: Colors.white,
-                                  snackPosition: SnackPosition.BOTTOM,
-                                );
-                              },
-                              icon: const Icon(Icons.zoom_in),
-                              label: const Text('Lihat Bukti Kerusakan'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColorsPetugas.babyBlue
-                                    .withOpacity(0.8),
-                                foregroundColor: AppColorsPetugas.navyBlue,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _buildPaymentOptionsCard(sewa: sewa, isPenalty: false),
+                  ] else if (status == 'PEMBAYARAN DENDA' ||
+                      status == 'PERIKSA PEMBAYARAN DENDA') ...[
                     const SizedBox(height: 16),
-                    _buildPaymentOptionsCard(isPenalty: true),
-                  ],
-
-                  // Penalty Details, Payment Proof, and Payment Options (for Periksa Denda status)
-                  if (status == 'Periksa Denda') ...[
-                    const SizedBox(height: 16),
-                    _buildInfoCard(
-                      title: 'Detail Denda',
-                      titleIcon: Icons.warning_amber_rounded,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildDetailRow(
-                            icon: Icons.text_snippet_outlined,
-                            label: 'Alasan Denda',
-                            value: 'Kerusakan pada aset saat pengembalian',
-                          ),
-                          _buildDetailRow(
-                            icon: Icons.calendar_today_rounded,
-                            label: 'Tanggal Pelaporan',
-                            value: '20 Maret 2025',
-                          ),
-                          _buildDetailRow(
-                            icon: Icons.money_outlined,
-                            label: 'Nominal Denda',
-                            value: controller.formatPrice(25000),
-                            valueColor: Colors.deepOrange,
-                            valueBold: true,
-                          ),
-                          _buildDetailRow(
-                            icon: Icons.calendar_month_rounded,
-                            label: 'Tanggal Pembayaran',
-                            value: '22 Maret 2025',
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Bukti Kerusakan',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColorsPetugas.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: AppColorsPetugas.babyBlue,
-                              ),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.asset(
-                                'assets/images/kerusakan.jpg',
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    height: 150,
-                                    color: AppColorsPetugas.babyBlueBright,
-                                    child: Center(
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.image_not_supported_outlined,
-                                            size: 40,
-                                            color: Colors.grey,
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'Gambar tidak tersedia',
-                                            style: TextStyle(
-                                              color:
-                                                  AppColorsPetugas
-                                                      .textSecondary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Center(
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                Get.snackbar(
-                                  'Lihat Bukti Kerusakan',
-                                  'Membuka gambar dalam tampilan penuh',
-                                  backgroundColor: AppColorsPetugas.blueGrotto,
-                                  colorText: Colors.white,
-                                  snackPosition: SnackPosition.BOTTOM,
-                                );
-                              },
-                              icon: const Icon(Icons.zoom_in),
-                              label: const Text('Lihat Bukti Kerusakan'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColorsPetugas.babyBlue
-                                    .withOpacity(0.8),
-                                foregroundColor: AppColorsPetugas.navyBlue,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInfoCard(
-                      title: 'Bukti Pembayaran Denda',
-                      titleIcon: Icons.receipt_rounded,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 8),
-                          Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: AppColorsPetugas.babyBlue,
-                              ),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.asset(
-                                'assets/images/bukti_transfer.jpg',
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    height: 150,
-                                    color: AppColorsPetugas.babyBlueBright,
-                                    child: Center(
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.image_not_supported_outlined,
-                                            size: 40,
-                                            color: Colors.grey,
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'Gambar tidak tersedia',
-                                            style: TextStyle(
-                                              color:
-                                                  AppColorsPetugas
-                                                      .textSecondary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Center(
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                Get.snackbar(
-                                  'Lihat Bukti Transfer',
-                                  'Membuka bukti transfer dalam tampilan penuh',
-                                  backgroundColor: AppColorsPetugas.blueGrotto,
-                                  colorText: Colors.white,
-                                  snackPosition: SnackPosition.BOTTOM,
-                                );
-                              },
-                              icon: const Icon(Icons.zoom_in),
-                              label: const Text('Lihat Bukti Transfer'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColorsPetugas.babyBlue
-                                    .withOpacity(0.8),
-                                foregroundColor: AppColorsPetugas.navyBlue,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildPaymentOptionsCard(
-                      isPenalty: true,
-                      isVerifying: true,
-                    ),
+                    _buildPaymentOptionsCard(sewa: sewa, isPenalty: true),
                   ],
 
                   const SizedBox(height: 100), // Space for bottom bar
@@ -730,7 +990,120 @@ class PetugasDetailSewaView extends StatelessWidget {
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomActionBar(),
+      bottomNavigationBar:
+          (sewa.status == 'DIKEMBALIKAN')
+              ? Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          _showAddPenaltyDialog();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepOrange,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('Tambah Denda'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          controller.completeSewa(sewa.id);
+                          await refreshSewaData();
+                          Get.snackbar(
+                            'Sewa Selesai',
+                            'Status sewa telah diubah menjadi SELESAI',
+                            backgroundColor: Colors.green,
+                            colorText: Colors.white,
+                            snackPosition: SnackPosition.BOTTOM,
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColorsPetugas.navyBlue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('Selesaikan Sewa'),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              : (sewa.status == 'AKTIF')
+              ? Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      await controller.markAsReturned(sewa.id);
+                      await refreshSewaData();
+                      Get.snackbar(
+                        'Pengembalian Dikonfirmasi',
+                        'Status sewa telah diubah menjadi DIKEMBALIKAN',
+                        backgroundColor: Colors.teal,
+                        colorText: Colors.white,
+                        snackPosition: SnackPosition.BOTTOM,
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('Konfirmasi Pengembalian'),
+                  ),
+                ),
+              )
+              : ((sewa.status == 'MENUNGGU PEMBAYARAN' ||
+                  sewa.status == 'PERIKSA PEMBAYARAN'))
+              ? Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          controller.rejectSewa(sewa.id);
+                          await refreshSewaData();
+                          Get.snackbar(
+                            'Sewa Dibatalkan',
+                            'Status sewa telah diubah menjadi DIBATALKAN',
+                            backgroundColor: Colors.red,
+                            colorText: Colors.white,
+                            snackPosition: SnackPosition.BOTTOM,
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('Batalkan Sewa'),
+                      ),
+                    ),
+                    // Jika ada tombol lain, tambahkan di sini (misal, opsi pembayaran)
+                  ],
+                ),
+              )
+              : null,
     );
   }
 
@@ -828,7 +1201,7 @@ class PetugasDetailSewaView extends StatelessWidget {
   }
 
   Widget _buildActionMenu(BuildContext context) {
-    final status = sewa['status'];
+    final status = sewa.status;
 
     // Determine available actions based on status
     List<PopupMenuEntry<String>> menuItems = [];
@@ -946,7 +1319,7 @@ class PetugasDetailSewaView extends StatelessWidget {
     switch (value) {
       case 'check_payment':
         // Update status to "Periksa Pembayaran"
-        controller.approveSewa(sewa['id']); // Reusing existing method
+        controller.approveSewa(sewa.id); // Reusing existing method
         Get.back();
         Get.snackbar(
           'Status Diubah',
@@ -959,7 +1332,7 @@ class PetugasDetailSewaView extends StatelessWidget {
 
       case 'approve':
         // Update status to "Diterima"
-        controller.approveSewa(sewa['id']);
+        controller.approveSewa(sewa.id);
         Get.back();
         Get.snackbar(
           'Pengajuan Diterima',
@@ -972,7 +1345,7 @@ class PetugasDetailSewaView extends StatelessWidget {
 
       case 'request_penalty':
         // Update status to "Pembayaran Denda"
-        controller.requestPenaltyPayment(sewa['id']);
+        controller.requestPenaltyPayment(sewa.id);
         Get.back();
         Get.snackbar(
           'Permintaan Denda',
@@ -985,7 +1358,7 @@ class PetugasDetailSewaView extends StatelessWidget {
 
       case 'check_penalty':
         // Update status to "Periksa Denda"
-        controller.markPenaltyForInspection(sewa['id']);
+        controller.markPenaltyForInspection(sewa.id);
         Get.back();
         Get.snackbar(
           'Status Diubah',
@@ -998,7 +1371,7 @@ class PetugasDetailSewaView extends StatelessWidget {
 
       case 'complete':
         // Update status to "Selesai"
-        controller.completeSewa(sewa['id']);
+        controller.completeSewa(sewa.id);
         Get.back();
         Get.snackbar(
           'Sewa Selesai',
@@ -1011,7 +1384,7 @@ class PetugasDetailSewaView extends StatelessWidget {
 
       case 'cancel':
         // Update status to "Dibatalkan"
-        controller.rejectSewa(sewa['id']);
+        controller.rejectSewa(sewa.id);
         Get.back();
         Get.snackbar(
           'Sewa Dibatalkan',
@@ -1025,7 +1398,7 @@ class PetugasDetailSewaView extends StatelessWidget {
   }
 
   Widget? _buildBottomActionBar() {
-    final status = sewa['status'];
+    final status = sewa.status;
 
     // Button text and actions based on status
     String? buttonText;
@@ -1117,7 +1490,7 @@ class PetugasDetailSewaView extends StatelessWidget {
                               ),
                               onTap: () {
                                 Get.back();
-                                controller.markAsReturned(sewa['id']);
+                                controller.markAsReturned(sewa.id);
                                 Get.back();
                                 Get.snackbar(
                                   'Aset Dikembalikan',
@@ -1150,7 +1523,7 @@ class PetugasDetailSewaView extends StatelessWidget {
                               ),
                               onTap: () {
                                 Get.back();
-                                controller.requestPenaltyPayment(sewa['id']);
+                                controller.requestPenaltyPayment(sewa.id);
                                 Get.back();
                                 Get.snackbar(
                                   'Denda Diterapkan',
@@ -1183,7 +1556,7 @@ class PetugasDetailSewaView extends StatelessWidget {
       buttonIcon = Icons.task_alt_outlined;
       buttonColor = Colors.purple;
       onPressed = () {
-        controller.completeSewa(sewa['id']);
+        controller.completeSewa(sewa.id);
         Get.back();
         Get.snackbar(
           'Sewa Selesai',
@@ -1231,7 +1604,7 @@ class PetugasDetailSewaView extends StatelessWidget {
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: () {
-                  controller.completeSewa(sewa['id']);
+                  controller.completeSewa(sewa.id);
                   Get.back();
                   Get.snackbar(
                     'Sewa Selesai',
@@ -1463,9 +1836,11 @@ class PetugasDetailSewaView extends StatelessWidget {
   Widget _buildPaymentOptionsCard({
     bool isPenalty = false,
     bool isVerifying = false,
+    required SewaModel sewa,
   }) {
-    final status = sewa['status'];
-    final isFullPayment = true.obs;
+    final status = sewa.status;
+    final isFullPayment = controller.getIsFullPayment(sewa.id);
+    final nominalController = controller.getNominalController(sewa.id);
 
     // Set title based on context
     String cardTitle = 'Opsi Pembayaran';
@@ -1482,29 +1857,45 @@ class PetugasDetailSewaView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Full Payment Option (Radio Button) - Only show when not verifying
+          // Full Payment Option (Button) - Only show when not verifying
           if (!isVerifying)
-            Obx(
-              () => Row(
-                children: [
-                  Radio(
-                    value: true,
-                    groupValue: isFullPayment.value,
-                    onChanged: (value) {
-                      isFullPayment.value = true;
-                      // Set payment amount to full rental fee
-                    },
-                    activeColor: AppColorsPetugas.blueGrotto,
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    nominalController.text = sewa.totalTagihan.toString();
+                  },
+                  icon: Icon(
+                    Icons.payments_outlined,
+                    color: AppColorsPetugas.blueGrotto,
                   ),
-                  Text(
+                  label: Text(
                     isPenalty ? 'Pembayaran Denda Penuh' : 'Pembayaran Penuh',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: AppColorsPetugas.textPrimary,
+                      color: AppColorsPetugas.blueGrotto,
                     ),
                   ),
-                ],
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(
+                      color: AppColorsPetugas.blueGrotto,
+                      width: 2,
+                    ),
+                    backgroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    foregroundColor: AppColorsPetugas.blueGrotto,
+                  ),
+                ),
               ),
             ),
 
@@ -1520,165 +1911,125 @@ class PetugasDetailSewaView extends StatelessWidget {
           const SizedBox(height: 12),
 
           // Payment Method Options
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap:
-                      !isVerifying
-                          ? () {
-                            // Handle cash payment selection
-                          }
-                          : null,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color:
-                          isVerifying && sewa['payment_method'] != 'cash'
-                              ? Colors.white
-                              : AppColorsPetugas.babyBlueBright,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color:
-                            isVerifying && sewa['payment_method'] == 'cash'
-                                ? AppColorsPetugas.blueGrotto
-                                : AppColorsPetugas.babyBlue,
-                        width:
-                            isVerifying && sewa['payment_method'] == 'cash'
-                                ? 2
-                                : 1,
+          Obx(() {
+            final selectedMethod = controller.getPaymentMethod(sewa.id).value;
+            return Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap:
+                        !isVerifying
+                            ? () {
+                              controller.setPaymentMethod(sewa.id, 'Tunai');
+                            }
+                            : null,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color:
+                              selectedMethod == 'Tunai'
+                                  ? AppColorsPetugas.blueGrotto
+                                  : AppColorsPetugas.babyBlue,
+                          width: selectedMethod == 'Tunai' ? 2 : 1,
+                        ),
                       ),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.payments_outlined,
-                          color: AppColorsPetugas.blueGrotto,
-                          size: 24,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Tunai',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight:
-                                isVerifying && sewa['payment_method'] == 'cash'
-                                    ? FontWeight.w600
-                                    : FontWeight.w500,
-                            color: AppColorsPetugas.textPrimary,
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.payments_outlined,
+                            color: AppColorsPetugas.blueGrotto,
+                            size: 24,
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tunai',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight:
+                                  selectedMethod == 'Tunai'
+                                      ? FontWeight.w600
+                                      : FontWeight.w500,
+                              color: AppColorsPetugas.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: InkWell(
-                  onTap:
-                      !isVerifying
-                          ? () {
-                            // Handle transfer payment selection
-                          }
-                          : null,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color:
-                          isVerifying && sewa['payment_method'] != 'transfer'
-                              ? Colors.white
-                              : AppColorsPetugas.babyBlueBright,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color:
-                            isVerifying && sewa['payment_method'] == 'transfer'
-                                ? AppColorsPetugas.blueGrotto
-                                : AppColorsPetugas.babyBlue,
-                        width:
-                            isVerifying && sewa['payment_method'] == 'transfer'
-                                ? 2
-                                : 1,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: InkWell(
+                    onTap:
+                        !isVerifying
+                            ? () {
+                              controller.setPaymentMethod(sewa.id, 'Transfer');
+                            }
+                            : null,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color:
+                              selectedMethod == 'Transfer'
+                                  ? AppColorsPetugas.blueGrotto
+                                  : AppColorsPetugas.babyBlue,
+                          width: selectedMethod == 'Transfer' ? 2 : 1,
+                        ),
                       ),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.account_balance_outlined,
-                          color: AppColorsPetugas.blueGrotto,
-                          size: 24,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Transfer',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight:
-                                isVerifying &&
-                                        sewa['payment_method'] == 'transfer'
-                                    ? FontWeight.w600
-                                    : FontWeight.w500,
-                            color: AppColorsPetugas.textPrimary,
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.account_balance_outlined,
+                            color: AppColorsPetugas.blueGrotto,
+                            size: 24,
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 8),
+                          Text(
+                            'Transfer',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight:
+                                  selectedMethod == 'Transfer'
+                                      ? FontWeight.w600
+                                      : FontWeight.w500,
+                              color: AppColorsPetugas.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            );
+          }),
 
           const SizedBox(height: 20),
 
-          // Amount Input Field
-          Text(
-            isPenalty
-                ? isVerifying
-                    ? 'Nominal Denda Dibayarkan'
-                    : 'Nominal Pembayaran Denda'
-                : isVerifying
-                ? 'Nominal Dibayarkan'
-                : 'Nominal Pembayaran',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColorsPetugas.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Obx(
-            () => TextFormField(
-              keyboardType: TextInputType.number,
-              initialValue:
-                  isFullPayment.value
-                      ? isPenalty
-                          ? '25000' // Hardcoded penalty amount
-                          : ((sewa['total_biaya'] ?? 0) +
-                                  (sewa['denda'] ?? 0) -
-                                  (sewa['dibayar'] ?? 0))
-                              .toString()
-                      : isVerifying
-                      ? (sewa['paid_amount'] ?? 0).toString()
-                      : null,
-              enabled: !isVerifying,
-              decoration: InputDecoration(
-                hintText:
-                    isPenalty
-                        ? 'Masukkan nominal pembayaran denda'
-                        : 'Masukkan nominal pembayaran',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColorsPetugas.babyBlue),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColorsPetugas.babyBlue),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 14,
-                  horizontal: 16,
-                ),
+          // Nominal Pembayaran
+          TextFormField(
+            controller: nominalController,
+            keyboardType: TextInputType.number,
+            enabled: !isVerifying,
+            decoration: InputDecoration(
+              hintText: sewa.totalTagihan.toString(),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: AppColorsPetugas.babyBlue),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: AppColorsPetugas.babyBlue),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 14,
+                horizontal: 16,
               ),
             ),
           ),
@@ -1689,83 +2040,35 @@ class PetugasDetailSewaView extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () {
-                // Handle payment confirmation or verification
-                if (isVerifying && isPenalty) {
-                  // Verify penalty payment
-                  controller.completeSewa(sewa['id']);
-                  Get.back();
+              onPressed: () async {
+                final nominal = int.tryParse(nominalController.text) ?? 0;
+                if (nominal > sewa.totalTagihan) {
                   Get.snackbar(
-                    'Pembayaran Denda Diverifikasi',
-                    'Status sewa diubah menjadi Selesai',
-                    backgroundColor: Colors.purple,
+                    'Nominal Tidak Valid',
+                    'Nominal tidak boleh melebihi total tagihan',
+                    backgroundColor: Colors.red,
                     colorText: Colors.white,
-                    snackPosition: SnackPosition.BOTTOM,
                   );
-                } else if (isVerifying) {
-                  // Verify regular payment
-                  controller.approveSewa(sewa['id']);
-                  Get.back();
-                  Get.snackbar(
-                    'Pembayaran Diverifikasi',
-                    'Pengajuan sewa aset telah disetujui',
-                    backgroundColor: Colors.green.shade600,
-                    colorText: Colors.white,
-                    snackPosition: SnackPosition.BOTTOM,
-                  );
-                } else if (isPenalty) {
-                  // Handle penalty payment
-                  controller.markPenaltyForInspection(sewa['id']);
-                  Get.back();
-                  Get.snackbar(
-                    'Pembayaran Denda Dikonfirmasi',
-                    'Status diubah menjadi Periksa Denda',
-                    backgroundColor: Colors.deepOrange,
-                    colorText: Colors.white,
-                    snackPosition: SnackPosition.BOTTOM,
-                  );
-                } else {
-                  // Confirm regular payment
-                  controller.approveSewa(sewa['id']);
-                  Get.back();
-                  Get.snackbar(
-                    'Pembayaran Dikonfirmasi',
-                    'Status pengajuan diubah menjadi Periksa Pembayaran',
-                    backgroundColor: Colors.green.shade600,
-                    colorText: Colors.white,
-                    snackPosition: SnackPosition.BOTTOM,
-                  );
+                  return;
                 }
+                final metode = controller.getPaymentMethod(sewa.id).value;
+                await controller.confirmPembayaranTagihan(
+                  sewaAsetId: sewa.id,
+                  nominal: nominal,
+                  metodePembayaran: metode,
+                );
+                await refreshSewaData();
               },
-              icon: Icon(
-                isVerifying
-                    ? isPenalty
-                        ? Icons.task_alt_outlined
-                        : Icons.check_circle_outline
-                    : isPenalty
-                    ? Icons.warning_amber_rounded
-                    : Icons.payments_outlined,
-              ),
-              label: Text(
-                isVerifying
-                    ? isPenalty
-                        ? 'Verifikasi Pembayaran Denda'
-                        : 'Verifikasi Pembayaran'
-                    : isPenalty
-                    ? 'Konfirmasi Pembayaran Denda'
-                    : 'Konfirmasi Pembayaran',
-              ),
+              icon: const Icon(Icons.check_circle_outline),
+              label: Text(isVerifying ? 'Verifikasi' : 'Konfirmasi Pembayaran'),
               style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    isVerifying && isPenalty
-                        ? Colors.purple
-                        : isVerifying
-                        ? Colors.green.shade600
-                        : isPenalty
-                        ? Colors.deepOrange
-                        : AppColorsPetugas.blueGrotto,
+                backgroundColor: AppColorsPetugas.blueGrotto,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
+                textStyle: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -1909,27 +2212,72 @@ class PetugasDetailSewaView extends StatelessWidget {
                       color: Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
                       child: InkWell(
-                        onTap: () {
-                          // This would open the camera in a real implementation
-                          // Using a snackbar here as a placeholder
-                          Get.snackbar(
-                            'Membuka Kamera',
-                            'Implementasi kamera akan dibuka di sini',
-                            backgroundColor: AppColorsPetugas.blueGrotto,
-                            colorText: Colors.white,
-                            snackPosition: SnackPosition.BOTTOM,
+                        onTap: () async {
+                          // Show bottom sheet to choose image source
+                          showModalBottomSheet(
+                            context: context,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(16),
+                              ),
+                            ),
+                            builder: (context) {
+                              return SafeArea(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ListTile(
+                                      leading: const Icon(Icons.camera_alt),
+                                      title: const Text('Ambil Foto'),
+                                      onTap: () async {
+                                        Navigator.pop(context);
+                                        final ImagePicker picker =
+                                            ImagePicker();
+                                        final XFile? image = await picker
+                                            .pickImage(
+                                              source: ImageSource.camera,
+                                              imageQuality: 80,
+                                            );
+                                        if (image != null) {
+                                          selectedDamageImage.value = File(
+                                            image.path,
+                                          );
+                                          hasImage.value = true;
+                                        }
+                                      },
+                                    ),
+                                    ListTile(
+                                      leading: const Icon(Icons.photo_library),
+                                      title: const Text('Pilih dari Galeri'),
+                                      onTap: () async {
+                                        Navigator.pop(context);
+                                        final ImagePicker picker =
+                                            ImagePicker();
+                                        final XFile? image = await picker
+                                            .pickImage(
+                                              source: ImageSource.gallery,
+                                              imageQuality: 80,
+                                            );
+                                        if (image != null) {
+                                          selectedDamageImage.value = File(
+                                            image.path,
+                                          );
+                                          hasImage.value = true;
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                           );
-
-                          // Simulate taking a photo for the UI
-                          hasImage.value = true;
                         },
                         borderRadius: BorderRadius.circular(8),
                         child:
-                            hasImage.value
+                            hasImage.value && selectedDamageImage.value != null
                                 ? Stack(
                                   alignment: Alignment.center,
                                   children: [
-                                    // This would be the actual image preview
                                     Container(
                                       width: double.infinity,
                                       decoration: BoxDecoration(
@@ -1937,15 +2285,14 @@ class PetugasDetailSewaView extends StatelessWidget {
                                       ),
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(8),
-                                        child: Image.asset(
-                                          'assets/images/damage_preview.jpg',
+                                        child: Image.file(
+                                          selectedDamageImage.value!,
                                           fit: BoxFit.cover,
                                           errorBuilder: (
                                             context,
                                             error,
                                             stackTrace,
                                           ) {
-                                            // Fallback if image not found
                                             return Center(
                                               child: Icon(
                                                 Icons.image,
@@ -1958,7 +2305,6 @@ class PetugasDetailSewaView extends StatelessWidget {
                                         ),
                                       ),
                                     ),
-                                    // Edit overlay
                                     Container(
                                       width: double.infinity,
                                       height: double.infinity,
@@ -2004,7 +2350,7 @@ class PetugasDetailSewaView extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () {
+                    onPressed: () async {
                       // Validate inputs
                       if (penaltyAmountController.text.isEmpty) {
                         Get.snackbar(
@@ -2017,12 +2363,40 @@ class PetugasDetailSewaView extends StatelessWidget {
                         return;
                       }
 
-                      // Process the penalty
-                      Get.back(); // Close the dialog
+                      // 1. Upload image to Supabase Storage (foto.denda)
+                      String? fotoUrl;
+                      if (selectedDamageImage.value != null) {
+                        final file = File(selectedDamageImage.value!.path);
+                        fotoUrl = await AsetProvider().uploadFileToStorage(
+                          file,
+                        );
+                      }
 
-                      // Update status to Pembayaran Denda
-                      controller.requestPenaltyPayment(sewa['id']);
-                      Get.back(); // Return from the detail page
+                      // 2. Update tagihan_sewa (denda, keterangan, foto_kerusakan)
+                      final tagihan = await AsetProvider().getTagihanSewa(
+                        sewa.id,
+                      );
+                      if (tagihan != null && tagihan['id'] != null) {
+                        await AsetProvider().client
+                            .from('tagihan_sewa')
+                            .update({
+                              'denda':
+                                  int.tryParse(penaltyAmountController.text) ??
+                                  0,
+                              'keterangan': descriptionController.text,
+                              'foto_kerusakan': fotoUrl ?? '',
+                            })
+                            .eq('id', tagihan['id']);
+                      }
+
+                      // 3. Update status sewa_aset ke PEMBAYARAN DENDA
+                      await AsetProvider().updateSewaAsetStatus(
+                        sewaAsetId: sewa.id,
+                        status: 'PEMBAYARAN DENDA',
+                      );
+
+                      Get.back(); // Close the dialog
+                      await refreshSewaData();
 
                       Get.snackbar(
                         'Denda Diterapkan',
@@ -2050,5 +2424,125 @@ class PetugasDetailSewaView extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildDendaDetailCard(Map<String, dynamic> tagihanSewa) {
+    final alasan = tagihanSewa['keterangan']?.toString() ?? '-';
+    final nominal =
+        tagihanSewa['denda'] != null && tagihanSewa['denda'] != 0
+            ? 'Rp ${NumberFormat('#,###').format(tagihanSewa['denda'])}'
+            : '-';
+    final fotoKerusakan = tagihanSewa['foto_kerusakan']?.toString() ?? '';
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDetailRow(
+              icon: Icons.text_snippet_outlined,
+              label: 'Alasan Denda',
+              value: alasan,
+            ),
+            _buildDetailRow(
+              icon: Icons.attach_money,
+              label: 'Nominal Denda',
+              value: nominal,
+              valueColor: Colors.red[700],
+              valueBold: true,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Foto Bukti Kerusakan:',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            if (fotoKerusakan.isNotEmpty)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.network(
+                  fotoKerusakan,
+                  height: 160,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder:
+                      (c, e, s) => Container(
+                        height: 160,
+                        color: Colors.grey[200],
+                        child: const Icon(Icons.broken_image, size: 40),
+                      ),
+                ),
+              )
+            else
+              const Text('Tidak ada foto kerusakan'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Tambahkan fungsi helper untuk fetch bukti pembayaran sewa
+  Future<List<String>> _fetchBuktiPembayaranSewa(String sewaId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      // Ambil tagihan_sewa_id dari tagihan_sewa (berdasarkan sewa.id)
+      final tagihan =
+          await supabase
+              .from('tagihan_sewa')
+              .select('id')
+              .eq('sewa_aset_id', sewaId)
+              .maybeSingle();
+      if (tagihan == null || tagihan['id'] == null) return [];
+      final tagihanSewaId = tagihan['id'];
+      // Ambil foto pembayaran dengan jenis_pembayaran = 'tagihan awal'
+      final fotoList = await supabase
+          .from('foto_pembayaran')
+          .select('foto_pembayaran')
+          .eq('tagihan_sewa_id', tagihanSewaId)
+          .eq('jenis_pembayaran', 'tagihan awal');
+      if (fotoList == null || fotoList.isEmpty) return [];
+      return List<String>.from(
+        fotoList
+            .map((e) => e['foto_pembayaran'])
+            .where((url) => url != null && url.toString().isNotEmpty),
+      );
+    } catch (e) {
+      debugPrint('Error fetching bukti pembayaran sewa: $e');
+      return [];
+    }
+  }
+
+  // Tambahkan fungsi helper untuk fetch bukti pembayaran denda
+  Future<List<String>> _fetchBuktiPembayaranDenda(String sewaId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      // Ambil tagihan_sewa_id dari tagihan_sewa (berdasarkan sewa.id)
+      final tagihan =
+          await supabase
+              .from('tagihan_sewa')
+              .select('id')
+              .eq('sewa_aset_id', sewaId)
+              .maybeSingle();
+      if (tagihan == null || tagihan['id'] == null) return [];
+      final tagihanSewaId = tagihan['id'];
+      // Ambil foto pembayaran dengan jenis_pembayaran = 'denda'
+      final fotoList = await supabase
+          .from('foto_pembayaran')
+          .select('foto_pembayaran')
+          .eq('tagihan_sewa_id', tagihanSewaId)
+          .eq('jenis_pembayaran', 'denda');
+      if (fotoList == null || fotoList.isEmpty) return [];
+      return List<String>.from(
+        fotoList
+            .map((e) => e['foto_pembayaran'])
+            .where((url) => url != null && url.toString().isNotEmpty),
+      );
+    } catch (e) {
+      debugPrint('Error fetching bukti pembayaran denda: $e');
+      return [];
+    }
   }
 }

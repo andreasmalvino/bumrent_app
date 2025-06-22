@@ -34,7 +34,7 @@ class SplashView extends GetView<SplashController> {
               child: Container(
                 decoration: const BoxDecoration(
                   image: DecorationImage(
-                    image: AssetImage('assets/images/pattern.png'),
+                    image: AssetImage('assets/images/logo.png'), // Using logo.png which exists
                     repeat: ImageRepeat.repeat,
                     scale: 4.0,
                   ),
