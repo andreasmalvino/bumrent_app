@@ -148,7 +148,7 @@ class WargaDashboardView extends GetView<WargaDashboardController> {
     // Define services - removed Langganan and Pengaduan
     final services = [
       {
-        'title': 'Sewa',
+        'title': 'Aset Tunggal',
         'icon': Icons.home_work_outlined,
         'color': const Color(0xFF4CAF50),
         'route': () => controller.navigateToRentals(),
@@ -168,7 +168,7 @@ class WargaDashboardView extends GetView<WargaDashboardController> {
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
           child: Text(
-            'Layanan',
+            'Layanan Sewa',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,

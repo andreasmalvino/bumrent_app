@@ -9,6 +9,16 @@ class PesananProvider {
   final SupabaseClient _supabase = Supabase.instance.client;
   final _tableName = 'pesanan';
 
+  // Method to clear any cached data
+  void clearCache() {
+    print('Clearing PesananProvider cached data');
+    // Clear any cached order data or state
+    // This is useful when logging out to ensure no user data remains in memory
+
+    // Note: Since this provider doesn't currently maintain any persistent cache variables,
+    // this method serves as a placeholder for future cache implementations
+  }
+
   Future<List<PesananModel>> getPesananByUserId(String userId) async {
     try {
       final response = await _supabase

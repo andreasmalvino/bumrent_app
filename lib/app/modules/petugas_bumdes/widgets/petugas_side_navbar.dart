@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_colors_petugas.dart';
 import '../controllers/petugas_bumdes_dashboard_controller.dart';
+import '../../../routes/app_routes.dart';
 
 class PetugasSideNavbar extends StatelessWidget {
   final PetugasBumdesDashboardController controller;
@@ -147,6 +148,30 @@ class PetugasSideNavbar extends StatelessWidget {
             subtitle: 'Kelola sewa aset',
             isSelected: controller.currentTabIndex.value == 3,
             onTap: () => controller.changeTab(3),
+          ),
+          _buildMenuItem(
+            icon: Icons.people_outlined,
+            activeIcon: Icons.people,
+            title: 'Penyewa',
+            subtitle: 'Kelola data penyewa',
+            isSelected: controller.currentTabIndex.value == 4,
+            onTap: () => controller.changeTab(4),
+          ),
+          _buildMenuItem(
+            icon: Icons.account_balance_outlined,
+            activeIcon: Icons.account_balance,
+            title: 'Kelola Akun Bank',
+            subtitle: 'Kelola akun bank BUMDes',
+            isSelected: false,
+            onTap: () => Get.toNamed(Routes.PETUGAS_AKUN_BANK),
+          ),
+          _buildMenuItem(
+            icon: Icons.bar_chart_outlined,
+            activeIcon: Icons.bar_chart,
+            title: 'Laporan Bulanan',
+            subtitle: 'Cetak laporan bulanan',
+            isSelected: false,
+            onTap: () => Get.toNamed(Routes.PETUGAS_LAPORAN),
           ),
         ],
       ),

@@ -9,6 +9,7 @@ class LoginView extends GetView<AuthController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
           // Background gradient
@@ -72,18 +73,21 @@ class LoginView extends GetView<AuthController> {
             ),
           ),
 
-          // Main content
+          // Main content with keyboard avoidance
           SafeArea(
             child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
+              physics: const ClampingScrollPhysics(),
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 50),
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.05),
                     _buildHeader(),
-                    const SizedBox(height: 40),
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.03),
                     _buildLoginCard(),
                     _buildRegisterLink(),
                     const SizedBox(height: 30),
@@ -103,12 +107,12 @@ class LoginView extends GetView<AuthController> {
         tag: 'logo',
         child: Image.asset(
           'assets/images/logo.png',
-          width: 220,
-          height: 220,
+          width: 180,
+          height: 180,
           errorBuilder: (context, error, stackTrace) {
             return Icon(
               Icons.apartment_rounded,
-              size: 180,
+              size: 150,
               color: AppColors.primary,
             );
           },
@@ -123,7 +127,7 @@ class LoginView extends GetView<AuthController> {
       shadowColor: AppColors.shadow,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Padding(
-        padding: const EdgeInsets.all(28.0),
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -145,7 +149,7 @@ class LoginView extends GetView<AuthController> {
                 fontWeight: FontWeight.w400,
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
 
             // Email field
             _buildInputLabel('Email'),
@@ -204,7 +208,7 @@ class LoginView extends GetView<AuthController> {
             Obx(
               () => SizedBox(
                 width: double.infinity,
-                height: 56,
+                height: 50, // Slightly smaller height
                 child: ElevatedButton(
                   onPressed:
                       controller.isLoading.value ? null : controller.login,
@@ -309,6 +313,16 @@ class LoginView extends GetView<AuthController> {
       keyboardType: keyboardType,
       obscureText: obscureText,
       style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
+      textInputAction:
+          keyboardType == TextInputType.emailAddress
+              ? TextInputAction.next
+              : TextInputAction.done,
+      scrollPhysics: const ClampingScrollPhysics(),
+      onChanged: (_) {
+        if (controller.text.isNotEmpty) {
+          this.controller.errorMessage.value = '';
+        }
+      },
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(color: AppColors.textLight),

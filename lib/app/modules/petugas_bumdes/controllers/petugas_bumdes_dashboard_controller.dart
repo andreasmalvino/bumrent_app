@@ -5,6 +5,8 @@ import '../../../services/sewa_service.dart';
 import '../../../services/service_manager.dart';
 import '../../../data/models/pembayaran_model.dart';
 import '../../../services/pembayaran_service.dart';
+import '../../../data/providers/aset_provider.dart';
+import '../../../data/providers/pesanan_provider.dart';
 
 class PetugasBumdesDashboardController extends GetxController {
   AuthProvider? _authProvider;
@@ -16,38 +18,45 @@ class PetugasBumdesDashboardController extends GetxController {
   final userName = ''.obs;
 
   // Revenue Statistics
-  final totalPendapatanBulanIni = 'Rp 8.500.000'.obs;
-  final totalPendapatanBulanLalu = 'Rp 7.200.000'.obs;
-  final persentaseKenaikan = '18%'.obs;
+  final totalPendapatanBulanIni = ''.obs;
+  final totalPendapatanBulanLalu = ''.obs;
+  final persentaseKenaikan = ''.obs;
   final isKenaikanPositif = true.obs;
 
   // Revenue by Category
-  final pendapatanSewa = 'Rp 5.200.000'.obs;
-  final persentaseSewa = 100.obs;
+  final pendapatanSewa = ''.obs;
+  final persentaseSewa = 0.obs;
 
   // Revenue Trends (last 6 months)
   final trendPendapatan = <double>[].obs; // 6 bulan terakhir
 
   // Status Counters for Sewa Aset
-  final terlaksanaCount = 5.obs;
-  final dijadwalkanCount = 1.obs;
-  final aktifCount = 1.obs;
-  final dibatalkanCount = 3.obs;
+  final terlaksanaCount = 0.obs;
+  final dijadwalkanCount = 0.obs;
+  final aktifCount = 0.obs;
+  final dibatalkanCount = 0.obs;
 
   // Additional Sewa Aset Status Counters
-  final menungguPembayaranCount = 2.obs;
-  final periksaPembayaranCount = 1.obs;
-  final diterimaCount = 3.obs;
-  final pembayaranDendaCount = 1.obs;
+  final menungguPembayaranCount = 0.obs;
+  final periksaPembayaranCount = 0.obs;
+  final diterimaCount = 0.obs;
+  final pembayaranDendaCount = 0.obs;
   final periksaPembayaranDendaCount = 0.obs;
-  final selesaiCount = 4.obs;
+  final selesaiCount = 0.obs;
 
   // Status counts for Sewa
-  final pengajuanSewaCount = 5.obs;
-  final pemasanganCountSewa = 3.obs;
-  final sewaAktifCount = 10.obs;
-  final tagihanAktifCountSewa = 7.obs;
-  final periksaPembayaranCountSewa = 2.obs;
+  final pengajuanSewaCount = 0.obs;
+  final pemasanganCountSewa = 0.obs;
+  final sewaAktifCount = 0.obs;
+  final tagihanAktifCountSewa = 0.obs;
+  final periksaPembayaranCountSewa = 0.obs;
+
+  // Tenant (Penyewa) Statistics
+  final penyewaPendingCount = 0.obs;
+  final penyewaActiveCount = 0.obs;
+  final penyewaSuspendedCount = 0.obs;
+  final penyewaTotalCount = 0.obs;
+  final isPenyewaStatsLoading = true.obs;
 
   // Statistik pendapatan
   final totalPendapatan = 0.obs;
@@ -76,6 +85,7 @@ class PetugasBumdesDashboardController extends GetxController {
     print('\u2705 PetugasBumdesDashboardController initialized successfully');
     countSewaByStatus();
     fetchPembayaranStats();
+    fetchPenyewaStats();
   }
 
   Future<void> countSewaByStatus() async {
@@ -172,6 +182,55 @@ class PetugasBumdesDashboardController extends GetxController {
     }
   }
 
+  Future<void> fetchPenyewaStats() async {
+    isPenyewaStatsLoading.value = true;
+    try {
+      if (_authProvider == null || _authProvider!.client == null) {
+        print('Auth provider or client is null');
+        return;
+      }
+
+      final data = await _authProvider!.client
+          .from('warga_desa')
+          .select('status, user_id')
+          .not('user_id', 'is', null);
+
+      if (data != null) {
+        final List<dynamic> penyewaList = data as List<dynamic>;
+
+        // Count penyewa by status
+        penyewaPendingCount.value =
+            penyewaList
+                .where(
+                  (p) => p['status']?.toString().toLowerCase() == 'pending',
+                )
+                .length;
+
+        penyewaActiveCount.value =
+            penyewaList
+                .where((p) => p['status']?.toString().toLowerCase() == 'active')
+                .length;
+
+        penyewaSuspendedCount.value =
+            penyewaList
+                .where(
+                  (p) => p['status']?.toString().toLowerCase() == 'suspended',
+                )
+                .length;
+
+        penyewaTotalCount.value = penyewaList.length;
+
+        print(
+          'Penyewa stats - Pending: ${penyewaPendingCount.value}, Active: ${penyewaActiveCount.value}, Suspended: ${penyewaSuspendedCount.value}, Total: ${penyewaTotalCount.value}',
+        );
+      }
+    } catch (e) {
+      print('Error fetching penyewa stats: $e');
+    } finally {
+      isPenyewaStatsLoading.value = false;
+    }
+  }
+
   void changeTab(int index) {
     try {
       currentTabIndex.value = index;
@@ -193,6 +252,10 @@ class PetugasBumdesDashboardController extends GetxController {
         case 3:
           // Navigate to Sewa page
           navigateToSewa();
+          break;
+        case 4:
+          // Navigate to Penyewa page
+          navigateToPenyewa();
           break;
       }
     } catch (e) {
@@ -224,11 +287,42 @@ class PetugasBumdesDashboardController extends GetxController {
     }
   }
 
+  void navigateToPenyewa() {
+    try {
+      Get.offAllNamed(Routes.PETUGAS_PENYEWA);
+    } catch (e) {
+      print('Error navigating to Penyewa: $e');
+    }
+  }
+
   void logout() async {
     try {
+      // Clear providers data
       if (_authProvider != null) {
+        // Sign out from Supabase
         await _authProvider!.signOut();
+
+        // Clear auth provider data
+        _authProvider!.clearAuthData();
+
+        // Clear aset provider data
+        try {
+          final asetProvider = Get.find<AsetProvider>();
+          asetProvider.clearCache();
+        } catch (e) {
+          print('Error clearing AsetProvider: $e');
+        }
+
+        // Clear pesanan provider data
+        try {
+          final pesananProvider = Get.find<PesananProvider>();
+          pesananProvider.clearCache();
+        } catch (e) {
+          print('Error clearing PesananProvider: $e');
+        }
       }
+
+      // Navigate to login screen
       Get.offAllNamed(Routes.LOGIN);
     } catch (e) {
       print('Error during logout: $e');

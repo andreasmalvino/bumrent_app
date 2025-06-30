@@ -64,6 +64,14 @@ class PetugasBumdesBottomNavbar extends StatelessWidget {
             isSelected: selectedIndex == 3,
             onTap: () => onItemTapped(3),
           ),
+          _buildNavItem(
+            context: context,
+            icon: Icons.people_outlined,
+            activeIcon: Icons.people,
+            label: 'Penyewa',
+            isSelected: selectedIndex == 4,
+            onTap: () => onItemTapped(4),
+          ),
         ],
       ),
     );
@@ -79,7 +87,7 @@ class PetugasBumdesBottomNavbar extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     final primaryColor = AppColors.primary;
-    final tabWidth = MediaQuery.of(context).size.width / 4;
+    final tabWidth = MediaQuery.of(context).size.width / 5;
 
     return Material(
       color: Colors.transparent,

@@ -68,7 +68,7 @@ class SewaAsetView extends GetView<SewaAsetController> {
               child: TextField(
                 controller: controller.searchController,
                 decoration: InputDecoration(
-                  hintText: 'Cari aset...',
+                  hintText: 'Cari aset atau paket...',
                   hintStyle: TextStyle(color: Colors.grey[400]),
                   prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
                   border: InputBorder.none,
@@ -364,259 +364,271 @@ class SewaAsetView extends GetView<SewaAsetController> {
         );
       }
 
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: GridView.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: 0.50, // Make cards taller to avoid overflow
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-          ),
-          itemCount: controller.filteredPakets.length,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemBuilder: (context, index) {
-            final paket = controller.filteredPakets[index];
-            final List<dynamic> satuanWaktuSewa =
-                paket['satuanWaktuSewa'] ?? [];
+      return RefreshIndicator(
+        onRefresh: controller.loadPakets,
+        color: const Color(0xFF3A6EA5), // Primary blue
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: GridView.builder(
+            padding: const EdgeInsets.only(top: 16.0, bottom: 16.0),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.50, // Make cards taller to avoid overflow
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+            ),
+            itemCount: controller.filteredPakets.length,
+            itemBuilder: (context, index) {
+              final paket = controller.filteredPakets[index];
+              final List<dynamic> satuanWaktuSewa =
+                  paket['satuanWaktuSewa'] ?? [];
 
-            // Find the lowest price
-            int lowestPrice =
-                satuanWaktuSewa.isEmpty
-                    ? 0
-                    : satuanWaktuSewa
-                        .map<int>((sws) => sws['harga'] ?? 0)
-                        .reduce((a, b) => a < b ? a : b);
+              // Find the lowest price
+              int lowestPrice =
+                  satuanWaktuSewa.isEmpty
+                      ? 0
+                      : satuanWaktuSewa
+                          .map<int>((sws) => sws['harga'] ?? 0)
+                          .reduce((a, b) => a < b ? a : b);
 
-            // Get image URL or default
-            String imageUrl = paket['gambar_url'] ?? '';
+              // Get image URL or default
+              String imageUrl = paket['gambar_url'] ?? '';
 
-            return GestureDetector(
-              onTap: () {
-                _showPaketDetailModal(paket);
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12.0),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.shadow,
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Image section
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(12),
+              return GestureDetector(
+                onTap: () {
+                  // No action when tapping on the card
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(12.0),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.shadow,
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
                       ),
-                      child: AspectRatio(
-                        aspectRatio: 1.0,
-                        child: CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          fit: BoxFit.cover,
-                          placeholder:
-                              (context, url) => const Center(
-                                child: CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.purple,
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Image section
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(12),
+                        ),
+                        child: AspectRatio(
+                          aspectRatio: 1.0,
+                          child: CachedNetworkImage(
+                            imageUrl: imageUrl,
+                            fit: BoxFit.cover,
+                            placeholder:
+                                (context, url) => const Center(
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.purple,
+                                    ),
                                   ),
                                 ),
-                              ),
-                          errorWidget:
-                              (context, url, error) => Container(
-                                color: Colors.grey[200],
-                                child: Center(
-                                  child: Icon(
-                                    Icons.image_not_supported,
-                                    size: 32,
-                                    color: Colors.grey[400],
+                            errorWidget:
+                                (context, url, error) => Container(
+                                  color: Colors.grey[200],
+                                  child: Center(
+                                    child: Icon(
+                                      Icons.image_not_supported,
+                                      size: 32,
+                                      color: Colors.grey[400],
+                                    ),
                                   ),
                                 ),
-                              ),
+                          ),
                         ),
                       ),
-                    ),
 
-                    // Content section
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(10.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Package name
-                            Text(
-                              paket['nama'] ?? 'Paket',
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
+                      // Content section
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(10.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Package name
+                              Text(
+                                paket['nama'] ?? 'Paket',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
+                              const SizedBox(height: 4),
 
-                            // Status availability
-                            Row(
-                              children: [
+                              // Status availability
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.success,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Tersedia',
+                                    style: TextStyle(
+                                      color: AppColors.success,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+
+                              // Package pricing - show all pricing options with scrolling
+                              if (satuanWaktuSewa.isNotEmpty)
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: Wrap(
+                                    spacing: 4,
+                                    runSpacing: 4,
+                                    children: [
+                                      ...satuanWaktuSewa.map((sws) {
+                                        // Pastikan data yang ditampilkan valid
+                                        final harga = sws['harga'] ?? 0;
+                                        final namaSatuan =
+                                            sws['nama_satuan_waktu'] ??
+                                            'Satuan';
+                                        return Container(
+                                          margin: const EdgeInsets.only(
+                                            bottom: 4,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[100],
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.grey[300]!,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                "Rp ${_formatNumber(harga)}",
+                                                style: const TextStyle(
+                                                  color: AppColors.primary,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                              Text(
+                                                "/$namaSatuan",
+                                                style: TextStyle(
+                                                  color: Colors.grey[700],
+                                                  fontSize: 10,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                  ),
+                                )
+                              else
                                 Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.success,
-                                    shape: BoxShape.circle,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: Colors.grey[300]!,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'Mulai dari Rp ${NumberFormat('#,###').format(lowestPrice)}',
+                                        style: const TextStyle(
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Tersedia',
-                                  style: TextStyle(
-                                    color: AppColors.success,
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
 
-                            // Package pricing - show all pricing options with scrolling
-                            if (satuanWaktuSewa.isNotEmpty)
+                              const Spacer(),
+
+                              // Remove the items count badge and replace with direct Order button
                               SizedBox(
                                 width: double.infinity,
-                                child: Wrap(
-                                  spacing: 4,
-                                  runSpacing: 4,
-                                  children: [
-                                    ...satuanWaktuSewa.map((sws) {
-                                      // Pastikan data yang ditampilkan valid
-                                      final harga = sws['harga'] ?? 0;
-                                      final namaSatuan =
-                                          sws['nama_satuan_waktu'] ?? 'Satuan';
-                                      return Container(
-                                        margin: const EdgeInsets.only(
-                                          bottom: 4,
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 3,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey[100],
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.grey[300]!,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              "Rp ${_formatNumber(harga)}",
-                                              style: const TextStyle(
-                                                color: AppColors.primary,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 11,
-                                              ),
-                                            ),
-                                            Text(
-                                              "/$namaSatuan",
-                                              style: TextStyle(
-                                                color: Colors.grey[700],
-                                                fontSize: 10,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }),
-                                  ],
-                                ),
-                              )
-                            else
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[100],
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.grey[300]!),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      'Mulai dari Rp ${NumberFormat('#,###').format(lowestPrice)}',
-                                      style: const TextStyle(
-                                        color: AppColors.primary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 11,
-                                      ),
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    // Navigate to order sewa aset page with package data and isPaket flag
+                                    Get.toNamed(
+                                      Routes.ORDER_SEWA_ASET,
+                                      arguments: {
+                                        'asetId': paket['id'],
+                                        'paketId': paket['id'],
+                                        'paketData': paket,
+                                        'satuanWaktuSewa': satuanWaktuSewa,
+                                        'isPaket':
+                                            true, // Add flag to indicate this is a package
+                                      },
+                                      preventDuplicates: false,
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
-                                  ],
-                                ),
-                              ),
-
-                            const Spacer(),
-
-                            // Remove the items count badge and replace with direct Order button
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  // Navigate directly to order page with package data
-                                  Get.toNamed(
-                                    Routes.ORDER_SEWA_PAKET,
-                                    arguments: {
-                                      'id': paket['id'],
-                                      'paketId': paket['id'],
-                                      'paketData': paket,
-                                      'satuanWaktuSewa': satuanWaktuSewa,
-                                    },
-                                  );
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 6,
+                                    ),
+                                    minimumSize: const Size(
+                                      double.infinity,
+                                      30,
+                                    ),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                   ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 6,
-                                  ),
-                                  minimumSize: const Size(double.infinity, 30),
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                child: const Text(
-                                  'Pesan',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
+                                  child: const Text(
+                                    'Pesan',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       );
     });
@@ -1796,8 +1808,15 @@ class SewaAsetView extends GetView<SewaAsetController> {
       return;
     }
 
-    // Use the static navigation method to ensure consistent behavior
-    OrderSewaAsetController.navigateToOrderPage(aset.id);
+    // Navigate to order page with asset ID and isAset flag
+    Get.toNamed(
+      Routes.ORDER_SEWA_ASET,
+      arguments: {
+        'asetId': aset.id,
+        'isAset': true, // Add flag to indicate this is a single asset
+      },
+      preventDuplicates: false,
+    );
   }
 
   // Helper to format numbers for display

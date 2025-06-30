@@ -18,6 +18,75 @@ class AsetProvider extends GetxService {
     client = Supabase.instance.client;
   }
 
+  // Method to clear any cached data
+  void clearCache() {
+    debugPrint('Clearing AsetProvider cached data');
+    // Clear any cached asset data or state
+    // This is useful when logging out to ensure no user data remains in memory
+
+    // Note: Since this provider doesn't currently maintain any persistent cache variables,
+    // this method serves as a placeholder for future cache implementations
+  }
+
+  // Delete an asset and all related data
+  Future<bool> deleteAset(String asetId) async {
+    try {
+      debugPrint('🔄 Starting deletion process for asset ID: $asetId');
+
+      // 1. Get existing photo URLs to delete them from storage
+      debugPrint('📋 Fetching photos for asset ID: $asetId');
+      final existingPhotos = await client
+          .from('foto_aset')
+          .select('foto_aset')
+          .eq('id_aset', asetId);
+
+      // 2. Delete files from storage first
+      if (existingPhotos is List && existingPhotos.isNotEmpty) {
+        debugPrint('🗑️ Deleting ${existingPhotos.length} files from storage');
+        for (final photo in existingPhotos) {
+          final url = photo['foto_aset'] as String?;
+          if (url != null && url.isNotEmpty) {
+            await deleteFileFromStorage(url);
+          }
+        }
+      }
+
+      // 3. Delete records from related tables in the correct order to maintain referential integrity
+      // 3.1 Delete rental time units
+      debugPrint('🗑️ Deleting rental time units for asset ID: $asetId');
+      await deleteSatuanWaktuSewaByAsetId(asetId);
+
+      // 3.2 Delete photo records from database
+      debugPrint('🗑️ Deleting photo records for asset ID: $asetId');
+      await client.from('foto_aset').delete().eq('id_aset', asetId);
+
+      // 3.3 Delete bookings if any (optional, may want to keep for historical records)
+      debugPrint('🗑️ Checking for bookings related to asset ID: $asetId');
+      final bookings = await client
+          .from('booked_detail')
+          .select('id')
+          .eq('aset_id', asetId);
+
+      if (bookings is List && bookings.isNotEmpty) {
+        debugPrint('⚠️ Found ${bookings.length} bookings for this asset');
+        debugPrint('⚠️ Consider handling booking records appropriately');
+        // Uncomment to delete bookings:
+        // await client.from('booked_detail').delete().eq('aset_id', asetId);
+      }
+
+      // 4. Finally delete the asset itself
+      debugPrint('🗑️ Deleting asset record with ID: $asetId');
+      await client.from('aset').delete().eq('id', asetId);
+
+      debugPrint('✅ Asset deletion completed successfully');
+      return true;
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error deleting asset: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+      return false;
+    }
+  }
+
   // Mendapatkan semua aset dengan kategori "sewa"
   Future<List<AsetModel>> getSewaAsets() async {
     try {
@@ -805,7 +874,8 @@ class AsetProvider extends GetxService {
   // Fungsi untuk membuat pesanan lengkap (sewa_aset, booked_detail, dan tagihan_sewa) dalam satu operasi
   Future<bool> createCompleteOrder({
     required Map<String, dynamic> sewaAsetData,
-    required Map<String, dynamic> bookedDetailData,
+    required dynamic
+    bookedDetailData, // Changed to dynamic to accept List or Map
     required Map<String, dynamic> tagihanSewaData,
   }) async {
     try {
@@ -813,15 +883,39 @@ class AsetProvider extends GetxService {
       debugPrint('📦 sewa_aset data:');
       sewaAsetData.forEach((key, value) => debugPrint('   $key: $value'));
 
-      debugPrint('📦 booked_detail data:');
-      bookedDetailData.forEach((key, value) => debugPrint('   $key: $value'));
+      // Check if bookedDetailData is a list (for package orders) or a single map (for regular orders)
+      bool isPackageOrder = bookedDetailData is List;
 
-      // Ensure we don't try to insert a status field that no longer exists
-      if (bookedDetailData.containsKey('status')) {
+      if (isPackageOrder) {
         debugPrint(
-          '⚠️ Removing status field from booked_detail data as it does not exist in the table',
+          '📦 Package order detected with ${bookedDetailData.length} booked_detail items',
         );
-        bookedDetailData.remove('status');
+        for (int i = 0; i < bookedDetailData.length; i++) {
+          debugPrint('📦 booked_detail item $i:');
+          bookedDetailData[i].forEach(
+            (key, value) => debugPrint('   $key: $value'),
+          );
+
+          // Ensure we don't try to insert a status field that no longer exists
+          if (bookedDetailData[i].containsKey('status')) {
+            debugPrint(
+              '⚠️ Removing status field from booked_detail data as it does not exist in the table',
+            );
+            bookedDetailData[i].remove('status');
+          }
+        }
+      } else {
+        debugPrint('📦 Regular order with single booked_detail');
+        debugPrint('📦 booked_detail data:');
+        bookedDetailData.forEach((key, value) => debugPrint('   $key: $value'));
+
+        // Ensure we don't try to insert a status field that no longer exists
+        if (bookedDetailData.containsKey('status')) {
+          debugPrint(
+            '⚠️ Removing status field from booked_detail data as it does not exist in the table',
+          );
+          bookedDetailData.remove('status');
+        }
       }
 
       debugPrint('📦 tagihan_sewa data:');
@@ -835,19 +929,36 @@ class AsetProvider extends GetxService {
         tagihanSewaData.remove('nama_aset');
       }
 
-      // Insert all three records
+      // Insert sewa_aset record
       final sewaAsetResult =
           await client.from('sewa_aset').insert(sewaAsetData).select().single();
       debugPrint('✅ sewa_aset created: ${sewaAsetResult['id']}');
 
-      final bookedDetailResult =
-          await client
-              .from('booked_detail')
-              .insert(bookedDetailData)
-              .select()
-              .single();
-      debugPrint('✅ booked_detail created: ${bookedDetailResult['id']}');
+      // Insert booked_detail record(s)
+      if (isPackageOrder) {
+        // For package orders, insert multiple booked_detail records
+        for (int i = 0; i < bookedDetailData.length; i++) {
+          final bookedDetailItem = bookedDetailData[i];
+          final bookedDetailResult =
+              await client
+                  .from('booked_detail')
+                  .insert(bookedDetailItem)
+                  .select()
+                  .single();
+          debugPrint('✅ booked_detail $i created: ${bookedDetailResult['id']}');
+        }
+      } else {
+        // For regular orders, insert a single booked_detail record
+        final bookedDetailResult =
+            await client
+                .from('booked_detail')
+                .insert(bookedDetailData)
+                .select()
+                .single();
+        debugPrint('✅ booked_detail created: ${bookedDetailResult['id']}');
+      }
 
+      // Insert tagihan_sewa record
       final tagihanSewaResult =
           await client
               .from('tagihan_sewa')
@@ -875,9 +986,19 @@ class AsetProvider extends GetxService {
         );
         // Print the field names from each data object to help debug
         debugPrint('❌ Fields in sewa_aset data: ${sewaAsetData.keys.toList()}');
-        debugPrint(
-          '❌ Fields in booked_detail data: ${bookedDetailData.keys.toList()}',
-        );
+
+        if (bookedDetailData is List) {
+          for (int i = 0; i < bookedDetailData.length; i++) {
+            debugPrint(
+              '❌ Fields in booked_detail item $i: ${bookedDetailData[i].keys.toList()}',
+            );
+          }
+        } else {
+          debugPrint(
+            '❌ Fields in booked_detail data: ${bookedDetailData.keys.toList()}',
+          );
+        }
+
         debugPrint(
           '❌ Fields in tagihan_sewa data: ${tagihanSewaData.keys.toList()}',
         );
@@ -1461,6 +1582,8 @@ class AsetProvider extends GetxService {
   // Get photos for a package
   Future<List<String>> getFotoPaket(String paketId) async {
     try {
+      debugPrint('🔍 Fetching photos for package ID: $paketId');
+
       final response = await client
           .from('foto_aset')
           .select('foto_aset')
@@ -1468,13 +1591,27 @@ class AsetProvider extends GetxService {
           .order('created_at');
 
       if (response != null && response.isNotEmpty) {
-        return response
-            .map<String>((item) => item['foto_aset'] as String)
-            .toList();
+        // Extract photo URLs and filter out duplicates
+        final Set<String> uniqueUrls = {};
+        final List<String> uniquePhotos = [];
+
+        for (var item in response) {
+          final String url = item['foto_aset'] as String;
+          if (url.isNotEmpty && !uniqueUrls.contains(url)) {
+            uniqueUrls.add(url);
+            uniquePhotos.add(url);
+          }
+        }
+
+        debugPrint(
+          '📸 Found ${response.length} photos, ${uniquePhotos.length} unique for package $paketId',
+        );
+        return uniquePhotos;
       }
+      debugPrint('⚠️ No photos found for package ID: $paketId');
       return [];
     } catch (e) {
-      debugPrint('Error getting package photos: $e');
+      debugPrint('❌ Error getting package photos for ID $paketId: $e');
       return [];
     }
   }
@@ -1910,7 +2047,7 @@ class AsetProvider extends GetxService {
         'tagihan_sewa_id': tagihanSewaId,
         'metode_pembayaran': metodePembayaran,
         'total_pembayaran': nominal,
-        'status': 'lunas',
+        'status': 'diterima',
         'created_at': DateTime.now().toIso8601String(),
         'id_petugas': idPetugas,
       };
@@ -1978,5 +2115,75 @@ class AsetProvider extends GetxService {
       return response.length;
     }
     return 0;
+  }
+
+  /// Delete a package (paket) and all related data
+  /// This includes:
+  /// 1. Deleting photos from storage
+  /// 2. Removing records from foto_aset table
+  /// 3. Removing records from satuan_waktu_sewa table
+  /// 4. Removing records from paket_item table
+  /// 5. Finally deleting the package itself from the paket table
+  Future<bool> deletePaket(String paketId) async {
+    try {
+      debugPrint('🔄 Starting deletion process for package ID: $paketId');
+
+      // 1. Get all photo URLs for this package
+      debugPrint('📋 Fetching photos for package ID: $paketId');
+      final existingPhotos = await client
+          .from('foto_aset')
+          .select('foto_aset')
+          .eq('id_paket', paketId);
+
+      // 2. Delete files from storage first
+      if (existingPhotos is List && existingPhotos.isNotEmpty) {
+        debugPrint('🗑️ Deleting ${existingPhotos.length} files from storage');
+        for (final photo in existingPhotos) {
+          final url = photo['foto_aset'] as String?;
+          if (url != null && url.isNotEmpty) {
+            await deleteFileFromStorage(url);
+          }
+        }
+      }
+
+      // 3. Delete records from related tables in the correct order to maintain referential integrity
+      // 3.1 Delete rental time units related to this package
+      debugPrint('🗑️ Deleting rental time units for package ID: $paketId');
+      await client.from('satuan_waktu_sewa').delete().eq('paket_id', paketId);
+
+      // 3.2 Delete photo records from database
+      debugPrint('🗑️ Deleting photo records for package ID: $paketId');
+      await client.from('foto_aset').delete().eq('id_paket', paketId);
+
+      // 3.3 Delete package items
+      debugPrint('🗑️ Deleting package items for package ID: $paketId');
+      await client.from('paket_item').delete().eq('paket_id', paketId);
+
+      // 3.4 Check for bookings (optional)
+      debugPrint('🔍 Checking for bookings related to package ID: $paketId');
+      final bookings = await client
+          .from('sewa_aset')
+          .select('id')
+          .eq('paket_id', paketId)
+          .not('status', 'in', '(DIBATALKAN,SELESAI)');
+
+      if (bookings is List && bookings.isNotEmpty) {
+        debugPrint('⚠️ Found ${bookings.length} bookings for this package');
+        debugPrint(
+          '⚠️ These bookings will be orphaned. Consider updating them if needed',
+        );
+      }
+
+      // 4. Finally delete the package itself
+      debugPrint('🗑️ Deleting package record with ID: $paketId');
+      await client.from('paket').delete().eq('id', paketId);
+
+      debugPrint('✅ Package deletion completed successfully');
+      return true;
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error deleting package: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+      return false;
+    }
   }
 }

@@ -222,8 +222,63 @@ class PetugasAsetController extends GetxController {
   }
 
   // Delete an asset
-  void deleteAset(String id) {
-    asetList.removeWhere((aset) => aset['id'] == id);
-    applyFilters();
+  Future<bool> deleteAset(String id) async {
+    try {
+      debugPrint('🗑️ Starting deletion process for asset ID: $id');
+
+      // Show loading indicator
+      Get.dialog(
+        const Center(child: CircularProgressIndicator()),
+        barrierDismissible: false,
+      );
+
+      // Call the provider to delete the asset
+      final success = await _asetProvider.deleteAset(id);
+
+      // Close the loading dialog
+      Get.back();
+
+      if (success) {
+        // Remove the asset from our local list
+        asetList.removeWhere((aset) => aset['id'] == id);
+        // Apply filters to update the UI
+        applyFilters();
+
+        // Show success message
+        Get.snackbar(
+          'Sukses',
+          'Aset berhasil dihapus',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+        return true;
+      } else {
+        // Show error message
+        Get.snackbar(
+          'Gagal',
+          'Terjadi kesalahan saat menghapus aset',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return false;
+      }
+    } catch (e) {
+      // Close the loading dialog if still open
+      if (Get.isDialogOpen ?? false) {
+        Get.back();
+      }
+
+      // Show error message
+      Get.snackbar(
+        'Error',
+        'Gagal menghapus aset: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return false;
+    }
   }
 }

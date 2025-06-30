@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../theme/app_colors.dart';
+import 'package:flutter/rendering.dart';
 
 class RegistrationSuccessView extends StatefulWidget {
   const RegistrationSuccessView({Key? key}) : super(key: key);
@@ -15,10 +17,17 @@ class _RegistrationSuccessViewState extends State<RegistrationSuccessView>
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
+  String? registerId;
 
   @override
   void initState() {
     super.initState();
+
+    // Get the registration ID from arguments
+    if (Get.arguments != null && Get.arguments is Map) {
+      registerId = Get.arguments['register_id'] as String?;
+    }
+
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -215,7 +224,7 @@ class _RegistrationSuccessViewState extends State<RegistrationSuccessView>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  'Akun Anda telah berhasil terdaftar. Silakan masuk dengan email dan password yang telah Anda daftarkan.',
+                  'Akun Anda telah berhasil terdaftar. Silahkan tunggu petugas untuk melakukan verifikasi data diri anda.',
                   style: TextStyle(
                     fontSize: 16,
                     color: AppColors.textSecondary,
@@ -224,6 +233,84 @@ class _RegistrationSuccessViewState extends State<RegistrationSuccessView>
                   textAlign: TextAlign.center,
                 ),
               ),
+              if (registerId != null) ...[
+                const SizedBox(height: 24),
+                Text(
+                  'Kode Registrasi:',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.successLight,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.success.withOpacity(0.5),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        registerId!,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.success,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: Icon(
+                          Icons.copy,
+                          size: 20,
+                          color: AppColors.success,
+                        ),
+                        onPressed: () {
+                          // Copy to clipboard
+                          final data = ClipboardData(text: registerId!);
+                          Clipboard.setData(data);
+                          Get.snackbar(
+                            'Berhasil Disalin',
+                            'Kode registrasi telah disalin ke clipboard',
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: AppColors.successLight,
+                            colorText: AppColors.success,
+                            margin: const EdgeInsets.all(16),
+                          );
+                        },
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        splashRadius: 20,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'Simpan kode registrasi ini untuk memeriksa status pendaftaran Anda.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
             ],
           ),
         );

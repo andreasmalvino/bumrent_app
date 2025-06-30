@@ -24,6 +24,8 @@ class SewaModel {
   final double? denda;
   final double? dibayar;
   final double? paidAmount;
+  // Add nama_satuan_waktu field
+  final String? namaSatuanWaktu;
 
   SewaModel({
     required this.id,
@@ -47,6 +49,7 @@ class SewaModel {
     this.denda,
     this.dibayar,
     this.paidAmount,
+    this.namaSatuanWaktu,
   });
 
   factory SewaModel.fromJson(Map<String, dynamic> json) {
@@ -90,6 +93,7 @@ class SewaModel {
           (json['paid_amount'] is num)
               ? json['paid_amount'].toDouble()
               : double.tryParse(json['paid_amount']?.toString() ?? '0'),
+      namaSatuanWaktu: json['nama_satuan_waktu'],
     );
   }
 }

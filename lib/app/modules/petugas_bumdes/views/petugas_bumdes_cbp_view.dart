@@ -327,7 +327,7 @@ class PetugasBumdesCbpView extends GetView<PetugasBumdesCbpController> {
             leading: const Icon(Icons.subscriptions_outlined),
             title: const Text('Kelola Langganan'),
             onTap: () {
-              Get.offAllNamed(Routes.PETUGAS_LANGGANAN);
+              Get.offAllNamed(Routes.PETUGAS_BUMDES_DASHBOARD);
             },
           ),
           ListTile(

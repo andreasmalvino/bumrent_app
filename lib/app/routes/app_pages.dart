@@ -14,6 +14,7 @@ import '../modules/warga/bindings/pembayaran_sewa_binding.dart';
 import '../modules/petugas_bumdes/bindings/petugas_aset_binding.dart';
 import '../modules/petugas_bumdes/bindings/petugas_paket_binding.dart';
 import '../modules/petugas_bumdes/bindings/petugas_sewa_binding.dart';
+import '../modules/petugas_bumdes/bindings/petugas_penyewa_binding.dart';
 import '../modules/petugas_bumdes/bindings/petugas_manajemen_bumdes_binding.dart';
 import '../modules/petugas_bumdes/bindings/petugas_tambah_aset_binding.dart';
 import '../modules/petugas_bumdes/bindings/petugas_tambah_paket_binding.dart';
@@ -21,6 +22,9 @@ import '../modules/petugas_bumdes/bindings/petugas_bumdes_cbp_binding.dart';
 import '../modules/petugas_bumdes/bindings/list_petugas_mitra_binding.dart';
 import '../modules/petugas_bumdes/bindings/list_pelanggan_aktif_binding.dart';
 import '../modules/petugas_bumdes/bindings/list_tagihan_periode_binding.dart';
+import '../modules/petugas_bumdes/bindings/petugas_akun_bank_binding.dart';
+import '../modules/petugas_bumdes/bindings/petugas_laporan_binding.dart';
+import '../modules/petugas_bumdes/bindings/petugas_detail_penyewa_binding.dart';
 
 // Import views
 import '../modules/auth/views/login_view.dart';
@@ -35,6 +39,7 @@ import '../modules/petugas_bumdes/views/petugas_bumdes_dashboard_view.dart';
 import '../modules/petugas_bumdes/views/petugas_aset_view.dart';
 import '../modules/petugas_bumdes/views/petugas_paket_view.dart';
 import '../modules/petugas_bumdes/views/petugas_sewa_view.dart';
+import '../modules/petugas_bumdes/views/petugas_penyewa_view.dart';
 import '../modules/petugas_bumdes/views/petugas_manajemen_bumdes_view.dart';
 import '../modules/splash/views/splash_view.dart';
 import '../modules/warga/views/order_sewa_aset_view.dart';
@@ -46,6 +51,9 @@ import '../modules/petugas_bumdes/views/petugas_bumdes_cbp_view.dart';
 import '../modules/petugas_bumdes/views/list_petugas_mitra_view.dart';
 import '../modules/petugas_bumdes/views/list_pelanggan_aktif_view.dart';
 import '../modules/petugas_bumdes/views/list_tagihan_periode_view.dart';
+import '../modules/petugas_bumdes/views/petugas_akun_bank_view.dart';
+import '../modules/petugas_bumdes/views/petugas_laporan_view.dart';
+import '../modules/petugas_bumdes/views/petugas_detail_penyewa_view.dart';
 
 // Import fixed routes (standalone file)
 import 'app_routes.dart';
@@ -165,6 +173,17 @@ class AppPages {
       transition: Transition.fadeIn,
     ),
     GetPage(
+      name: Routes.PETUGAS_PENYEWA,
+      page: () => const PetugasPenyewaView(),
+      binding: PetugasPenyewaBinding(),
+      transition: Transition.fadeIn,
+    ),
+    GetPage(
+      name: Routes.PETUGAS_DETAIL_PENYEWA,
+      page: () => const PetugasDetailPenyewaView(),
+      binding: PetugasDetailPenyewaBinding(),
+    ),
+    GetPage(
       name: Routes.PETUGAS_MANAJEMEN_BUMDES,
       page: () => const PetugasManajemenBumdesView(),
       binding: PetugasManajemenBumdesBinding(),
@@ -205,6 +224,17 @@ class AppPages {
       page: () => const ListTagihanPeriodeView(),
       binding: ListTagihanPeriodeBinding(),
       transition: Transition.fadeIn,
+    ),
+    GetPage(
+      name: Routes.PETUGAS_AKUN_BANK,
+      page: () => const PetugasAkunBankView(),
+      binding: PetugasAkunBankBinding(),
+      transition: Transition.fadeIn,
+    ),
+    GetPage(
+      name: Routes.PETUGAS_LAPORAN,
+      page: () => const PetugasLaporanView(),
+      binding: PetugasLaporanBinding(),
     ),
   ];
 }

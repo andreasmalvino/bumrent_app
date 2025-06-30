@@ -59,6 +59,10 @@ class OrderSewaAsetController extends GetxController {
   // Store the asset ID to retrieve it after hot reload
   final asetId = RxString('');
 
+  // Order type flags
+  final isAset = true.obs;
+  final isPaket = false.obs;
+
   // Asset photos data
   final assetPhotos = <FotoAsetModel>[].obs;
   final currentPhotoIndex = 0.obs;
@@ -102,18 +106,27 @@ class OrderSewaAsetController extends GetxController {
       <String, Map<int, int>>{}.obs;
   final unavailableDatesForHourly = <DateTime>[].obs;
 
+  // Package items data
+  final RxList<Map<String, dynamic>> paketItems = <Map<String, dynamic>>[].obs;
+  final RxBool isPaketItemsLoaded = false.obs;
+  final RxString paketId =
+      ''.obs; // Add paketId variable to store the package ID
+
   // Static method for navigation (moved to NavigationService)
-  static Future<void> navigateToOrderPage(String asetId) async {
+  static Future<void> navigateToOrderPage(
+    String asetId, {
+    bool isAset = true,
+  }) async {
     try {
       // Use ServiceManager to get NavigationService instead of direct Get.find
-      ServiceManager.navigationService.toOrderSewaAset(asetId);
+      ServiceManager.navigationService.toOrderSewaAset(asetId, isAset: isAset);
       debugPrint('✅ Successfully navigated to order page via ServiceManager');
     } catch (e) {
       debugPrint('⚠️ Error in navigateToOrderPage: $e');
       // Fallback direct navigation
       Get.toNamed(
         '/warga/order-sewa-aset',
-        arguments: {'asetId': asetId},
+        arguments: {'asetId': asetId, 'isAset': isAset},
         preventDuplicates: false,
       );
     }
@@ -139,7 +152,25 @@ class OrderSewaAsetController extends GetxController {
     // Initialize unavailable dates collection
     unavailableDatesForHourly.clear();
 
+    // Initialize controller
     _initializeController();
+
+    // Add reaction to ensure jumlahUnit is always 1 when isPaket is true
+    ever(isPaket, (bool value) {
+      if (value) {
+        jumlahUnit.value = 1;
+        debugPrint('📦 Package detected: Setting jumlahUnit to 1');
+      }
+    });
+
+    // Add reaction to check for duplicates whenever assetPhotos changes
+    ever(assetPhotos, (_) {
+      // Only run if we have more than 1 photo
+      if (assetPhotos.length > 1) {
+        debugPrint('🔄 assetPhotos changed, checking for duplicates...');
+        ensureNoDuplicatePhotos();
+      }
+    });
   }
 
   @override
@@ -161,8 +192,12 @@ class OrderSewaAsetController extends GetxController {
 
     // If we don't have an asset yet but we have an ID stored, load it
     if (aset.value == null && asetId.value.isNotEmpty) {
-      debugPrint('🔄 Loading asset data from onReady with ID: ${asetId.value}');
-      loadAsetData(asetId.value);
+      debugPrint('🔄 Loading data from onReady with ID: ${asetId.value}');
+      if (isPaket.value) {
+        loadPaketData(asetId.value);
+      } else {
+        loadAsetData(asetId.value);
+      }
     }
     // If we still don't have an asset and no error is set, go back to the previous screen
     else if (aset.value == null &&
@@ -175,7 +210,7 @@ class OrderSewaAsetController extends GetxController {
         navigationService.backFromOrderSewaAset();
         Get.snackbar(
           'Info',
-          'Tidak dapat menampilkan aset - data tidak tersedia',
+          'Tidak dapat menampilkan data - data tidak tersedia',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.amber,
           colorText: Colors.black,
@@ -211,6 +246,14 @@ class OrderSewaAsetController extends GetxController {
       if (args != null && args.containsKey('asetId')) {
         storedId = args['asetId'] as String?;
         debugPrint('📦 Found asetId in arguments after hot reload: $storedId');
+
+        // Check if it's a package
+        isPaket.value = args['isPaket'] == true;
+        isAset.value = args['isAset'] == true;
+
+        debugPrint(
+          '📦 Order type after hot reload: ${isPaket.value ? "Package" : "Asset"}',
+        );
       }
 
       // Jika tidak ada di arguments, cek di GetStorage
@@ -221,14 +264,21 @@ class OrderSewaAsetController extends GetxController {
       }
 
       if (storedId != null && storedId.isNotEmpty) {
-        debugPrint(
-          '🔄 Reloading asset data with ID after hot reload: $storedId',
-        );
+        debugPrint('🔄 Reloading data with ID after hot reload: $storedId');
         asetId.value = storedId;
 
         // Tambahkan delay kecil untuk memastikan controller sudah siap
         Future.delayed(const Duration(milliseconds: 100), () {
-          loadAsetData(storedId!);
+          if (isPaket.value) {
+            debugPrint('🔄 Loading package data after hot reload');
+            // Set paketId.value to ensure it's not empty when creating the order after hot reload
+            paketId.value = storedId!;
+            debugPrint('📦 Set paketId.value to: $storedId in handleHotReload');
+            loadPaketData(storedId!);
+          } else {
+            debugPrint('🔄 Loading asset data after hot reload');
+            loadAsetData(storedId!);
+          }
         });
       } else {
         debugPrint('⚠️ No asetId found after hot reload');
@@ -243,15 +293,31 @@ class OrderSewaAsetController extends GetxController {
     final args = Get.arguments;
     debugPrint('📌 Arguments received in controller: $args');
 
+    // Check for flags
+    final bool isAsetFlag = args?['isAset'] == true;
+    final bool isPaketFlag = args?['isPaket'] == true;
+
+    // Set the order type properties
+    isAset.value = isAsetFlag;
+    isPaket.value = isPaketFlag;
+
+    debugPrint(
+      '📌 Order type: ${isAset.value
+          ? "Single Asset"
+          : isPaket.value
+          ? "Package"
+          : "Unknown"}',
+    );
+
     String? newAsetId;
     if (args != null && args.containsKey('asetId')) {
       newAsetId = args['asetId'] as String?;
-      debugPrint('📌 Asset ID from arguments: $newAsetId');
+      debugPrint('📌 Asset/Package ID from arguments: $newAsetId');
 
       // Simpan ID ke storage segera setelah menerimanya dari arguments
       if (newAsetId != null && newAsetId.isNotEmpty) {
         box.write('current_aset_id', newAsetId);
-        debugPrint('💾 Immediately saved asetId to GetStorage: $newAsetId');
+        debugPrint('💾 Immediately saved ID to GetStorage: $newAsetId');
       }
     }
 
@@ -259,19 +325,31 @@ class OrderSewaAsetController extends GetxController {
     if ((newAsetId == null || newAsetId.isEmpty) &&
         box.hasData('current_aset_id')) {
       newAsetId = box.read('current_aset_id');
-      debugPrint('📌 Asset ID from GetStorage: $newAsetId');
+      debugPrint('📌 Asset/Package ID from GetStorage: $newAsetId');
     }
 
     if (newAsetId != null && newAsetId.isNotEmpty) {
-      debugPrint('📌 Using asset ID: $newAsetId');
+      debugPrint('📌 Using ID: $newAsetId');
       asetId.value = newAsetId;
-      debugPrint('🔄 Loading asset data with ID: ${asetId.value}');
-      loadAsetData(asetId.value);
+
+      // Load data based on type
+      if (isPaket.value) {
+        debugPrint('🔄 Loading package data with ID: ${asetId.value}');
+        // Set paketId.value to ensure it's not empty when creating the order
+        paketId.value = newAsetId;
+        debugPrint(
+          '📦 Set paketId.value to: $newAsetId in _initializeController',
+        );
+        loadPaketData(asetId.value);
+      } else {
+        debugPrint('🔄 Loading asset data with ID: ${asetId.value}');
+        loadAsetData(asetId.value);
+      }
     } else {
-      debugPrint('❌ No asset ID available - returning to previous screen');
+      debugPrint('❌ No ID available - returning to previous screen');
       isLoading.value = false;
       hasError.value = true;
-      errorMessage.value = 'ID aset tidak ditemukan';
+      errorMessage.value = 'ID tidak ditemukan';
       // Don't navigate back here, let onReady handle it
     }
 
@@ -401,6 +479,9 @@ class OrderSewaAsetController extends GetxController {
       final photos = await asetProvider.getAsetPhotos(asetId);
       assetPhotos.value = photos;
 
+      // Ensure no duplicates in assetPhotos
+      ensureNoDuplicatePhotos();
+
       debugPrint('✅ Loaded ${photos.length} photos for asset');
     } catch (e) {
       debugPrint('❌ Error loading asset photos: $e');
@@ -408,6 +489,37 @@ class OrderSewaAsetController extends GetxController {
       errorMessage.value = 'Gagal memuat foto aset: ${e.toString()}';
     } finally {
       isPhotosLoading.value = false;
+    }
+  }
+
+  // Load package items
+  Future<void> loadPaketItems(String paketId) async {
+    try {
+      debugPrint('🔄 Loading package items for paket ID: $paketId');
+      isPaketItemsLoaded.value = false;
+
+      final response = await asetProvider.client
+          .from('paket_item')
+          .select('*, aset(*)')
+          .eq('paket_id', paketId);
+
+      if (response != null && response is List && response.isNotEmpty) {
+        // Convert the response to a list of maps
+        final items = List<Map<String, dynamic>>.from(response);
+
+        paketItems.value = items;
+        isPaketItemsLoaded.value = true;
+
+        debugPrint(
+          '✅ Loaded ${items.length} package items for paket ID: $paketId',
+        );
+      } else {
+        debugPrint('⚠️ No package items found for paket ID: $paketId');
+        paketItems.value = [];
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading package items: $e');
+      isPaketItemsLoaded.value = false;
     }
   }
 
@@ -439,9 +551,59 @@ class OrderSewaAsetController extends GetxController {
     return assetPhotos[currentPhotoIndex.value].fotoAset;
   }
 
+  // Helper method to ensure no duplicate photos in assetPhotos
+  void ensureNoDuplicatePhotos() {
+    if (assetPhotos.isEmpty) return;
+
+    debugPrint(
+      '🔍 Checking for duplicate photos in assetPhotos (before): ${assetPhotos.length}',
+    );
+
+    // Use a set to track unique photo URLs
+    final Set<String> uniqueUrls = {};
+    final List<FotoAsetModel> uniquePhotos = [];
+
+    // Filter out duplicates
+    for (var photo in assetPhotos) {
+      if (photo.fotoAset != null &&
+          photo.fotoAset.isNotEmpty &&
+          !uniqueUrls.contains(photo.fotoAset)) {
+        uniqueUrls.add(photo.fotoAset);
+        uniquePhotos.add(photo);
+      } else {
+        debugPrint('🗑️ Removing duplicate photo: ${photo.fotoAset}');
+      }
+    }
+
+    // Update assetPhotos with unique photos only if there were duplicates
+    if (uniquePhotos.length < assetPhotos.length) {
+      debugPrint(
+        '🔄 Updating assetPhotos: removed ${assetPhotos.length - uniquePhotos.length} duplicates',
+      );
+      assetPhotos.value = uniquePhotos;
+
+      // Reset currentPhotoIndex if it's out of bounds
+      if (currentPhotoIndex.value >= assetPhotos.length) {
+        currentPhotoIndex.value = assetPhotos.length - 1;
+        if (currentPhotoIndex.value < 0) currentPhotoIndex.value = 0;
+      }
+    }
+
+    debugPrint('✅ Unique photos in assetPhotos (after): ${assetPhotos.length}');
+  }
+
   // Load bookings for the selected date and calculate availability across dates and times
   Future<void> loadBookingsForDate(DateTime date) async {
     try {
+      // Check if we're dealing with a package or a single asset
+      if (isPaket.value && paketItems.isNotEmpty) {
+        debugPrint(
+          '📦 Loading bookings for package items for date: ${DateFormat('yyyy-MM-dd').format(date)}',
+        );
+        await loadPackageBookingsForDate(date);
+        return;
+      }
+
       isLoadingBookings(true);
 
       // Clear selections and booked hours
@@ -708,6 +870,229 @@ class OrderSewaAsetController extends GetxController {
     }
   }
 
+  // Load bookings for a specific date for package items
+  Future<void> loadPackageBookingsForDate(DateTime date) async {
+    try {
+      isLoadingBookings(true);
+
+      // Clear selections and booked hours
+      selectedHours.clear();
+      bookedHours.clear();
+      bookedHoursList.clear();
+
+      // Format date for API
+      final String formattedDate = DateFormat('yyyy-MM-dd').format(date);
+      debugPrint(
+        '🔍 Loading package bookings for date: $date (formatted: $formattedDate)',
+      );
+
+      // Initialize a combined inventory map for this date
+      Map<String, Map<int, int>> combinedInventory = {};
+
+      // Initialize inventory for this date with hours 0-23
+      // Start with "infinite" availability, we'll find the minimum later
+      Map<int, int> dayInventory = {};
+      for (int hour = 0; hour < 24; hour++) {
+        dayInventory[hour] = 999999; // Start with a high number
+      }
+      combinedInventory[formattedDate] = dayInventory;
+
+      // Process each package item
+      for (int i = 0; i < paketItems.length; i++) {
+        final item = paketItems[i];
+        final asetData = item['aset'] as Map<String, dynamic>?;
+
+        if (asetData == null) {
+          debugPrint('⚠️ Package item $i has no asset data, skipping');
+          continue;
+        }
+
+        final String asetId = asetData['id'] ?? '';
+        final String asetName = asetData['nama'] ?? 'Unknown Asset';
+        final int requiredQuantity =
+            item['kuantitas'] is int ? item['kuantitas'] : 1;
+
+        if (asetId.isEmpty) {
+          debugPrint('⚠️ Package item $i has empty asset ID, skipping');
+          continue;
+        }
+
+        debugPrint('📦 Processing package item $i: $asetName (ID: $asetId)');
+        debugPrint('📦 Required quantity: $requiredQuantity');
+
+        // Get all bookings for this asset on the specific date
+        final List<Map<String, dynamic>> bookings = await asetProvider
+            .getAsetBookings(asetId, formattedDate);
+
+        debugPrint(
+          '📊 Found ${bookings.length} bookings for asset $asetName on $formattedDate',
+        );
+
+        // Get the total quantity of this asset
+        final int totalAssetQuantity =
+            asetData['kuantitas'] is int ? asetData['kuantitas'] : 0;
+        debugPrint(
+          '📊 Total quantity for asset $asetName: $totalAssetQuantity',
+        );
+
+        // Create an inventory map for this specific asset
+        Map<String, Map<int, int>> assetInventory = {};
+
+        // Initialize inventory for this date with full quantity
+        Map<int, int> assetDayInventory = {};
+        for (int hour = 0; hour < 24; hour++) {
+          assetDayInventory[hour] = totalAssetQuantity;
+        }
+        assetInventory[formattedDate] = assetDayInventory;
+
+        // Process all bookings for this asset
+        if (bookings.isNotEmpty) {
+          // Process each booking and adjust inventory
+          for (var booking in bookings) {
+            final String bookingId = booking['id'] ?? '';
+            final String status = booking['status'] ?? '';
+            final int bookingQuantity = booking['kuantitas'] ?? 1;
+
+            // Skip rejected bookings
+            if (status == 'ditolak') {
+              continue;
+            }
+
+            // Get start and end date-times
+            final String waktuMulaiStr = booking['waktu_mulai'] ?? '';
+            final String waktuSelesaiStr = booking['waktu_selesai'] ?? '';
+
+            if (waktuMulaiStr.isEmpty || waktuSelesaiStr.isEmpty) {
+              continue;
+            }
+
+            try {
+              final DateTime waktuMulai = DateTime.parse(waktuMulaiStr);
+              final DateTime waktuSelesai = DateTime.parse(waktuSelesaiStr);
+
+              // Calculate all date-hour combinations in the booking range
+              final List<DateTime> allDateHours = [];
+
+              // Add all hours from start to end
+              DateTime currentHour = DateTime(
+                waktuMulai.year,
+                waktuMulai.month,
+                waktuMulai.day,
+                waktuMulai.hour,
+              );
+
+              while (!currentHour.isAfter(waktuSelesai)) {
+                allDateHours.add(currentHour);
+                currentHour = currentHour.add(const Duration(hours: 1));
+              }
+
+              // Process each hour in the booking range to reduce inventory
+              for (DateTime dateHour in allDateHours) {
+                final String dateStr = DateFormat(
+                  'yyyy-MM-dd',
+                ).format(dateHour);
+                final int hour = dateHour.hour;
+
+                // Skip if outside our initialized inventory range
+                if (!assetInventory.containsKey(dateStr)) {
+                  continue;
+                }
+
+                // Reduce inventory for this hour
+                if (assetInventory[dateStr]!.containsKey(hour)) {
+                  final int previousQty = assetInventory[dateStr]![hour]!;
+                  assetInventory[dateStr]![hour] = math.max(
+                    0,
+                    previousQty - bookingQuantity,
+                  );
+                }
+              }
+            } catch (e) {
+              debugPrint('❌ Error processing booking $bookingId: $e');
+            }
+          }
+        }
+
+        // Now update the combined inventory based on this asset's availability
+        // For each hour, calculate how many complete package items can be booked
+        for (final hour in assetInventory[formattedDate]!.keys) {
+          // Calculate how many complete package items can be booked based on this asset
+          final int availableAssetQty = assetInventory[formattedDate]![hour]!;
+          final int possiblePackages = availableAssetQty ~/ requiredQuantity;
+
+          // Update combined inventory with the minimum possible packages
+          combinedInventory[formattedDate]![hour] = math.min(
+            combinedInventory[formattedDate]![hour]!,
+            possiblePackages,
+          );
+        }
+      }
+
+      // Store the combined inventory in our controller
+      hourlyInventory.clear();
+      hourlyInventory.addAll(combinedInventory);
+
+      // Now determine which hours are available for the selected date
+      if (hourlyInventory.containsKey(formattedDate)) {
+        final dayInventory = hourlyInventory[formattedDate]!;
+
+        // Debug output of inventory status for this date
+        debugPrint('📊 PACKAGE INVENTORY STATUS FOR $formattedDate:');
+        debugPrint('------------------------------------');
+        debugPrint('Requested quantity: ${jumlahUnit.value}');
+
+        // Business hours (typically 6-21)
+        List<int> businessHours = List.generate(16, (index) => index + 6);
+
+        // Count available vs unavailable hours
+        int availableHoursCount = 0;
+        int unavailableHoursCount = 0;
+
+        for (int hour in businessHours) {
+          final int availableQty =
+              dayInventory.containsKey(hour) ? dayInventory[hour]! : 0;
+          final bool isAvailable = availableQty >= jumlahUnit.value;
+          final String status = isAvailable ? "✅ AVAILABLE" : "❌ UNAVAILABLE";
+
+          debugPrint('Hour ${formatHour(hour)}: $availableQty units - $status');
+
+          if (isAvailable) {
+            availableHoursCount++;
+          } else {
+            unavailableHoursCount++;
+            bookedHoursList.add(hour); // Mark this hour as unavailable
+          }
+        }
+
+        debugPrint('------------------------------------');
+        debugPrint(
+          'Summary: $availableHoursCount hours available, $unavailableHoursCount hours unavailable',
+        );
+
+        // If all business hours are unavailable, add this date to unavailable dates list
+        if (availableHoursCount == 0) {
+          final DateTime unavailableDate = DateFormat(
+            'yyyy-MM-dd',
+          ).parse(formattedDate);
+          if (!unavailableDatesForHourly.contains(unavailableDate)) {
+            unavailableDatesForHourly.add(unavailableDate);
+            debugPrint(
+              '🚫 Date $formattedDate FULLY BOOKED - Adding to unavailable dates',
+            );
+          }
+        }
+      }
+
+      debugPrint(
+        '✅ Completed loading package bookings for date $formattedDate',
+      );
+    } catch (e) {
+      debugPrint('❌ Error loading package bookings for date: $e');
+    } finally {
+      isLoadingBookings(false);
+    }
+  }
+
   // Select a time unit (e.g., hourly or daily)
   void selectSatuanWaktu(Map<String, dynamic> satuan) {
     final bool wasDaily = isDailyRental();
@@ -753,12 +1138,6 @@ class OrderSewaAsetController extends GetxController {
 
       // If switching from daily to hourly, reload hourly inventory
       if (wasDaily) {
-        // Get current date for hourly rental
-        final DateTime currentDate = DateTime.now();
-        final String formattedDate = DateFormat(
-          'yyyy-MM-dd',
-        ).format(currentDate);
-
         debugPrint(
           '🔄 Switching to hourly rental mode, loading hourly inventory',
         );
@@ -767,11 +1146,27 @@ class OrderSewaAsetController extends GetxController {
         hourlyInventory.clear();
         unavailableDatesForHourly.clear();
 
-        // Load current date and next 7 days to have availability data
-        loadBookingsForDate(currentDate);
-        for (int i = 1; i <= 7; i++) {
-          final futureDate = currentDate.add(Duration(days: i));
-          loadBookingsForDate(futureDate);
+        // Check if we're dealing with a package or a regular asset
+        if (isPaket.value && paketItems.isNotEmpty) {
+          debugPrint(
+            '📦 Package detected: Loading comprehensive package booking data',
+          );
+          // For packages, load comprehensive booking data for all items
+          loadAllPackageBookings();
+        } else if (isAset.value) {
+          debugPrint(
+            '🏢 Asset detected: Loading comprehensive asset booking data',
+          );
+          // For regular assets, use the same comprehensive loading as initial load
+          loadAllBookings();
+        } else {
+          // Fallback for any other case
+          final DateTime currentDate = DateTime.now();
+          loadBookingsForDate(currentDate);
+          for (int i = 1; i <= 7; i++) {
+            final futureDate = currentDate.add(Duration(days: i));
+            loadBookingsForDate(futureDate);
+          }
         }
       }
     }
@@ -1411,6 +1806,13 @@ class OrderSewaAsetController extends GetxController {
   // Load booked dates for daily rental with inventory-based logic
   Future<void> loadBookedDates() async {
     try {
+      // Check if we're dealing with a package or a single asset
+      if (isPaket.value && paketItems.isNotEmpty) {
+        debugPrint('📦 Package detected: Loading package booked dates');
+        await loadPackageBookedDates();
+        return;
+      }
+
       isLoadingBookedDates(true);
       bookedDates.clear();
 
@@ -1610,9 +2012,231 @@ class OrderSewaAsetController extends GetxController {
           debugPrint('  - ${DateFormat('yyyy-MM-dd').format(bookedDates[i])}');
         }
       }
-    } catch (e, stackTrace) {
+    } catch (e) {
       debugPrint('❌ Error loading booked dates: $e');
-      debugPrint('🔍 Stack trace: $stackTrace');
+    } finally {
+      isLoadingBookedDates(false);
+    }
+  }
+
+  // Load booked dates for package items in daily rental mode
+  Future<void> loadPackageBookedDates() async {
+    try {
+      isLoadingBookedDates(true);
+      bookedDates.clear();
+
+      // For packages, we always use quantity 1
+      final int requestedQuantity = 1;
+      debugPrint(
+        '📦 Package booking: Using fixed quantity of $requestedQuantity',
+      );
+
+      // Date range to check (next 90 days)
+      final startDateForQuery = DateTime.now();
+      final endDateForQuery = DateTime.now().add(const Duration(days: 90));
+
+      // Format dates for API
+      final String formattedStartDate = DateFormat(
+        'yyyy-MM-dd',
+      ).format(startDateForQuery);
+      final String formattedEndDate = DateFormat(
+        'yyyy-MM-dd',
+      ).format(endDateForQuery);
+
+      debugPrint(
+        '📦 Checking package availability from $formattedStartDate to $formattedEndDate',
+      );
+
+      // Initialize a combined inventory map to track availability across all package items
+      Map<String, int> combinedInventory = {};
+
+      // Initialize inventory for each day in the range with "infinite" availability
+      for (
+        DateTime day = startDateForQuery;
+        !day.isAfter(endDateForQuery);
+        day = day.add(const Duration(days: 1))
+      ) {
+        String dateStr = DateFormat('yyyy-MM-dd').format(day);
+        combinedInventory[dateStr] = 999999; // Start with a high number
+      }
+
+      // Process each package item
+      for (int i = 0; i < paketItems.length; i++) {
+        final item = paketItems[i];
+        final asetData = item['aset'] as Map<String, dynamic>?;
+
+        if (asetData == null) {
+          debugPrint('⚠️ Package item $i has no asset data, skipping');
+          continue;
+        }
+
+        final String asetId = asetData['id'] ?? '';
+        final String asetName = asetData['nama'] ?? 'Unknown Asset';
+        final int requiredQuantity =
+            item['kuantitas'] is int ? item['kuantitas'] : 1;
+
+        if (asetId.isEmpty) {
+          debugPrint('⚠️ Package item $i has empty asset ID, skipping');
+          continue;
+        }
+
+        debugPrint('📦 Processing package item $i: $asetName (ID: $asetId)');
+        debugPrint('📦 Required quantity: $requiredQuantity');
+
+        // Get all bookings for this asset in the date range
+        final List<Map<String, dynamic>> bookings = await asetProvider
+            .getAsetDailyBookings(asetId, formattedStartDate, formattedEndDate);
+
+        debugPrint('📊 Found ${bookings.length} bookings for asset $asetName');
+
+        // Get the total quantity of this asset
+        final int totalAssetQuantity =
+            asetData['kuantitas'] is int ? asetData['kuantitas'] : 0;
+        debugPrint(
+          '📊 Total quantity for asset $asetName: $totalAssetQuantity',
+        );
+
+        // Create an inventory map for this specific asset
+        Map<String, int> assetInventory = {};
+
+        // Initialize inventory for each day in the range with full quantity
+        for (
+          DateTime day = startDateForQuery;
+          !day.isAfter(endDateForQuery);
+          day = day.add(const Duration(days: 1))
+        ) {
+          String dateStr = DateFormat('yyyy-MM-dd').format(day);
+          assetInventory[dateStr] = totalAssetQuantity;
+        }
+
+        // Process all bookings for this asset
+        if (bookings.isNotEmpty) {
+          // Process each booking and adjust inventory
+          for (var booking in bookings) {
+            final String? startDateStr = booking['waktu_mulai'];
+            final String? endDateStr = booking['waktu_selesai'];
+            final int bookingQuantity = booking['kuantitas'] ?? 0;
+            final String bookingStatus = booking['status'] ?? '';
+
+            // Skip rejected bookings
+            if (bookingStatus == 'ditolak') {
+              continue;
+            }
+
+            if (startDateStr != null &&
+                endDateStr != null &&
+                bookingQuantity > 0) {
+              final DateTime bookingStart = DateTime.parse(startDateStr);
+              final DateTime bookingEnd = DateTime.parse(endDateStr);
+
+              // Get dates without time
+              final DateTime startDateOnly = DateTime(
+                bookingStart.year,
+                bookingStart.month,
+                bookingStart.day,
+              );
+              final DateTime endDateOnly = DateTime(
+                bookingEnd.year,
+                bookingEnd.month,
+                bookingEnd.day,
+              );
+
+              // Reduce available quantity for each day in the booking range
+              for (
+                DateTime day = startDateOnly;
+                !day.isAfter(endDateOnly);
+                day = day.add(const Duration(days: 1))
+              ) {
+                String dateStr = DateFormat('yyyy-MM-dd').format(day);
+
+                // Subtract the booking quantity from available inventory
+                if (assetInventory.containsKey(dateStr)) {
+                  int previousInventory = assetInventory[dateStr]!;
+                  assetInventory[dateStr] = math.max(
+                    0,
+                    previousInventory - bookingQuantity,
+                  );
+                }
+              }
+            }
+          }
+        }
+
+        // Now update the combined inventory based on this asset's availability
+        // For each day, calculate how many complete package items can be booked
+        for (final dateStr in assetInventory.keys) {
+          // Calculate how many complete package items can be booked based on this asset
+          final int availableAssetQty = assetInventory[dateStr]!;
+          final int possiblePackages =
+              requiredQuantity > 0 ? availableAssetQty ~/ requiredQuantity : 0;
+
+          // Update combined inventory with the minimum possible packages
+          combinedInventory[dateStr] = math.min(
+            combinedInventory[dateStr]!,
+            possiblePackages,
+          );
+        }
+      }
+
+      // Final inventory status after processing all package items
+      debugPrint('📊 FINAL PACKAGE INVENTORY STATUS:');
+      debugPrint('------------------------------------');
+      debugPrint('Requested package quantity: $requestedQuantity');
+
+      // Show detailed inventory for next 10 days
+      DateTime currentDate = DateTime.now();
+      debugPrint('PACKAGE INVENTORY FOR NEXT 10 DAYS:');
+      for (int i = 0; i < 10; i++) {
+        String dateStr = DateFormat('yyyy-MM-dd').format(currentDate);
+        int available = combinedInventory[dateStr] ?? 0;
+        bool isAvailable = available >= requestedQuantity;
+        String availabilityStatus =
+            isAvailable ? "✅ AVAILABLE" : "❌ UNAVAILABLE";
+
+        debugPrint(
+          '${i + 1}. $dateStr: $available package units available - $availabilityStatus',
+        );
+        currentDate = currentDate.add(const Duration(days: 1));
+      }
+      debugPrint('------------------------------------');
+
+      // Find days where available quantity is less than requested quantity
+      for (var entry in combinedInventory.entries) {
+        if (entry.value < requestedQuantity) {
+          // Parse the date and add to booked dates
+          final DateTime bookedDate = DateFormat('yyyy-MM-dd').parse(entry.key);
+          bookedDates.add(bookedDate);
+          debugPrint(
+            '🚫 Disabling date ${entry.key}: available package quantity ${entry.value} < requested $requestedQuantity',
+          );
+        }
+      }
+
+      // Also add past dates (today and before) to booked dates
+      final today = DateTime.now();
+      final todayDate = DateTime(today.year, today.month, today.day);
+
+      for (
+        DateTime day = startDateForQuery;
+        !day.isAfter(todayDate);
+        day = day.add(const Duration(days: 1))
+      ) {
+        bookedDates.add(day);
+        debugPrint(
+          '🕒 Disabling past date: ${DateFormat('yyyy-MM-dd').format(day)}',
+        );
+      }
+
+      // Debug the total number of disabled dates
+      debugPrint('📋 Total dates disabled for package: ${bookedDates.length}');
+      if (bookedDates.isNotEmpty) {
+        debugPrint('📅 Sample disabled dates for package:');
+        for (int i = 0; i < math.min(5, bookedDates.length); i++) {
+          debugPrint('  - ${DateFormat('yyyy-MM-dd').format(bookedDates[i])}');
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading package booked dates: $e');
     } finally {
       isLoadingBookedDates(false);
     }
@@ -1896,10 +2520,111 @@ class OrderSewaAsetController extends GetxController {
       isLoading.value = true;
 
       Map<String, dynamic> sewaAsetData;
-      Map<String, dynamic> bookedDetailData;
+      dynamic
+      bookedDetailData; // Changed to dynamic to handle both Map and List
       Map<String, dynamic> tagihanSewaData;
 
-      if (isDailyRental()) {
+      // Check if this is a package order
+      if (isPaket.value) {
+        debugPrint('📦 Creating package order');
+        debugPrint('📦 Package ID: ${paketId.value}');
+
+        // Format date for booking based on rental type
+        String waktuMulai;
+        String waktuSelesai;
+        String satuanWaktu;
+        int durasiBooking;
+
+        if (isDailyRental()) {
+          // Create daily rental order for package
+          final String formattedStartDate = DateFormat(
+            'yyyy-MM-dd',
+          ).format(startDate.value!);
+          final String formattedEndDate = DateFormat(
+            'yyyy-MM-dd',
+          ).format(endDate.value!);
+
+          // Default time for start is 06:00:00, end is 21:00:00
+          waktuMulai = '${formattedStartDate}T06:00:00';
+          waktuSelesai = '${formattedEndDate}T21:00:00';
+          satuanWaktu = 'hari';
+          durasiBooking =
+              endDate.value!.difference(startDate.value!).inDays + 1;
+
+          debugPrint(
+            '📅 Creating daily package booking from $waktuMulai to $waktuSelesai',
+          );
+        } else {
+          // Format date for hourly booking
+          final DateTime bookingDate = DateFormat(
+            'dd MMMM yyyy',
+            'id_ID',
+          ).parse(selectedDate.value);
+
+          // Format start and end times using ISO format
+          final String formattedDate = DateFormat(
+            'yyyy-MM-dd',
+          ).format(bookingDate);
+          final String startTime = formatHour(startHour.value);
+          final String endTime = formatHour(endHour.value);
+
+          // Create ISO timestamp strings
+          waktuMulai = '${formattedDate}T$startTime:00';
+          waktuSelesai = '${formattedDate}T$endTime:00';
+          satuanWaktu = 'jam';
+          durasiBooking = duration.value;
+
+          debugPrint(
+            '📅 Creating hourly package booking from $waktuMulai to $waktuSelesai',
+          );
+        }
+
+        // Prepare sewa_aset data for package
+        sewaAsetData = {
+          'id': orderId, // Set UUID as the ID
+          'user_id': userId,
+          'paket_id':
+              paketId.value, // Use paket_id instead of aset_id for packages
+          'waktu_mulai': waktuMulai,
+          'waktu_selesai': waktuSelesai,
+          'kuantitas': 1, // Always 1 for packages
+          'status': 'MENUNGGU PEMBAYARAN',
+          'tipe_pesanan': 'paket',
+          'total': totalPrice.value,
+          'nama_satuan_waktu': satuanWaktu,
+        };
+
+        // Prepare booked_detail data as a List for package items
+        List<Map<String, dynamic>> bookedDetailList = [];
+
+        // Create a booked_detail entry for each item in the package
+        for (var item in paketItems) {
+          final asetData = item['aset'] as Map<String, dynamic>?;
+          final String asetId = asetData?['id'] ?? '';
+          final int quantity = item['kuantitas'] is int ? item['kuantitas'] : 1;
+
+          bookedDetailList.add({
+            'id': uuid.v4(), // Generate a new UUID for each booked_detail
+            'aset_id': asetId,
+            'sewa_aset_id': orderId,
+            'paket_id': paketId.value, // Add paket_id for package orders
+            'waktu_mulai': waktuMulai,
+            'waktu_selesai': waktuSelesai,
+            'kuantitas': quantity,
+          });
+        }
+
+        bookedDetailData = bookedDetailList;
+
+        // Prepare tagihan_sewa data
+        tagihanSewaData = {
+          'sewa_aset_id': orderId,
+          'durasi': durasiBooking,
+          'satuan_waktu': satuanWaktu,
+          'harga_sewa': selectedSatuanWaktu.value?['harga'] ?? 0,
+          'tagihan_awal': totalPrice.value,
+        };
+      } else if (isDailyRental()) {
         // Create daily rental order
         final String formattedStartDate = DateFormat(
           'yyyy-MM-dd',
@@ -2028,7 +2753,15 @@ class OrderSewaAsetController extends GetxController {
         debugPrint('✅ Complete order created successfully with ID: $orderId');
 
         // Navigate to payment page
-        Get.toNamed(Routes.PEMBAYARAN_SEWA, arguments: {'orderId': orderId});
+        Get.toNamed(
+          Routes.PEMBAYARAN_SEWA,
+          arguments: {
+            'orderId': orderId,
+            'isPaket': isPaket.value,
+            'paketId': isPaket.value ? paketId.value : null,
+            'initialTab': 2, // Direct to payment tab
+          },
+        );
       } else {
         // Show error message
         Get.snackbar(
@@ -2055,6 +2788,43 @@ class OrderSewaAsetController extends GetxController {
 
   // Validate booking inputs
   bool _validateBookingInputs() {
+    // For package orders, we need to validate differently
+    if (isPaket.value) {
+      if (selectedSatuanWaktu.value == null) {
+        _showError('Harap pilih satuan waktu terlebih dahulu');
+        return false;
+      }
+
+      // Check if package items are loaded
+      if (!isPaketItemsLoaded.value || paketItems.isEmpty) {
+        _showError('Data paket tidak tersedia. Silakan coba lagi.');
+        return false;
+      }
+
+      // Check if we're using hourly or daily rental
+      if (isDailyRental()) {
+        if (startDate.value == null || endDate.value == null) {
+          _showError('Harap pilih tanggal terlebih dahulu');
+          return false;
+        }
+      } else {
+        if (startHour.value == -1 || duration.value <= 0) {
+          _showError('Harap pilih waktu terlebih dahulu');
+          return false;
+        }
+      }
+
+      // Check if user is logged in
+      final userId = authProvider.getCurrentUserId();
+      if (userId == null) {
+        _showError('Anda belum login. Silakan login terlebih dahulu.');
+        return false;
+      }
+
+      return true;
+    }
+
+    // Regular asset validation
     if (selectedSatuanWaktu.value == null || aset.value == null) {
       _showError('Harap pilih satuan waktu terlebih dahulu');
       return false;
@@ -2098,6 +2868,13 @@ class OrderSewaAsetController extends GetxController {
   // Load all bookings for the next 30 days to determine available dates
   Future<void> loadAllBookings() async {
     try {
+      // Check if we're dealing with a package or a single asset
+      if (isPaket.value && paketItems.isNotEmpty) {
+        debugPrint('📦 Loading bookings for package items');
+        await loadAllPackageBookings();
+        return;
+      }
+
       debugPrint(
         '🔄 Loading all bookings for asset ${aset.value!.id} for the next 30 days',
       );
@@ -2360,5 +3137,404 @@ class OrderSewaAsetController extends GetxController {
     return date1.year == date2.year &&
         date1.month == date2.month &&
         date1.day == date2.day;
+  }
+
+  // Method to load package data
+  Future<void> loadPaketData(String id) async {
+    if (id.isEmpty) {
+      debugPrint('❌ Cannot load package: ID is empty');
+      isLoading.value = false;
+      hasError.value = true;
+      errorMessage.value = 'ID paket tidak valid';
+      return;
+    }
+
+    try {
+      isLoading.value = true;
+      hasError.value = false;
+      debugPrint('🔄 Loading package data with ID: $id');
+
+      // For packages, always set jumlahUnit to 1
+      jumlahUnit.value = 1;
+      debugPrint('📦 Package: Setting jumlahUnit to 1');
+
+      // Save current package ID to storage and explicitly set paketId.value
+      asetId.value = id; // We're reusing asetId for both assets and packages
+      paketId.value =
+          id; // Explicitly set paketId.value to ensure it's not empty
+      debugPrint('📦 Set paketId.value to: $id');
+
+      box.write('current_aset_id', id);
+      debugPrint(
+        '💾 Saved current paketId to GetStorage during loadPaketData: $id',
+      );
+
+      // Get package data from provider
+      final pakets = await asetProvider.getPakets();
+      final paketData = pakets.firstWhereOrNull((p) => p['id'] == id);
+
+      if (paketData != null) {
+        // Convert package data to AsetModel for compatibility
+        final convertedAset = AsetModel(
+          id: paketData['id'],
+          nama: paketData['nama'],
+          deskripsi: paketData['deskripsi'],
+          harga:
+              paketData['harga'] is num
+                  ? (paketData['harga'] as num).toInt()
+                  : 0,
+          kuantitas:
+              paketData['kuantitas'] is num
+                  ? (paketData['kuantitas'] as num).toInt()
+                  : 1,
+          kategori: 'paket',
+          status: paketData['status'] ?? 'tersedia',
+          createdAt:
+              paketData['created_at'] != null
+                  ? DateTime.parse(paketData['created_at'])
+                  : DateTime.now(),
+          updatedAt:
+              paketData['updated_at'] != null
+                  ? DateTime.parse(paketData['updated_at'])
+                  : DateTime.now(),
+        );
+
+        // Set satuan waktu sewa after creation
+        if (paketData['satuanWaktuSewa'] != null) {
+          final List<Map<String, dynamic>> satuanList =
+              List<Map<String, dynamic>>.from(paketData['satuanWaktuSewa']);
+          convertedAset.satuanWaktuSewa.clear();
+          convertedAset.satuanWaktuSewa.addAll(satuanList);
+        }
+
+        aset.value = convertedAset;
+        debugPrint('✅ Package loaded successfully: ${convertedAset.nama}');
+
+        // Set max unit to total quantity of the package
+        maxUnit.value = convertedAset.kuantitas ?? 1;
+        debugPrint('📊 Set max unit to: ${maxUnit.value}');
+
+        // Load package photos
+        await loadPaketPhotos(id);
+
+        // Load package items
+        await loadPaketItems(id);
+
+        // Load all bookings for the next 30 days to initialize availability data
+        await loadAllBookings();
+
+        // Find and select hourly option by default if exists
+        final hourlyOption = convertedAset.satuanWaktuSewa.firstWhereOrNull(
+          (element) =>
+              element['nama_satuan_waktu']?.toString().toLowerCase().contains(
+                'jam',
+              ) ??
+              false,
+        );
+
+        if (hourlyOption != null) {
+          debugPrint(
+            '✅ Selected hourly option: ${hourlyOption['nama_satuan_waktu']}',
+          );
+          selectSatuanWaktu(hourlyOption);
+        } else if (convertedAset.satuanWaktuSewa.isNotEmpty) {
+          // Otherwise select the first option if any exist
+          debugPrint(
+            '✅ Selected first available option: ${convertedAset.satuanWaktuSewa[0]['nama_satuan_waktu']}',
+          );
+          selectSatuanWaktu(convertedAset.satuanWaktuSewa[0]);
+        }
+      } else {
+        debugPrint('❌ Package with ID $id not found');
+        hasError.value = true;
+        errorMessage.value = 'Paket tidak ditemukan';
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading package: $e');
+      hasError.value = true;
+      errorMessage.value = 'Terjadi kesalahan: $e';
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // Load package photos
+  Future<void> loadPaketPhotos(String paketId) async {
+    try {
+      // Skip if we're trying to load photos for a different package than the current one
+      if (isPaket.value && this.paketId.value != paketId) {
+        debugPrint(
+          '⚠️ Skipping photo load for package $paketId as current package is ${this.paketId.value}',
+        );
+        return;
+      }
+
+      isPhotosLoading.value = true;
+      debugPrint(
+        '🔄 Starting to load photos for package ID: $paketId, current package ID: ${this.paketId.value}',
+      );
+
+      // Clear existing photos
+      assetPhotos.clear();
+      currentPhotoIndex.value = 0;
+
+      // Get photos from provider
+      final photos = await asetProvider.getFotoPaket(paketId);
+
+      // Filter out empty or null photos and remove duplicates
+      final Set<String> uniquePhotoUrls = {};
+      final List<String> validPhotos = [];
+
+      for (var photo in photos) {
+        if (photo != null &&
+            photo.isNotEmpty &&
+            !uniquePhotoUrls.contains(photo)) {
+          uniquePhotoUrls.add(photo);
+          validPhotos.add(photo);
+        }
+      }
+
+      debugPrint(
+        '📸 Found ${photos.length} total photos, ${validPhotos.length} unique valid photos for package $paketId',
+      );
+
+      if (validPhotos.isNotEmpty) {
+        // Convert to FotoAsetModel for compatibility with existing code
+        assetPhotos.addAll(
+          validPhotos.map(
+            (photo) => FotoAsetModel(
+              id: '${paketId}_${validPhotos.indexOf(photo)}',
+              idAset: paketId,
+              fotoAset: photo,
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+          ),
+        );
+        debugPrint(
+          '✅ Loaded ${assetPhotos.length} unique package photos for package $paketId',
+        );
+
+        // Ensure no duplicates in assetPhotos
+        ensureNoDuplicatePhotos();
+      } else {
+        debugPrint('⚠️ No valid photos found for package $paketId');
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading package photos for $paketId: $e');
+    } finally {
+      isPhotosLoading.value = false;
+      debugPrint(
+        '✅ Completed loading photos for package ID: $paketId, photo count: ${assetPhotos.length}',
+      );
+    }
+  }
+
+  // Load bookings for all assets in a package and calculate combined availability
+  Future<void> loadAllPackageBookings() async {
+    try {
+      debugPrint('📦 Loading bookings for all package items');
+
+      // Clear current inventory data
+      hourlyInventory.clear();
+      unavailableDatesForHourly.clear();
+
+      // Date range to check (today + 30 days)
+      final DateTime today = DateTime.now();
+      final DateTime endDate = today.add(const Duration(days: 30));
+
+      // Format dates for API
+      final String formattedStartDate = DateFormat('yyyy-MM-dd').format(today);
+      final String formattedEndDate = DateFormat('yyyy-MM-dd').format(endDate);
+
+      debugPrint(
+        '📅 Package: Fetching bookings from $formattedStartDate to $formattedEndDate',
+      );
+
+      // Initialize a combined inventory map to track availability across all package items
+      Map<String, Map<int, int>> combinedInventory = {};
+
+      // Initialize inventory for next 30 days, each with hours 0-23
+      // Start with "infinite" availability, we'll find the minimum later
+      for (int day = 0; day < 30; day++) {
+        final DateTime currentDate = today.add(Duration(days: day));
+        final String currentDateStr = DateFormat(
+          'yyyy-MM-dd',
+        ).format(currentDate);
+
+        // Initialize inventory for each hour of this day
+        Map<int, int> dayInventory = {};
+        for (int hour = 0; hour < 24; hour++) {
+          dayInventory[hour] = 999999; // Start with a high number
+        }
+
+        combinedInventory[currentDateStr] = dayInventory;
+      }
+
+      // Process each package item
+      for (int i = 0; i < paketItems.length; i++) {
+        final item = paketItems[i];
+        final asetData = item['aset'] as Map<String, dynamic>?;
+
+        if (asetData == null) {
+          debugPrint('⚠️ Package item $i has no asset data, skipping');
+          continue;
+        }
+
+        final String asetId = asetData['id'] ?? '';
+        final String asetName = asetData['nama'] ?? 'Unknown Asset';
+        final int requiredQuantity =
+            item['kuantitas'] is int ? item['kuantitas'] : 1;
+
+        if (asetId.isEmpty) {
+          debugPrint('⚠️ Package item $i has empty asset ID, skipping');
+          continue;
+        }
+
+        debugPrint('📦 Processing package item $i: $asetName (ID: $asetId)');
+        debugPrint('📦 Required quantity: $requiredQuantity');
+
+        // Get all bookings for this asset in the date range
+        final List<Map<String, dynamic>> bookings = await asetProvider
+            .getAsetDailyBookings(asetId, formattedStartDate, formattedEndDate);
+
+        debugPrint('📊 Found ${bookings.length} bookings for asset $asetName');
+
+        // Get the total quantity of this asset
+        final int totalAssetQuantity =
+            asetData['kuantitas'] is int ? asetData['kuantitas'] : 0;
+        debugPrint(
+          '📊 Total quantity for asset $asetName: $totalAssetQuantity',
+        );
+
+        // Create an inventory map for this specific asset
+        Map<String, Map<int, int>> assetInventory = {};
+
+        // Initialize inventory for next 30 days for this asset
+        for (int day = 0; day < 30; day++) {
+          final DateTime currentDate = today.add(Duration(days: day));
+          final String currentDateStr = DateFormat(
+            'yyyy-MM-dd',
+          ).format(currentDate);
+
+          // Initialize inventory for each hour of this day with full quantity
+          Map<int, int> dayInventory = {};
+          for (int hour = 0; hour < 24; hour++) {
+            dayInventory[hour] = totalAssetQuantity;
+          }
+
+          assetInventory[currentDateStr] = dayInventory;
+        }
+
+        // Process all bookings for this asset
+        if (bookings.isNotEmpty) {
+          // Sort bookings by start time
+          bookings.sort((a, b) {
+            final String startA = a['waktu_mulai'] ?? '';
+            final String startB = b['waktu_mulai'] ?? '';
+            return startA.compareTo(startB);
+          });
+
+          // Process each booking and adjust inventory
+          for (var booking in bookings) {
+            final String bookingId = booking['id'] ?? '';
+            final String status = booking['status'] ?? '';
+            final int bookingQuantity = booking['kuantitas'] ?? 1;
+
+            // Skip rejected bookings
+            if (status == 'ditolak') {
+              continue;
+            }
+
+            // Get start and end date-times
+            final String waktuMulaiStr = booking['waktu_mulai'] ?? '';
+            final String waktuSelesaiStr = booking['waktu_selesai'] ?? '';
+
+            if (waktuMulaiStr.isEmpty || waktuSelesaiStr.isEmpty) {
+              continue;
+            }
+
+            try {
+              final DateTime waktuMulai = DateTime.parse(waktuMulaiStr);
+              final DateTime waktuSelesai = DateTime.parse(waktuSelesaiStr);
+
+              // Calculate all date-hour combinations in the booking range
+              final List<DateTime> allDateHours = [];
+
+              // Add all hours from start to end
+              DateTime currentHour = DateTime(
+                waktuMulai.year,
+                waktuMulai.month,
+                waktuMulai.day,
+                waktuMulai.hour,
+              );
+
+              while (!currentHour.isAfter(waktuSelesai)) {
+                allDateHours.add(currentHour);
+                currentHour = currentHour.add(const Duration(hours: 1));
+              }
+
+              // Process each hour in the booking range to reduce inventory
+              for (DateTime dateHour in allDateHours) {
+                final String dateStr = DateFormat(
+                  'yyyy-MM-dd',
+                ).format(dateHour);
+                final int hour = dateHour.hour;
+
+                // Skip if outside our initialized inventory range
+                if (!assetInventory.containsKey(dateStr)) {
+                  continue;
+                }
+
+                // Reduce inventory for this hour
+                if (assetInventory[dateStr]!.containsKey(hour)) {
+                  final int previousQty = assetInventory[dateStr]![hour]!;
+                  assetInventory[dateStr]![hour] = math.max(
+                    0,
+                    previousQty - bookingQuantity,
+                  );
+                }
+              }
+            } catch (e) {
+              debugPrint('❌ Error processing booking $bookingId: $e');
+            }
+          }
+        }
+
+        // Now update the combined inventory based on this asset's availability
+        // For each date and hour, calculate how many complete package items can be booked
+        for (final dateStr in assetInventory.keys) {
+          for (final hour in assetInventory[dateStr]!.keys) {
+            // Calculate how many complete package items can be booked based on this asset
+            final int availableAssetQty = assetInventory[dateStr]![hour]!;
+            final int possiblePackages = availableAssetQty ~/ requiredQuantity;
+
+            // Update combined inventory with the minimum possible packages
+            combinedInventory[dateStr]![hour] = math.min(
+              combinedInventory[dateStr]![hour]!,
+              possiblePackages,
+            );
+          }
+        }
+      }
+
+      // Store the combined inventory in our controller
+      hourlyInventory.clear();
+      hourlyInventory.addAll(combinedInventory);
+
+      // Now determine which dates are fully booked (no available hours during business hours)
+      _identifyUnavailableDates();
+
+      debugPrint(
+        '✅ Completed loading all package item bookings and calculating availability',
+      );
+      debugPrint(
+        '🗓️ Total unavailable dates identified: ${unavailableDatesForHourly.length}',
+      );
+    } catch (e) {
+      debugPrint('❌ Error loading package bookings: $e');
+    } finally {
+      isLoadingBookings(false);
+    }
   }
 }

@@ -75,6 +75,15 @@ class AuthProvider extends GetxService {
     await client.auth.signOut();
   }
 
+  // Method to clear any cached data in the AuthProvider
+  void clearAuthData() {
+    // Clear any cached user data or state
+    // This method is called during logout to ensure all user-related data is cleared
+    debugPrint('Clearing AuthProvider cached data');
+    // Currently, signOut() handles most of the cleanup, but this method can be extended
+    // if additional cleanup is needed in the future
+  }
+
   User? get currentUser => client.auth.currentUser;
 
   Stream<AuthState> get authChanges => client.auth.onAuthStateChange;
@@ -415,28 +424,17 @@ class AuthProvider extends GetxService {
       final userData =
           await client
               .from('warga_desa')
-              .select('nomor_telepon, no_telepon, phone')
+              .select('no_hp')
               .eq('user_id', user.id)
               .maybeSingle();
 
       // Jika berhasil mendapatkan data, cek beberapa kemungkinan nama kolom
       if (userData != null) {
-        if (userData.containsKey('nomor_telepon')) {
-          final phone = userData['nomor_telepon']?.toString();
-          if (phone != null && phone.isNotEmpty) return phone;
-        }
-
-        if (userData.containsKey('no_telepon')) {
-          final phone = userData['no_telepon']?.toString();
-          if (phone != null && phone.isNotEmpty) return phone;
-        }
-
-        if (userData.containsKey('phone')) {
-          final phone = userData['phone']?.toString();
+        if (userData.containsKey('no_hp')) {
+          final phone = userData['no_hp']?.toString();
           if (phone != null && phone.isNotEmpty) return phone;
         }
       }
-
       // Fallback ke data dari Supabase Auth
       final userMetadata = user.userMetadata;
       if (userMetadata != null) {
@@ -496,6 +494,146 @@ class AuthProvider extends GetxService {
     }
   }
 
+  // Metode untuk mendapatkan tanggal lahir dari tabel warga_desa berdasarkan user_id
+  Future<String?> getUserTanggalLahir() async {
+    final user = currentUser;
+    if (user == null) {
+      debugPrint('No current user found when getting tanggal_lahir');
+      return null;
+    }
+
+    try {
+      debugPrint('Fetching tanggal_lahir for user_id: ${user.id}');
+
+      // Coba ambil tanggal lahir dari tabel warga_desa
+      final userData =
+          await client
+              .from('warga_desa')
+              .select('tanggal_lahir')
+              .eq('user_id', user.id)
+              .maybeSingle();
+
+      // Jika berhasil mendapatkan data
+      if (userData != null && userData.containsKey('tanggal_lahir')) {
+        final tanggalLahir = userData['tanggal_lahir']?.toString();
+        if (tanggalLahir != null && tanggalLahir.isNotEmpty) {
+          debugPrint('Found tanggal_lahir: $tanggalLahir');
+          return tanggalLahir;
+        }
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching user tanggal_lahir: $e');
+      return null;
+    }
+  }
+
+  // Metode untuk mendapatkan RT/RW dari tabel warga_desa berdasarkan user_id
+  Future<String?> getUserRtRw() async {
+    final user = currentUser;
+    if (user == null) {
+      debugPrint('No current user found when getting rt_rw');
+      return null;
+    }
+
+    try {
+      debugPrint('Fetching rt_rw for user_id: ${user.id}');
+
+      // Coba ambil RT/RW dari tabel warga_desa
+      final userData =
+          await client
+              .from('warga_desa')
+              .select('rt_rw')
+              .eq('user_id', user.id)
+              .maybeSingle();
+
+      // Jika berhasil mendapatkan data
+      if (userData != null && userData.containsKey('rt_rw')) {
+        final rtRw = userData['rt_rw']?.toString();
+        if (rtRw != null && rtRw.isNotEmpty) {
+          debugPrint('Found rt_rw: $rtRw');
+          return rtRw;
+        }
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching user rt_rw: $e');
+      return null;
+    }
+  }
+
+  // Metode untuk mendapatkan kelurahan/desa dari tabel warga_desa berdasarkan user_id
+  Future<String?> getUserKelurahanDesa() async {
+    final user = currentUser;
+    if (user == null) {
+      debugPrint('No current user found when getting kelurahan_desa');
+      return null;
+    }
+
+    try {
+      debugPrint('Fetching kelurahan_desa for user_id: ${user.id}');
+
+      // Coba ambil kelurahan/desa dari tabel warga_desa
+      final userData =
+          await client
+              .from('warga_desa')
+              .select('kelurahan_desa')
+              .eq('user_id', user.id)
+              .maybeSingle();
+
+      // Jika berhasil mendapatkan data
+      if (userData != null && userData.containsKey('kelurahan_desa')) {
+        final kelurahanDesa = userData['kelurahan_desa']?.toString();
+        if (kelurahanDesa != null && kelurahanDesa.isNotEmpty) {
+          debugPrint('Found kelurahan_desa: $kelurahanDesa');
+          return kelurahanDesa;
+        }
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching user kelurahan_desa: $e');
+      return null;
+    }
+  }
+
+  // Metode untuk mendapatkan kecamatan dari tabel warga_desa berdasarkan user_id
+  Future<String?> getUserKecamatan() async {
+    final user = currentUser;
+    if (user == null) {
+      debugPrint('No current user found when getting kecamatan');
+      return null;
+    }
+
+    try {
+      debugPrint('Fetching kecamatan for user_id: ${user.id}');
+
+      // Coba ambil kecamatan dari tabel warga_desa
+      final userData =
+          await client
+              .from('warga_desa')
+              .select('kecamatan')
+              .eq('user_id', user.id)
+              .maybeSingle();
+
+      // Jika berhasil mendapatkan data
+      if (userData != null && userData.containsKey('kecamatan')) {
+        final kecamatan = userData['kecamatan']?.toString();
+        if (kecamatan != null && kecamatan.isNotEmpty) {
+          debugPrint('Found kecamatan: $kecamatan');
+          return kecamatan;
+        }
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching user kecamatan: $e');
+      return null;
+    }
+  }
+
   // Mendapatkan data sewa_aset berdasarkan status (misal: MENUNGGU PEMBAYARAN, PEMBAYARANAN DENDA)
   Future<List<Map<String, dynamic>>> getSewaAsetByStatus(
     List<String> statuses,
@@ -507,28 +645,78 @@ class AuthProvider extends GetxService {
     }
     try {
       debugPrint(
-        'Fetching sewa_aset for user_id: \\${user.id} with statuses: \\${statuses.join(', ')}',
+        'Fetching sewa_aset for user_id: ${user.id} with statuses: ${statuses.join(', ')}',
       );
       // Supabase expects the IN filter as a comma-separated string in parentheses
       final statusString = '(${statuses.map((s) => '"$s"').join(',')})';
+
+      // Get sewa_aset records filtered by user_id and status
       final response = await client
           .from('sewa_aset')
           .select('*')
           .eq('user_id', user.id)
-          .filter('status', 'in', statusString);
-      debugPrint('Fetched sewa_aset count: \\${response.length}');
-      // Pastikan response adalah List
+          .filter('status', 'in', statusString)
+          .order('created_at', ascending: false);
+
+      debugPrint('Fetched sewa_aset count: ${response.length}');
+
+      // Process the response to handle package data
       if (response is List) {
-        return response
-            .map<Map<String, dynamic>>(
-              (item) => Map<String, dynamic>.from(item),
-            )
-            .toList();
+        final List<Map<String, dynamic>> processedResponse = [];
+
+        for (var item in response) {
+          final Map<String, dynamic> processedItem = Map<String, dynamic>.from(
+            item,
+          );
+
+          // If aset_id is null and paket_id is not null, fetch package data
+          if (item['aset_id'] == null && item['paket_id'] != null) {
+            final String paketId = item['paket_id'];
+            debugPrint(
+              'Found rental with paket_id: $paketId, fetching package details',
+            );
+
+            try {
+              // Get package name from paket table
+              final paketResponse =
+                  await client
+                      .from('paket')
+                      .select('nama')
+                      .eq('id', paketId)
+                      .maybeSingle();
+
+              if (paketResponse != null && paketResponse['nama'] != null) {
+                processedItem['nama_paket'] = paketResponse['nama'];
+                debugPrint('Found package name: ${paketResponse['nama']}');
+              }
+
+              // Get package photo from foto_aset table
+              final fotoResponse =
+                  await client
+                      .from('foto_aset')
+                      .select('foto_aset')
+                      .eq('id_paket', paketId)
+                      .limit(1)
+                      .maybeSingle();
+
+              if (fotoResponse != null && fotoResponse['foto_aset'] != null) {
+                processedItem['foto_paket'] = fotoResponse['foto_aset'];
+                debugPrint('Found package photo: ${fotoResponse['foto_aset']}');
+              }
+            } catch (e) {
+              debugPrint('Error fetching package details: $e');
+            }
+          }
+
+          processedResponse.add(processedItem);
+        }
+
+        return processedResponse;
       } else {
         return [];
       }
     } catch (e) {
-      debugPrint('Error fetching sewa_aset by status: \\${e.toString()}');
+      debugPrint('Error fetching sewa_aset by status: ${e.toString()}');
       return [];
     }
   }

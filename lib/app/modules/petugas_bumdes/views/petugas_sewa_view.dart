@@ -481,25 +481,26 @@ class _PetugasSewaViewState extends State<PetugasSewaView>
                       ),
                     ),
 
-                    // Price
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColorsPetugas.blueGrotto.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        controller.formatPrice(sewa.totalTagihan),
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppColorsPetugas.blueGrotto,
+                    // Price - only show if total_tagihan > 0
+                    if (sewa.totalTagihan > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColorsPetugas.blueGrotto.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          controller.formatPrice(sewa.totalTagihan),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppColorsPetugas.blueGrotto,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -574,7 +575,7 @@ class _PetugasSewaViewState extends State<PetugasSewaView>
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                '${sewa.waktuMulai.toIso8601String().substring(0, 10)} - ${sewa.waktuSelesai.toIso8601String().substring(0, 10)}',
+                                _formatDateRange(sewa),
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: AppColorsPetugas.textSecondary,
@@ -600,6 +601,37 @@ class _PetugasSewaViewState extends State<PetugasSewaView>
         ),
       ),
     );
+  }
+
+  String _formatDateRange(SewaModel sewa) {
+    final startDate = sewa.waktuMulai;
+    final endDate = sewa.waktuSelesai;
+
+    // Format dates as dd-mm-yyyy
+    String formattedStartDate =
+        '${startDate.day.toString().padLeft(2, '0')}-${startDate.month.toString().padLeft(2, '0')}-${startDate.year}';
+    String formattedEndDate =
+        '${endDate.day.toString().padLeft(2, '0')}-${endDate.month.toString().padLeft(2, '0')}-${endDate.year}';
+
+    // Check if rental unit is "jam" (hour)
+    if (sewa.namaSatuanWaktu?.toLowerCase() == 'jam') {
+      // Format as "dd-mm-yyyy icon jam 09.00-15.00"
+      String startTime =
+          '${startDate.hour.toString().padLeft(2, '0')}.${startDate.minute.toString().padLeft(2, '0')}';
+      String endTime =
+          '${endDate.hour.toString().padLeft(2, '0')}.${endDate.minute.toString().padLeft(2, '0')}';
+      return '$formattedStartDate ⏱ $startTime-$endTime';
+    }
+    // If same day but not hourly, just show the date
+    else if (startDate.day == endDate.day &&
+        startDate.month == endDate.month &&
+        startDate.year == endDate.year) {
+      return formattedStartDate;
+    }
+    // Different days - show date range
+    else {
+      return '$formattedStartDate - $formattedEndDate';
+    }
   }
 
   void _showFilterBottomSheet() {

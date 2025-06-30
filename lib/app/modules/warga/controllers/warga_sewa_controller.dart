@@ -133,6 +133,111 @@ class WargaSewaController extends GetxController
     super.onClose();
   }
 
+  // Helper method to process rental data
+  Future<Map<String, dynamic>> _processRentalData(
+    Map<String, dynamic> sewaAset,
+  ) async {
+    // Get asset details if aset_id is available
+    String assetName = 'Aset';
+    String? imageUrl;
+    String namaSatuanWaktu = sewaAset['nama_satuan_waktu'] ?? 'jam';
+
+    // Check if this is a package or single asset rental
+    bool isPaket = sewaAset['aset_id'] == null && sewaAset['paket_id'] != null;
+
+    if (isPaket) {
+      // Use package data that was fetched in getSewaAsetByStatus
+      assetName = sewaAset['nama_paket'] ?? 'Paket';
+      imageUrl = sewaAset['foto_paket'];
+      debugPrint(
+        'Using package data: name=${assetName}, imageUrl=${imageUrl ?? "none"}',
+      );
+    } else if (sewaAset['aset_id'] != null) {
+      // Regular asset rental
+      final asetData = await asetProvider.getAsetById(sewaAset['aset_id']);
+      if (asetData != null) {
+        assetName = asetData.nama;
+        imageUrl = asetData.imageUrl;
+      }
+    }
+
+    // Parse waktu mulai and waktu selesai
+    DateTime? waktuMulai;
+    DateTime? waktuSelesai;
+    String waktuSewa = '';
+    String tanggalSewa = '';
+    String jamMulai = '';
+    String jamSelesai = '';
+    String rentangWaktu = '';
+
+    if (sewaAset['waktu_mulai'] != null && sewaAset['waktu_selesai'] != null) {
+      waktuMulai = DateTime.parse(sewaAset['waktu_mulai']);
+      waktuSelesai = DateTime.parse(sewaAset['waktu_selesai']);
+
+      // Format for display
+      final formatTanggal = DateFormat('dd-MM-yyyy');
+      final formatWaktu = DateFormat('HH:mm');
+      final formatTanggalLengkap = DateFormat('dd MMMM yyyy', 'id_ID');
+
+      tanggalSewa = formatTanggalLengkap.format(waktuMulai);
+      jamMulai = formatWaktu.format(waktuMulai);
+      jamSelesai = formatWaktu.format(waktuSelesai);
+
+      // Format based on satuan waktu
+      if (namaSatuanWaktu.toLowerCase() == 'jam') {
+        // For hours, show time range on same day
+        rentangWaktu = '$jamMulai - $jamSelesai';
+      } else if (namaSatuanWaktu.toLowerCase() == 'hari') {
+        // For days, show date range
+        final tanggalMulai = formatTanggalLengkap.format(waktuMulai);
+        final tanggalSelesai = formatTanggalLengkap.format(waktuSelesai);
+        rentangWaktu = '$tanggalMulai - $tanggalSelesai';
+      } else {
+        // Default format
+        rentangWaktu = '$jamMulai - $jamSelesai';
+      }
+
+      // Full time format for waktuSewa
+      waktuSewa =
+          '${formatTanggal.format(waktuMulai)} | ${formatWaktu.format(waktuMulai)} - '
+          '${formatTanggal.format(waktuSelesai)} | ${formatWaktu.format(waktuSelesai)}';
+    }
+
+    // Format price
+    String totalPrice = 'Rp 0';
+    if (sewaAset['total'] != null) {
+      final formatter = NumberFormat.currency(
+        locale: 'id',
+        symbol: 'Rp ',
+        decimalDigits: 0,
+      );
+      totalPrice = formatter.format(sewaAset['total']);
+    }
+
+    // Return processed rental data
+    return {
+      'id': sewaAset['id'] ?? '',
+      'name': assetName,
+      'imageUrl': imageUrl ?? 'assets/images/gambar_pendukung.jpg',
+      'jumlahUnit': sewaAset['kuantitas'] ?? 0,
+      'waktuSewa': waktuSewa,
+      'duration': '${sewaAset['durasi'] ?? 0} ${namaSatuanWaktu}',
+      'status': sewaAset['status'] ?? '',
+      'totalPrice': totalPrice,
+      'countdown': '00:59:59', // Default countdown
+      'tanggalSewa': tanggalSewa,
+      'jamMulai': jamMulai,
+      'jamSelesai': jamSelesai,
+      'rentangWaktu': rentangWaktu,
+      'namaSatuanWaktu': namaSatuanWaktu,
+      'waktuMulai': sewaAset['waktu_mulai'],
+      'waktuSelesai': sewaAset['waktu_selesai'],
+      'updated_at': sewaAset['updated_at'],
+      'isPaket': isPaket,
+      'paketId': isPaket ? sewaAset['paket_id'] : null,
+    };
+  }
+
   // Load real data from sewa_aset table
   Future<void> loadRentalsData() async {
     try {
@@ -151,93 +256,9 @@ class WargaSewaController extends GetxController
 
       // Process each sewa_aset record
       for (var sewaAset in sewaAsetList) {
-        // Get asset details if aset_id is available
-        String assetName = 'Aset';
-        String? imageUrl;
-        String namaSatuanWaktu = sewaAset['nama_satuan_waktu'] ?? 'jam';
-
-        if (sewaAset['aset_id'] != null) {
-          final asetData = await asetProvider.getAsetById(sewaAset['aset_id']);
-          if (asetData != null) {
-            assetName = asetData.nama;
-            imageUrl = asetData.imageUrl;
-          }
-        }
-
-        // Parse waktu mulai and waktu selesai
-        DateTime? waktuMulai;
-        DateTime? waktuSelesai;
-        String waktuSewa = '';
-        String tanggalSewa = '';
-        String jamMulai = '';
-        String jamSelesai = '';
-        String rentangWaktu = '';
-
-        if (sewaAset['waktu_mulai'] != null &&
-            sewaAset['waktu_selesai'] != null) {
-          waktuMulai = DateTime.parse(sewaAset['waktu_mulai']);
-          waktuSelesai = DateTime.parse(sewaAset['waktu_selesai']);
-
-          // Format for display
-          final formatTanggal = DateFormat('dd-MM-yyyy');
-          final formatWaktu = DateFormat('HH:mm');
-          final formatTanggalLengkap = DateFormat('dd MMMM yyyy', 'id_ID');
-
-          tanggalSewa = formatTanggalLengkap.format(waktuMulai);
-          jamMulai = formatWaktu.format(waktuMulai);
-          jamSelesai = formatWaktu.format(waktuSelesai);
-
-          // Format based on satuan waktu
-          if (namaSatuanWaktu.toLowerCase() == 'jam') {
-            // For hours, show time range on same day
-            rentangWaktu = '$jamMulai - $jamSelesai';
-          } else if (namaSatuanWaktu.toLowerCase() == 'hari') {
-            // For days, show date range
-            final tanggalMulai = formatTanggalLengkap.format(waktuMulai);
-            final tanggalSelesai = formatTanggalLengkap.format(waktuSelesai);
-            rentangWaktu = '$tanggalMulai - $tanggalSelesai';
-          } else {
-            // Default format
-            rentangWaktu = '$jamMulai - $jamSelesai';
-          }
-
-          // Full time format for waktuSewa
-          waktuSewa =
-              '${formatTanggal.format(waktuMulai)} | ${formatWaktu.format(waktuMulai)} - '
-              '${formatTanggal.format(waktuSelesai)} | ${formatWaktu.format(waktuSelesai)}';
-        }
-
-        // Format price
-        String totalPrice = 'Rp 0';
-        if (sewaAset['total'] != null) {
-          final formatter = NumberFormat.currency(
-            locale: 'id',
-            symbol: 'Rp ',
-            decimalDigits: 0,
-          );
-          totalPrice = formatter.format(sewaAset['total']);
-        }
-
-        // Add to rentals list
-        rentals.add({
-          'id': sewaAset['id'] ?? '',
-          'name': assetName,
-          'imageUrl': imageUrl ?? 'assets/images/gambar_pendukung.jpg',
-          'jumlahUnit': sewaAset['kuantitas'] ?? 0,
-          'waktuSewa': waktuSewa,
-          'duration': '${sewaAset['durasi'] ?? 0} ${namaSatuanWaktu}',
-          'status': sewaAset['status'] ?? 'MENUNGGU PEMBAYARAN',
-          'totalPrice': totalPrice,
-          'countdown': '00:59:59', // Default countdown
-          'tanggalSewa': tanggalSewa,
-          'jamMulai': jamMulai,
-          'jamSelesai': jamSelesai,
-          'rentangWaktu': rentangWaktu,
-          'namaSatuanWaktu': namaSatuanWaktu,
-          'waktuMulai': sewaAset['waktu_mulai'],
-          'waktuSelesai': sewaAset['waktu_selesai'],
-          'updated_at': sewaAset['updated_at'],
-        });
+        final processedData = await _processRentalData(sewaAset);
+        processedData['status'] = sewaAset['status'] ?? 'MENUNGGU PEMBAYARAN';
+        rentals.add(processedData);
       }
 
       debugPrint('Processed ${rentals.length} rental records');
@@ -335,6 +356,23 @@ class WargaSewaController extends GetxController
     );
   }
 
+  // Navigate directly to payment tab of payment page with the selected rental data
+  void viewPaymentTab(Map<String, dynamic> rental) {
+    debugPrint('Navigating to payment tab with rental ID: ${rental['id']}');
+
+    // Navigate to payment page with rental data and initialTab set to 2 (payment tab)
+    Get.toNamed(
+      Routes.PEMBAYARAN_SEWA,
+      arguments: {
+        'orderId': rental['id'],
+        'rentalData': rental,
+        'initialTab': 2, // Index 2 corresponds to the payment tab
+        'isPaket': rental['isPaket'] ?? false,
+        'paketId': rental['paketId'],
+      },
+    );
+  }
+
   void payRental(String id) {
     Get.snackbar(
       'Info',
@@ -358,91 +396,9 @@ class WargaSewaController extends GetxController
 
       // Process each sewa_aset record
       for (var sewaAset in sewaAsetList) {
-        // Get asset details if aset_id is available
-        String assetName = 'Aset';
-        String? imageUrl;
-        String namaSatuanWaktu = sewaAset['nama_satuan_waktu'] ?? 'jam';
-
-        if (sewaAset['aset_id'] != null) {
-          final asetData = await asetProvider.getAsetById(sewaAset['aset_id']);
-          if (asetData != null) {
-            assetName = asetData.nama;
-            imageUrl = asetData.imageUrl;
-          }
-        }
-
-        // Parse waktu mulai and waktu selesai
-        DateTime? waktuMulai;
-        DateTime? waktuSelesai;
-        String waktuSewa = '';
-        String tanggalSewa = '';
-        String jamMulai = '';
-        String jamSelesai = '';
-        String rentangWaktu = '';
-
-        if (sewaAset['waktu_mulai'] != null &&
-            sewaAset['waktu_selesai'] != null) {
-          waktuMulai = DateTime.parse(sewaAset['waktu_mulai']);
-          waktuSelesai = DateTime.parse(sewaAset['waktu_selesai']);
-
-          // Format for display
-          final formatTanggal = DateFormat('dd-MM-yyyy');
-          final formatWaktu = DateFormat('HH:mm');
-          final formatTanggalLengkap = DateFormat('dd MMMM yyyy', 'id_ID');
-
-          tanggalSewa = formatTanggalLengkap.format(waktuMulai);
-          jamMulai = formatWaktu.format(waktuMulai);
-          jamSelesai = formatWaktu.format(waktuSelesai);
-
-          // Format based on satuan waktu
-          if (namaSatuanWaktu.toLowerCase() == 'jam') {
-            // For hours, show time range on same day
-            rentangWaktu = '$jamMulai - $jamSelesai';
-          } else if (namaSatuanWaktu.toLowerCase() == 'hari') {
-            // For days, show date range
-            final tanggalMulai = formatTanggalLengkap.format(waktuMulai);
-            final tanggalSelesai = formatTanggalLengkap.format(waktuSelesai);
-            rentangWaktu = '$tanggalMulai - $tanggalSelesai';
-          } else {
-            // Default format
-            rentangWaktu = '$jamMulai - $jamSelesai';
-          }
-
-          // Full time format for waktuSewa
-          waktuSewa =
-              '${formatTanggal.format(waktuMulai)} | ${formatWaktu.format(waktuMulai)} - '
-              '${formatTanggal.format(waktuSelesai)} | ${formatWaktu.format(waktuSelesai)}';
-        }
-
-        // Format price
-        String totalPrice = 'Rp 0';
-        if (sewaAset['total'] != null) {
-          final formatter = NumberFormat.currency(
-            locale: 'id',
-            symbol: 'Rp ',
-            decimalDigits: 0,
-          );
-          totalPrice = formatter.format(sewaAset['total']);
-        }
-
-        // Add to completed rentals list
-        completedRentals.add({
-          'id': sewaAset['id'] ?? '',
-          'name': assetName,
-          'imageUrl': imageUrl ?? 'assets/images/gambar_pendukung.jpg',
-          'jumlahUnit': sewaAset['kuantitas'] ?? 0,
-          'waktuSewa': waktuSewa,
-          'duration': '${sewaAset['durasi'] ?? 0} ${namaSatuanWaktu}',
-          'status': sewaAset['status'] ?? 'SELESAI',
-          'totalPrice': totalPrice,
-          'tanggalSewa': tanggalSewa,
-          'jamMulai': jamMulai,
-          'jamSelesai': jamSelesai,
-          'rentangWaktu': rentangWaktu,
-          'namaSatuanWaktu': namaSatuanWaktu,
-          'waktuMulai': sewaAset['waktu_mulai'],
-          'waktuSelesai': sewaAset['waktu_selesai'],
-        });
+        final processedData = await _processRentalData(sewaAset);
+        processedData['status'] = sewaAset['status'] ?? 'SELESAI';
+        completedRentals.add(processedData);
       }
 
       debugPrint(
@@ -472,92 +428,11 @@ class WargaSewaController extends GetxController
 
       // Process each sewa_aset record
       for (var sewaAset in sewaAsetList) {
-        // Get asset details if aset_id is available
-        String assetName = 'Aset';
-        String? imageUrl;
-        String namaSatuanWaktu = sewaAset['nama_satuan_waktu'] ?? 'jam';
-
-        if (sewaAset['aset_id'] != null) {
-          final asetData = await asetProvider.getAsetById(sewaAset['aset_id']);
-          if (asetData != null) {
-            assetName = asetData.nama;
-            imageUrl = asetData.imageUrl;
-          }
-        }
-
-        // Parse waktu mulai and waktu selesai
-        DateTime? waktuMulai;
-        DateTime? waktuSelesai;
-        String waktuSewa = '';
-        String tanggalSewa = '';
-        String jamMulai = '';
-        String jamSelesai = '';
-        String rentangWaktu = '';
-
-        if (sewaAset['waktu_mulai'] != null &&
-            sewaAset['waktu_selesai'] != null) {
-          waktuMulai = DateTime.parse(sewaAset['waktu_mulai']);
-          waktuSelesai = DateTime.parse(sewaAset['waktu_selesai']);
-
-          // Format for display
-          final formatTanggal = DateFormat('dd-MM-yyyy');
-          final formatWaktu = DateFormat('HH:mm');
-          final formatTanggalLengkap = DateFormat('dd MMMM yyyy', 'id_ID');
-
-          tanggalSewa = formatTanggalLengkap.format(waktuMulai);
-          jamMulai = formatWaktu.format(waktuMulai);
-          jamSelesai = formatWaktu.format(waktuSelesai);
-
-          // Format based on satuan waktu
-          if (namaSatuanWaktu.toLowerCase() == 'jam') {
-            // For hours, show time range on same day
-            rentangWaktu = '$jamMulai - $jamSelesai';
-          } else if (namaSatuanWaktu.toLowerCase() == 'hari') {
-            // For days, show date range
-            final tanggalMulai = formatTanggalLengkap.format(waktuMulai);
-            final tanggalSelesai = formatTanggalLengkap.format(waktuSelesai);
-            rentangWaktu = '$tanggalMulai - $tanggalSelesai';
-          } else {
-            // Default format
-            rentangWaktu = '$jamMulai - $jamSelesai';
-          }
-
-          // Full time format for waktuSewa
-          waktuSewa =
-              '${formatTanggal.format(waktuMulai)} | ${formatWaktu.format(waktuMulai)} - '
-              '${formatTanggal.format(waktuSelesai)} | ${formatWaktu.format(waktuSelesai)}';
-        }
-
-        // Format price
-        String totalPrice = 'Rp 0';
-        if (sewaAset['total'] != null) {
-          final formatter = NumberFormat.currency(
-            locale: 'id',
-            symbol: 'Rp ',
-            decimalDigits: 0,
-          );
-          totalPrice = formatter.format(sewaAset['total']);
-        }
-
-        // Add to cancelled rentals list
-        cancelledRentals.add({
-          'id': sewaAset['id'] ?? '',
-          'name': assetName,
-          'imageUrl': imageUrl ?? 'assets/images/gambar_pendukung.jpg',
-          'jumlahUnit': sewaAset['kuantitas'] ?? 0,
-          'waktuSewa': waktuSewa,
-          'duration': '${sewaAset['durasi'] ?? 0} ${namaSatuanWaktu}',
-          'status': sewaAset['status'] ?? 'DIBATALKAN',
-          'totalPrice': totalPrice,
-          'tanggalSewa': tanggalSewa,
-          'jamMulai': jamMulai,
-          'jamSelesai': jamSelesai,
-          'rentangWaktu': rentangWaktu,
-          'namaSatuanWaktu': namaSatuanWaktu,
-          'waktuMulai': sewaAset['waktu_mulai'],
-          'waktuSelesai': sewaAset['waktu_selesai'],
-          'alasanPembatalan': sewaAset['alasan_pembatalan'] ?? '-',
-        });
+        final processedData = await _processRentalData(sewaAset);
+        processedData['status'] = sewaAset['status'] ?? 'DIBATALKAN';
+        processedData['alasanPembatalan'] =
+            sewaAset['alasan_pembatalan'] ?? '-';
+        cancelledRentals.add(processedData);
       }
 
       debugPrint(
@@ -567,6 +442,64 @@ class WargaSewaController extends GetxController
       debugPrint('Error loading cancelled rentals data: $e');
     } finally {
       isLoadingCancelled.value = false;
+    }
+  }
+
+  // Load data for the Dikembalikan tab (status: DIKEMBALIKAN)
+  Future<void> loadReturnedRentals() async {
+    try {
+      isLoadingReturned.value = true;
+
+      // Clear existing data
+      returnedRentals.clear();
+
+      // Get sewa_aset data with status "DIKEMBALIKAN"
+      final sewaAsetList = await authProvider.getSewaAsetByStatus([
+        'DIKEMBALIKAN',
+      ]);
+
+      debugPrint('Fetched ${sewaAsetList.length} returned sewa_aset records');
+
+      // Process each sewa_aset record
+      for (var sewaAset in sewaAsetList) {
+        final processedData = await _processRentalData(sewaAset);
+        processedData['status'] = sewaAset['status'] ?? 'DIKEMBALIKAN';
+        returnedRentals.add(processedData);
+      }
+
+      debugPrint('Processed ${returnedRentals.length} returned rental records');
+    } catch (e) {
+      debugPrint('Error loading returned rentals data: $e');
+    } finally {
+      isLoadingReturned.value = false;
+    }
+  }
+
+  // Load data for the Aktif tab (status: AKTIF)
+  Future<void> loadActiveRentals() async {
+    try {
+      isLoadingActive.value = true;
+
+      // Clear existing data
+      activeRentals.clear();
+
+      // Get sewa_aset data with status "AKTIF"
+      final sewaAsetList = await authProvider.getSewaAsetByStatus(['AKTIF']);
+
+      debugPrint('Fetched ${sewaAsetList.length} active sewa_aset records');
+
+      // Process each sewa_aset record
+      for (var sewaAset in sewaAsetList) {
+        final processedData = await _processRentalData(sewaAset);
+        processedData['status'] = sewaAset['status'] ?? 'AKTIF';
+        activeRentals.add(processedData);
+      }
+
+      debugPrint('Processed ${activeRentals.length} active rental records');
+    } catch (e) {
+      debugPrint('Error loading active rentals data: $e');
+    } finally {
+      isLoadingActive.value = false;
     }
   }
 
@@ -588,91 +521,9 @@ class WargaSewaController extends GetxController
 
       // Process each sewa_aset record
       for (var sewaAset in sewaAsetList) {
-        // Get asset details if aset_id is available
-        String assetName = 'Aset';
-        String? imageUrl;
-        String namaSatuanWaktu = sewaAset['nama_satuan_waktu'] ?? 'jam';
-
-        if (sewaAset['aset_id'] != null) {
-          final asetData = await asetProvider.getAsetById(sewaAset['aset_id']);
-          if (asetData != null) {
-            assetName = asetData.nama;
-            imageUrl = asetData.imageUrl;
-          }
-        }
-
-        // Parse waktu mulai and waktu selesai
-        DateTime? waktuMulai;
-        DateTime? waktuSelesai;
-        String waktuSewa = '';
-        String tanggalSewa = '';
-        String jamMulai = '';
-        String jamSelesai = '';
-        String rentangWaktu = '';
-
-        if (sewaAset['waktu_mulai'] != null &&
-            sewaAset['waktu_selesai'] != null) {
-          waktuMulai = DateTime.parse(sewaAset['waktu_mulai']);
-          waktuSelesai = DateTime.parse(sewaAset['waktu_selesai']);
-
-          // Format for display
-          final formatTanggal = DateFormat('dd-MM-yyyy');
-          final formatWaktu = DateFormat('HH:mm');
-          final formatTanggalLengkap = DateFormat('dd MMMM yyyy', 'id_ID');
-
-          tanggalSewa = formatTanggalLengkap.format(waktuMulai);
-          jamMulai = formatWaktu.format(waktuMulai);
-          jamSelesai = formatWaktu.format(waktuSelesai);
-
-          // Format based on satuan waktu
-          if (namaSatuanWaktu.toLowerCase() == 'jam') {
-            // For hours, show time range on same day
-            rentangWaktu = '$jamMulai - $jamSelesai';
-          } else if (namaSatuanWaktu.toLowerCase() == 'hari') {
-            // For days, show date range
-            final tanggalMulai = formatTanggalLengkap.format(waktuMulai);
-            final tanggalSelesai = formatTanggalLengkap.format(waktuSelesai);
-            rentangWaktu = '$tanggalMulai - $tanggalSelesai';
-          } else {
-            // Default format
-            rentangWaktu = '$jamMulai - $jamSelesai';
-          }
-
-          // Full time format for waktuSewa
-          waktuSewa =
-              '${formatTanggal.format(waktuMulai)} | ${formatWaktu.format(waktuMulai)} - '
-              '${formatTanggal.format(waktuSelesai)} | ${formatWaktu.format(waktuSelesai)}';
-        }
-
-        // Format price
-        String totalPrice = 'Rp 0';
-        if (sewaAset['total'] != null) {
-          final formatter = NumberFormat.currency(
-            locale: 'id',
-            symbol: 'Rp ',
-            decimalDigits: 0,
-          );
-          totalPrice = formatter.format(sewaAset['total']);
-        }
-
-        // Add to pending rentals list
-        pendingRentals.add({
-          'id': sewaAset['id'] ?? '',
-          'name': assetName,
-          'imageUrl': imageUrl ?? 'assets/images/gambar_pendukung.jpg',
-          'jumlahUnit': sewaAset['kuantitas'] ?? 0,
-          'waktuSewa': waktuSewa,
-          'duration': '${sewaAset['durasi'] ?? 0} ${namaSatuanWaktu}',
-          'status': sewaAset['status'] ?? 'PERIKSA PEMBAYARAN',
-          'totalPrice': totalPrice,
-          'tanggalSewa': tanggalSewa,
-          'jamMulai': jamMulai,
-          'jamSelesai': jamSelesai,
-          'rentangWaktu': rentangWaktu,
-          'namaSatuanWaktu': namaSatuanWaktu,
-          'waktuMulai': sewaAset['waktu_mulai'],
-          'waktuSelesai': sewaAset['waktu_selesai'],
-        });
+        final processedData = await _processRentalData(sewaAset);
+        processedData['status'] = sewaAset['status'] ?? 'PERIKSA PEMBAYARAN';
+        pendingRentals.add(processedData);
       }
 
       debugPrint('Processed ${pendingRentals.length} pending rental records');
@@ -698,91 +549,9 @@ class WargaSewaController extends GetxController
 
       // Process each sewa_aset record
       for (var sewaAset in sewaAsetList) {
-        // Get asset details if aset_id is available
-        String assetName = 'Aset';
-        String? imageUrl;
-        String namaSatuanWaktu = sewaAset['nama_satuan_waktu'] ?? 'jam';
-
-        if (sewaAset['aset_id'] != null) {
-          final asetData = await asetProvider.getAsetById(sewaAset['aset_id']);
-          if (asetData != null) {
-            assetName = asetData.nama;
-            imageUrl = asetData.imageUrl;
-          }
-        }
-
-        // Parse waktu mulai and waktu selesai
-        DateTime? waktuMulai;
-        DateTime? waktuSelesai;
-        String waktuSewa = '';
-        String tanggalSewa = '';
-        String jamMulai = '';
-        String jamSelesai = '';
-        String rentangWaktu = '';
-
-        if (sewaAset['waktu_mulai'] != null &&
-            sewaAset['waktu_selesai'] != null) {
-          waktuMulai = DateTime.parse(sewaAset['waktu_mulai']);
-          waktuSelesai = DateTime.parse(sewaAset['waktu_selesai']);
-
-          // Format for display
-          final formatTanggal = DateFormat('dd-MM-yyyy');
-          final formatWaktu = DateFormat('HH:mm');
-          final formatTanggalLengkap = DateFormat('dd MMMM yyyy', 'id_ID');
-
-          tanggalSewa = formatTanggalLengkap.format(waktuMulai);
-          jamMulai = formatWaktu.format(waktuMulai);
-          jamSelesai = formatWaktu.format(waktuSelesai);
-
-          // Format based on satuan waktu
-          if (namaSatuanWaktu.toLowerCase() == 'jam') {
-            // For hours, show time range on same day
-            rentangWaktu = '$jamMulai - $jamSelesai';
-          } else if (namaSatuanWaktu.toLowerCase() == 'hari') {
-            // For days, show date range
-            final tanggalMulai = formatTanggalLengkap.format(waktuMulai);
-            final tanggalSelesai = formatTanggalLengkap.format(waktuSelesai);
-            rentangWaktu = '$tanggalMulai - $tanggalSelesai';
-          } else {
-            // Default format
-            rentangWaktu = '$jamMulai - $jamSelesai';
-          }
-
-          // Full time format for waktuSewa
-          waktuSewa =
-              '${formatTanggal.format(waktuMulai)} | ${formatWaktu.format(waktuMulai)} - '
-              '${formatTanggal.format(waktuSelesai)} | ${formatWaktu.format(waktuSelesai)}';
-        }
-
-        // Format price
-        String totalPrice = 'Rp 0';
-        if (sewaAset['total'] != null) {
-          final formatter = NumberFormat.currency(
-            locale: 'id',
-            symbol: 'Rp ',
-            decimalDigits: 0,
-          );
-          totalPrice = formatter.format(sewaAset['total']);
-        }
-
-        // Add to accepted rentals list
-        acceptedRentals.add({
-          'id': sewaAset['id'] ?? '',
-          'name': assetName,
-          'imageUrl': imageUrl ?? 'assets/images/gambar_pendukung.jpg',
-          'jumlahUnit': sewaAset['kuantitas'] ?? 0,
-          'waktuSewa': waktuSewa,
-          'duration': '${sewaAset['durasi'] ?? 0} ${namaSatuanWaktu}',
-          'status': sewaAset['status'] ?? 'DITERIMA',
-          'totalPrice': totalPrice,
-          'tanggalSewa': tanggalSewa,
-          'jamMulai': jamMulai,
-          'jamSelesai': jamSelesai,
-          'rentangWaktu': rentangWaktu,
-          'namaSatuanWaktu': namaSatuanWaktu,
-          'waktuMulai': sewaAset['waktu_mulai'],
-          'waktuSelesai': sewaAset['waktu_selesai'],
-        });
+        final processedData = await _processRentalData(sewaAset);
+        processedData['status'] = sewaAset['status'] ?? 'DITERIMA';
+        acceptedRentals.add(processedData);
       }
 
       debugPrint('Processed ${acceptedRentals.length} accepted rental records');
@@ -790,168 +559,6 @@ class WargaSewaController extends GetxController
       debugPrint('Error loading accepted rentals data: $e');
     } finally {
       isLoadingAccepted.value = false;
-    }
-  }
-
-  Future<void> loadReturnedRentals() async {
-    try {
-      isLoadingReturned.value = true;
-      returnedRentals.clear();
-      final sewaAsetList = await authProvider.getSewaAsetByStatus([
-        'DIKEMBALIKAN',
-      ]);
-      for (var sewaAset in sewaAsetList) {
-        String assetName = 'Aset';
-        String? imageUrl;
-        String namaSatuanWaktu = sewaAset['nama_satuan_waktu'] ?? 'jam';
-        if (sewaAset['aset_id'] != null) {
-          final asetData = await asetProvider.getAsetById(sewaAset['aset_id']);
-          if (asetData != null) {
-            assetName = asetData.nama;
-            imageUrl = asetData.imageUrl;
-          }
-        }
-        DateTime? waktuMulai;
-        DateTime? waktuSelesai;
-        String waktuSewa = '';
-        String tanggalSewa = '';
-        String jamMulai = '';
-        String jamSelesai = '';
-        String rentangWaktu = '';
-        if (sewaAset['waktu_mulai'] != null &&
-            sewaAset['waktu_selesai'] != null) {
-          waktuMulai = DateTime.parse(sewaAset['waktu_mulai']);
-          waktuSelesai = DateTime.parse(sewaAset['waktu_selesai']);
-          final formatTanggal = DateFormat('dd-MM-yyyy');
-          final formatWaktu = DateFormat('HH:mm');
-          final formatTanggalLengkap = DateFormat('dd MMMM yyyy', 'id_ID');
-          tanggalSewa = formatTanggalLengkap.format(waktuMulai);
-          jamMulai = formatWaktu.format(waktuMulai);
-          jamSelesai = formatWaktu.format(waktuSelesai);
-          if (namaSatuanWaktu.toLowerCase() == 'jam') {
-            rentangWaktu = '$jamMulai - $jamSelesai';
-          } else if (namaSatuanWaktu.toLowerCase() == 'hari') {
-            final tanggalMulai = formatTanggalLengkap.format(waktuMulai);
-            final tanggalSelesai = formatTanggalLengkap.format(waktuSelesai);
-            rentangWaktu = '$tanggalMulai - $tanggalSelesai';
-          } else {
-            rentangWaktu = '$jamMulai - $jamSelesai';
-          }
-          waktuSewa =
-              '${formatTanggal.format(waktuMulai)} | ${formatWaktu.format(waktuMulai)} - '
-              '${formatTanggal.format(waktuSelesai)} | ${formatWaktu.format(waktuSelesai)}';
-        }
-        String totalPrice = 'Rp 0';
-        if (sewaAset['total'] != null) {
-          final formatter = NumberFormat.currency(
-            locale: 'id',
-            symbol: 'Rp ',
-            decimalDigits: 0,
-          );
-          totalPrice = formatter.format(sewaAset['total']);
-        }
-        returnedRentals.add({
-          'id': sewaAset['id'] ?? '',
-          'name': assetName,
-          'imageUrl': imageUrl ?? 'assets/images/gambar_pendukung.jpg',
-          'jumlahUnit': sewaAset['kuantitas'] ?? 0,
-          'waktuSewa': waktuSewa,
-          'duration': '${sewaAset['durasi'] ?? 0} ${namaSatuanWaktu}',
-          'status': sewaAset['status'] ?? 'DIKEMBALIKAN',
-          'totalPrice': totalPrice,
-          'tanggalSewa': tanggalSewa,
-          'jamMulai': jamMulai,
-          'jamSelesai': jamSelesai,
-          'rentangWaktu': rentangWaktu,
-          'namaSatuanWaktu': namaSatuanWaktu,
-          'waktuMulai': sewaAset['waktu_mulai'],
-          'waktuSelesai': sewaAset['waktu_selesai'],
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading returned rentals data: $e');
-    } finally {
-      isLoadingReturned.value = false;
-    }
-  }
-
-  Future<void> loadActiveRentals() async {
-    try {
-      isLoadingActive.value = true;
-      activeRentals.clear();
-      final sewaAsetList = await authProvider.getSewaAsetByStatus(['AKTIF']);
-      for (var sewaAset in sewaAsetList) {
-        String assetName = 'Aset';
-        String? imageUrl;
-        String namaSatuanWaktu = sewaAset['nama_satuan_waktu'] ?? 'jam';
-        if (sewaAset['aset_id'] != null) {
-          final asetData = await asetProvider.getAsetById(sewaAset['aset_id']);
-          if (asetData != null) {
-            assetName = asetData.nama;
-            imageUrl = asetData.imageUrl;
-          }
-        }
-        DateTime? waktuMulai;
-        DateTime? waktuSelesai;
-        String waktuSewa = '';
-        String tanggalSewa = '';
-        String jamMulai = '';
-        String jamSelesai = '';
-        String rentangWaktu = '';
-        if (sewaAset['waktu_mulai'] != null &&
-            sewaAset['waktu_selesai'] != null) {
-          waktuMulai = DateTime.parse(sewaAset['waktu_mulai']);
-          waktuSelesai = DateTime.parse(sewaAset['waktu_selesai']);
-          final formatTanggal = DateFormat('dd-MM-yyyy');
-          final formatWaktu = DateFormat('HH:mm');
-          final formatTanggalLengkap = DateFormat('dd MMMM yyyy', 'id_ID');
-          tanggalSewa = formatTanggalLengkap.format(waktuMulai);
-          jamMulai = formatWaktu.format(waktuMulai);
-          jamSelesai = formatWaktu.format(waktuSelesai);
-          if (namaSatuanWaktu.toLowerCase() == 'jam') {
-            rentangWaktu = '$jamMulai - $jamSelesai';
-          } else if (namaSatuanWaktu.toLowerCase() == 'hari') {
-            final tanggalMulai = formatTanggalLengkap.format(waktuMulai);
-            final tanggalSelesai = formatTanggalLengkap.format(waktuSelesai);
-            rentangWaktu = '$tanggalMulai - $tanggalSelesai';
-          } else {
-            rentangWaktu = '$jamMulai - $jamSelesai';
-          }
-          waktuSewa =
-              '${formatTanggal.format(waktuMulai)} | ${formatWaktu.format(waktuMulai)} - '
-              '${formatTanggal.format(waktuSelesai)} | ${formatWaktu.format(waktuSelesai)}';
-        }
-        String totalPrice = 'Rp 0';
-        if (sewaAset['total'] != null) {
-          final formatter = NumberFormat.currency(
-            locale: 'id',
-            symbol: 'Rp ',
-            decimalDigits: 0,
-          );
-          totalPrice = formatter.format(sewaAset['total']);
-        }
-        activeRentals.add({
-          'id': sewaAset['id'] ?? '',
-          'name': assetName,
-          'imageUrl': imageUrl ?? 'assets/images/gambar_pendukung.jpg',
-          'jumlahUnit': sewaAset['kuantitas'] ?? 0,
-          'waktuSewa': waktuSewa,
-          'duration': '${sewaAset['durasi'] ?? 0} ${namaSatuanWaktu}',
-          'status': sewaAset['status'] ?? 'AKTIF',
-          'totalPrice': totalPrice,
-          'tanggalSewa': tanggalSewa,
-          'jamMulai': jamMulai,
-          'jamSelesai': jamSelesai,
-          'rentangWaktu': rentangWaktu,
-          'namaSatuanWaktu': namaSatuanWaktu,
-          'waktuMulai': sewaAset['waktu_mulai'],
-          'waktuSelesai': sewaAset['waktu_selesai'],
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading active rentals data: $e');
-    } finally {
-      isLoadingActive.value = false;
     }
   }
 }

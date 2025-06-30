@@ -1070,7 +1070,8 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
                 ),
               )
               : ((sewa.status == 'MENUNGGU PEMBAYARAN' ||
-                  sewa.status == 'PERIKSA PEMBAYARAN'))
+                  sewa.status == 'PERIKSA PEMBAYARAN' ||
+                  sewa.status == 'DITERIMA'))
               ? Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                 child: Row(
@@ -1078,14 +1079,68 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () async {
-                          controller.rejectSewa(sewa.id);
-                          await refreshSewaData();
-                          Get.snackbar(
-                            'Sewa Dibatalkan',
-                            'Status sewa telah diubah menjadi DIBATALKAN',
-                            backgroundColor: Colors.red,
-                            colorText: Colors.white,
-                            snackPosition: SnackPosition.BOTTOM,
+                          // Show confirmation dialog
+                          showDialog(
+                            context: context,
+                            builder: (BuildContext context) {
+                              return AlertDialog(
+                                title: Text('Konfirmasi Pembatalan'),
+                                content: Text(
+                                  'Apakah Anda yakin ingin membatalkan sewa ini?',
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.of(
+                                        context,
+                                      ).pop(); // Close dialog
+                                    },
+                                    child: Text(
+                                      'Batal',
+                                      style: TextStyle(color: Colors.grey),
+                                    ),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      Navigator.of(
+                                        context,
+                                      ).pop(); // Close dialog
+
+                                      // Update status to DIBATALKAN
+                                      final asetProvider =
+                                          Get.find<AsetProvider>();
+                                      await asetProvider.updateSewaAsetStatus(
+                                        sewaAsetId: sewa.id,
+                                        status: 'DIBATALKAN',
+                                      );
+
+                                      // Update local state
+                                      controller.rejectSewa(sewa.id);
+                                      await refreshSewaData();
+
+                                      // Show success notification
+                                      Get.snackbar(
+                                        'Sewa Dibatalkan',
+                                        'Status sewa telah diubah menjadi DIBATALKAN',
+                                        backgroundColor: Colors.red,
+                                        colorText: Colors.white,
+                                        snackPosition: SnackPosition.BOTTOM,
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: Text('Konfirmasi'),
+                                  ),
+                                ],
+                              );
+                            },
                           );
                         },
                         style: ElevatedButton.styleFrom(
@@ -1275,7 +1330,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
     }
 
     // Always add cancel option if not already completed or canceled
-    if (status != 'Selesai' && status != 'Dibatalkan') {
+    if (status != 'SELESAI' && status != 'DIBATALKAN') {
       menuItems.add(
         PopupMenuItem(
           value: 'cancel',
@@ -1384,14 +1439,57 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
 
       case 'cancel':
         // Update status to "Dibatalkan"
-        controller.rejectSewa(sewa.id);
-        Get.back();
-        Get.snackbar(
-          'Sewa Dibatalkan',
-          'Sewa aset telah dibatalkan',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          snackPosition: SnackPosition.BOTTOM,
+        showDialog(
+          context: Get.context!,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Konfirmasi Pembatalan'),
+              content: Text('Apakah Anda yakin ingin membatalkan sewa ini?'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Close dialog
+                  },
+                  child: Text('Batal', style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.of(context).pop(); // Close dialog
+
+                    // Update status to DIBATALKAN
+                    final asetProvider = Get.find<AsetProvider>();
+                    await asetProvider.updateSewaAsetStatus(
+                      sewaAsetId: sewa.id,
+                      status: 'DIBATALKAN',
+                    );
+
+                    // Update local state
+                    controller.rejectSewa(sewa.id);
+                    await refreshSewaData();
+
+                    // Show success notification
+                    Get.snackbar(
+                      'Sewa Dibatalkan',
+                      'Status sewa telah diubah menjadi DIBATALKAN',
+                      backgroundColor: Colors.red,
+                      colorText: Colors.white,
+                      snackPosition: SnackPosition.BOTTOM,
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text('Konfirmasi'),
+                ),
+              ],
+            );
+          },
         );
         break;
     }

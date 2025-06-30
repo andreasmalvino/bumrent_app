@@ -5,122 +5,129 @@ import '../controllers/pembayaran_sewa_controller.dart';
 import 'package:intl/intl.dart';
 import '../../../theme/app_colors.dart';
 import 'dart:async';
+import '../../../routes/app_routes.dart';
 
 class PembayaranSewaView extends GetView<PembayaranSewaController> {
   const PembayaranSewaView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text(
-          'Detail Pesanan',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    return WillPopScope(
+      onWillPop: () async {
+        controller.onBackPressed();
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text(
+            'Detail Pesanan',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          centerTitle: true,
+          backgroundColor: AppColors.primary,
+          foregroundColor: AppColors.textOnPrimary,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => controller.onBackPressed(),
+          ),
         ),
-        centerTitle: true,
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textOnPrimary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Get.back(),
-        ),
-      ),
-      body: Column(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.shadow,
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
+        body: Column(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.shadow,
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 4),
+                decoration: const BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
                 ),
-              ],
-            ),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 4),
-              decoration: const BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
+                child: TabBar(
+                  controller: controller.tabController,
+                  labelColor: AppColors.primary,
+                  unselectedLabelColor: AppColors.textSecondary,
+                  indicatorColor: AppColors.primary,
+                  indicatorWeight: 3,
+                  indicatorSize: TabBarIndicatorSize.label,
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.normal,
+                    fontSize: 14,
+                  ),
+                  tabs: const [
+                    Tab(text: 'Ringkasan'),
+                    Tab(text: 'Detail Tagihan'),
+                    Tab(text: 'Pembayaran'),
+                  ],
                 ),
               ),
-              child: TabBar(
+            ),
+            Expanded(
+              child: TabBarView(
                 controller: controller.tabController,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.textSecondary,
-                indicatorColor: AppColors.primary,
-                indicatorWeight: 3,
-                indicatorSize: TabBarIndicatorSize.label,
-                labelStyle: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-                unselectedLabelStyle: const TextStyle(
-                  fontWeight: FontWeight.normal,
-                  fontSize: 14,
-                ),
-                tabs: const [
-                  Tab(text: 'Ringkasan'),
-                  Tab(text: 'Detail Tagihan'),
-                  Tab(text: 'Pembayaran'),
+                children: [
+                  _buildSummaryTab(),
+                  _buildBillingTab(),
+                  _buildPaymentTab(),
                 ],
               ),
             ),
-          ),
-          Expanded(
-            child: TabBarView(
-              controller: controller.tabController,
-              children: [
-                _buildSummaryTab(),
-                _buildBillingTab(),
-                _buildPaymentTab(),
-              ],
-            ),
-          ),
-          if ((controller.orderDetails.value['status'] ?? '')
-                      .toString()
-                      .toUpperCase() ==
-                  'MENUNGGU PEMBAYARAN' &&
-              controller.orderDetails.value['updated_at'] != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Obx(() {
-                final status =
-                    (controller.orderDetails.value['status'] ?? '')
+            if ((controller.orderDetails.value['status'] ?? '')
                         .toString()
-                        .toUpperCase();
-                final updatedAtStr =
-                    controller.orderDetails.value['updated_at'];
-                print('DEBUG status: ' + status);
-                print(
-                  'DEBUG updated_at (raw): ' +
-                      (updatedAtStr?.toString() ?? 'NULL'),
-                );
-                if (status == 'MENUNGGU PEMBAYARAN' && updatedAtStr != null) {
-                  try {
-                    final updatedAt = DateTime.parse(updatedAtStr);
-                    print(
-                      'DEBUG updated_at (parsed): ' +
-                          updatedAt.toIso8601String(),
-                    );
-                    return CountdownTimerWidget(updatedAt: updatedAt);
-                  } catch (e) {
-                    print('ERROR parsing updated_at: ' + e.toString());
-                    return Text(
-                      'Format tanggal salah',
-                      style: TextStyle(color: Colors.red),
-                    );
+                        .toUpperCase() ==
+                    'MENUNGGU PEMBAYARAN' &&
+                controller.orderDetails.value['updated_at'] != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Obx(() {
+                  final status =
+                      (controller.orderDetails.value['status'] ?? '')
+                          .toString()
+                          .toUpperCase();
+                  final updatedAtStr =
+                      controller.orderDetails.value['updated_at'];
+                  print('DEBUG status: ' + status);
+                  print(
+                    'DEBUG updated_at (raw): ' +
+                        (updatedAtStr?.toString() ?? 'NULL'),
+                  );
+                  if (status == 'MENUNGGU PEMBAYARAN' && updatedAtStr != null) {
+                    try {
+                      final updatedAt = DateTime.parse(updatedAtStr);
+                      print(
+                        'DEBUG updated_at (parsed): ' +
+                            updatedAt.toIso8601String(),
+                      );
+                      return CountdownTimerWidget(updatedAt: updatedAt);
+                    } catch (e) {
+                      print('ERROR parsing updated_at: ' + e.toString());
+                      return Text(
+                        'Format tanggal salah',
+                        style: TextStyle(color: Colors.red),
+                      );
+                    }
                   }
-                }
-                return SizedBox.shrink();
-              }),
-            ),
-        ],
+                  return SizedBox.shrink();
+                }),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -683,7 +690,11 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                   // Item name from aset.nama
                   _buildDetailItem(
                     'Item',
-                    controller.sewaAsetDetails.value['aset_detail'] != null
+                    controller.isPaket.value &&
+                            controller.paketDetails.value.isNotEmpty
+                        ? controller.paketDetails.value['nama'] ?? 'Paket'
+                        : controller.sewaAsetDetails.value['aset_detail'] !=
+                            null
                         ? controller
                                 .sewaAsetDetails
                                 .value['aset_detail']['nama'] ??
@@ -692,6 +703,10 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                             controller.orderDetails.value['item_name'] ??
                             '-',
                   ),
+
+                  // If this is a package, show package items
+                  if (controller.isPaket.value) _buildPackageItemsList(),
+
                   // Quantity from sewa_aset.kuantitas
                   _buildDetailItem(
                     'Jumlah',
@@ -2461,6 +2476,94 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
       debugPrint('❌ Error formatting date time: $e');
       return dateTimeStr;
     }
+  }
+
+  // If this is a package, show package items
+  Widget _buildPackageItemsList() {
+    return Obx(() {
+      if (!controller.isPaketItemsLoaded.value) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.deepPurple,
+            ),
+          ),
+        );
+      }
+
+      if (controller.paketItems.isEmpty) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Text(
+            'Tidak ada item dalam paket ini',
+            style: TextStyle(
+              fontStyle: FontStyle.italic,
+              color: Colors.grey[600],
+            ),
+          ),
+        );
+      }
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
+              child: Text(
+                'Isi Paket:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.deepPurple,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(8.0),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Column(
+                children:
+                    controller.paketItems.map((item) {
+                      final asetData = item['aset'] as Map<String, dynamic>?;
+                      final String asetName =
+                          asetData?['nama'] ?? 'Aset tidak diketahui';
+                      final int quantity =
+                          item['kuantitas'] is int ? item['kuantitas'] : 1;
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4.0),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.circle,
+                              size: 8,
+                              color: Colors.deepPurple,
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '$asetName ($quantity unit)',
+                                style: TextStyle(fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
   }
 }
 

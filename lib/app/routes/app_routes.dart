@@ -27,9 +27,12 @@ abstract class Routes {
   static const LANGGANAN_ASET = '/langganan-aset';
 
   // Petugas BUMDes Features
+  static const PETUGAS_BUMDES = '/petugas-bumdes';
   static const PETUGAS_ASET = '/petugas-aset';
   static const PETUGAS_PAKET = '/petugas-paket';
   static const PETUGAS_SEWA = '/petugas-sewa';
+  static const PETUGAS_PENYEWA = '/petugas-penyewa';
+  static const PETUGAS_DETAIL_PENYEWA = '/petugas-detail-penyewa';
   static const PETUGAS_MANAJEMEN_BUMDES = '/petugas-manajemen-bumdes';
   static const PETUGAS_TAMBAH_ASET = '/petugas-tambah-aset';
   static const PETUGAS_TAMBAH_PAKET = '/petugas-tambah-paket';
@@ -37,8 +40,8 @@ abstract class Routes {
   static const LIST_PETUGAS_MITRA = '/list-petugas-mitra';
   static const LIST_PELANGGAN_AKTIF = '/list-pelanggan-aktif';
   static const LIST_TAGIHAN_PERIODE = '/list-tagihan-periode';
-  static const PETUGAS_LANGGANAN = '/petugas-langganan';
-  static const PETUGAS_TAGIHAN_LANGGANAN = '/petugas-tagihan-langganan';
+  static const PETUGAS_AKUN_BANK = '/petugas-akun-bank';
+  static const PETUGAS_LAPORAN = '/petugas-laporan';
 
   // Petugas Mitra Features
   static const PETUGAS_MITRA_DASHBOARD = '/petugas-mitra-dashboard';

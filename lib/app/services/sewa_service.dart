@@ -52,7 +52,9 @@ class SewaService {
     final tagihanData =
         await _supabase
                 .from('tagihan_sewa')
-                .select('sewa_aset_id, total_tagihan, denda, tagihan_dibayar')
+                .select(
+                  'sewa_aset_id, total_tagihan, denda, tagihan_dibayar, satuan_waktu',
+                )
                 .filter('sewa_aset_id', 'in', '(${sewaIds.join(",")})')
             as List<dynamic>;
     final Map<String, Map<String, dynamic>> mapTagihan = {
@@ -210,6 +212,7 @@ class SewaService {
           wargaNama: warga['nama'] ?? '-',
           wargaNoHp: warga['noHp'] ?? '-',
           wargaAvatar: warga['avatar'] ?? '-',
+          namaSatuanWaktu: tagihan['satuan_waktu'] as String?,
         ),
       );
     }

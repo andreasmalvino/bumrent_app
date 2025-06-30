@@ -39,23 +39,38 @@ class WargaSewaView extends GetView<WargaSewaController> {
           child: _buildTabBar(),
         ),
       ),
-      body: Column(
+      body: TabBarView(
+        controller: controller.tabController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        dragStartBehavior: DragStartBehavior.start,
         children: [
-          Expanded(
-            child: TabBarView(
-              controller: controller.tabController,
-              physics: const PageScrollPhysics(),
-              dragStartBehavior: DragStartBehavior.start,
-              children: [
-                _buildBelumBayarTab(),
-                _buildPendingTab(),
-                _buildDiterimaTab(),
-                _buildAktifTab(),
-                _buildDikembalikanTab(),
-                _buildSelesaiTab(),
-                _buildDibatalkanTab(),
-              ],
-            ),
+          RefreshIndicator(
+            onRefresh: controller.loadRentalsData,
+            child: _buildBelumBayarTab(),
+          ),
+          RefreshIndicator(
+            onRefresh: controller.loadRentalsData,
+            child: _buildPendingTab(),
+          ),
+          RefreshIndicator(
+            onRefresh: controller.loadRentalsData,
+            child: _buildDiterimaTab(),
+          ),
+          RefreshIndicator(
+            onRefresh: controller.loadRentalsData,
+            child: _buildAktifTab(),
+          ),
+          RefreshIndicator(
+            onRefresh: controller.loadRentalsData,
+            child: _buildDikembalikanTab(),
+          ),
+          RefreshIndicator(
+            onRefresh: controller.loadRentalsData,
+            child: _buildSelesaiTab(),
+          ),
+          RefreshIndicator(
+            onRefresh: controller.loadRentalsData,
+            child: _buildDibatalkanTab(),
           ),
         ],
       ),
@@ -147,74 +162,78 @@ class WargaSewaView extends GetView<WargaSewaController> {
   }
 
   Widget _buildPendingTab() {
-    return Obx(() {
-      // Show loading indicator while fetching data
-      if (controller.isLoadingPending.value) {
-        return const Center(child: CircularProgressIndicator());
-      }
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Obx(() {
+          // Show loading indicator while fetching data
+          if (controller.isLoadingPending.value) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-      // Check if there is any data to display
-      if (controller.pendingRentals.isNotEmpty) {
-        return SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children:
-                controller.pendingRentals
-                    .map(
-                      (rental) => Padding(
-                        padding: const EdgeInsets.only(bottom: 16.0),
-                        child: _buildUnpaidRentalCard(rental),
-                      ),
-                    )
-                    .toList(),
-          ),
-        );
-      }
+          // Check if there is any data to display
+          if (controller.pendingRentals.isNotEmpty) {
+            return Column(
+              children:
+                  controller.pendingRentals
+                      .map(
+                        (rental) => Padding(
+                          padding: const EdgeInsets.only(bottom: 16.0),
+                          child: _buildUnpaidRentalCard(rental),
+                        ),
+                      )
+                      .toList(),
+            );
+          }
 
-      // Return empty state if no data
-      return _buildTabContent(
-        icon: Icons.pending_actions,
-        title: 'Tidak ada pembayaran yang sedang diperiksa',
-        subtitle: 'Tidak ada sewa yang sedang dalam verifikasi pembayaran',
-        buttonText: 'Sewa Sekarang',
-        onButtonPressed: () => controller.navigateToRentals(),
-        color: AppColors.warning,
-      );
-    });
+          // Return empty state if no data
+          return _buildTabContent(
+            icon: Icons.pending_actions,
+            title: 'Tidak ada pembayaran yang sedang diperiksa',
+            subtitle: 'Tidak ada sewa yang sedang dalam verifikasi pembayaran',
+            buttonText: 'Sewa Sekarang',
+            onButtonPressed: () => controller.navigateToRentals(),
+            color: AppColors.warning,
+          );
+        }),
+      ),
+    );
   }
 
   Widget _buildAktifTab() {
-    return Obx(() {
-      if (controller.isLoadingActive.value) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      if (controller.activeRentals.isEmpty) {
-        return _buildTabContent(
-          icon: Icons.play_circle_outline,
-          title: 'Tidak ada sewa aktif',
-          subtitle: 'Sewa yang sedang berlangsung akan muncul di sini',
-          buttonText: 'Sewa Sekarang',
-          onButtonPressed: () => controller.navigateToRentals(),
-          color: Colors.blue,
-        );
-      }
-      return SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children:
-              controller.activeRentals
-                  .map(
-                    (rental) => Padding(
-                      padding: const EdgeInsets.only(bottom: 16.0),
-                      child: _buildAktifRentalCard(rental),
-                    ),
-                  )
-                  .toList(),
-        ),
-      );
-    });
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Obx(() {
+          if (controller.isLoadingActive.value) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (controller.activeRentals.isEmpty) {
+            return _buildTabContent(
+              icon: Icons.play_circle_outline,
+              title: 'Tidak ada sewa aktif',
+              subtitle: 'Sewa yang sedang berlangsung akan muncul di sini',
+              buttonText: 'Sewa Sekarang',
+              onButtonPressed: () => controller.navigateToRentals(),
+              color: Colors.blue,
+            );
+          }
+          return Column(
+            children:
+                controller.activeRentals
+                    .map(
+                      (rental) => Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: _buildAktifRentalCard(rental),
+                      ),
+                    )
+                    .toList(),
+          );
+        }),
+      ),
+    );
   }
 
   Widget _buildAktifRentalCard(Map<String, dynamic> rental) {
@@ -365,46 +384,48 @@ class WargaSewaView extends GetView<WargaSewaController> {
   }
 
   Widget _buildBelumBayarTab() {
-    return Obx(() {
-      // Show loading indicator while fetching data
-      if (controller.isLoading.value) {
-        return const Center(child: CircularProgressIndicator());
-      }
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Obx(() {
+          // Show loading indicator while fetching data
+          if (controller.isLoading.value) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-      // Check if there is any data to display
-      if (controller.rentals.isNotEmpty) {
-        return SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              // Build a card for each rental item
-              ...controller.rentals
-                  .map(
-                    (rental) => Column(
-                      children: [
-                        _buildUnpaidRentalCard(rental),
-                        const SizedBox(height: 20),
-                      ],
-                    ),
-                  )
-                  .toList(),
-              _buildTipsSection(),
-            ],
-          ),
-        );
-      }
+          // Check if there is any data to display
+          if (controller.rentals.isNotEmpty) {
+            return Column(
+              children: [
+                // Build a card for each rental item
+                ...controller.rentals
+                    .map(
+                      (rental) => Column(
+                        children: [
+                          _buildUnpaidRentalCard(rental),
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    )
+                    .toList(),
+                _buildTipsSection(),
+              ],
+            );
+          }
 
-      // Return empty state if no data
-      return _buildTabContent(
-        icon: Icons.payment_outlined,
-        title: 'Belum ada pembayaran',
-        subtitle: 'Tidak ada sewa yang menunggu pembayaran',
-        buttonText: 'Sewa Sekarang',
-        onButtonPressed: () => controller.navigateToRentals(),
-        color: AppColors.primary,
-      );
-    });
+          // Return empty state if no data
+          return _buildTabContent(
+            icon: Icons.payment_outlined,
+            title: 'Belum ada pembayaran',
+            subtitle: 'Tidak ada sewa yang menunggu pembayaran',
+            buttonText: 'Sewa Sekarang',
+            onButtonPressed: () => controller.navigateToRentals(),
+            color: AppColors.primary,
+          );
+        }),
+      ),
+    );
   }
 
   Widget _buildUnpaidRentalCard(Map<String, dynamic> rental) {
@@ -592,7 +613,7 @@ class WargaSewaView extends GetView<WargaSewaController> {
                 ),
                 // Pay button
                 ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () => controller.viewPaymentTab(rental),
                   style: ElevatedButton.styleFrom(
                     backgroundColor:
                         rental['status'] == 'PEMBAYARAN DENDA'
@@ -698,46 +719,48 @@ class WargaSewaView extends GetView<WargaSewaController> {
   }
 
   Widget _buildDiterimaTab() {
-    return Obx(() {
-      // Show loading indicator while fetching data
-      if (controller.isLoadingAccepted.value) {
-        return const Center(child: CircularProgressIndicator());
-      }
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Obx(() {
+          // Show loading indicator while fetching data
+          if (controller.isLoadingAccepted.value) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-      // Check if there is any data to display
-      if (controller.acceptedRentals.isNotEmpty) {
-        return SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              // Build a card for each accepted rental item
-              ...controller.acceptedRentals
-                  .map(
-                    (rental) => Column(
-                      children: [
-                        _buildDiterimaRentalCard(rental),
-                        const SizedBox(height: 20),
-                      ],
-                    ),
-                  )
-                  .toList(),
-              _buildTipsSectionDiterima(),
-            ],
-          ),
-        );
-      }
+          // Check if there is any data to display
+          if (controller.acceptedRentals.isNotEmpty) {
+            return Column(
+              children: [
+                // Build a card for each accepted rental item
+                ...controller.acceptedRentals
+                    .map(
+                      (rental) => Column(
+                        children: [
+                          _buildDiterimaRentalCard(rental),
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    )
+                    .toList(),
+                _buildTipsSectionDiterima(),
+              ],
+            );
+          }
 
-      // Return empty state if no data
-      return _buildTabContent(
-        icon: Icons.check_circle_outline,
-        title: 'Belum ada sewa diterima',
-        subtitle: 'Sewa yang sudah diterima akan muncul di sini',
-        buttonText: 'Sewa Sekarang',
-        onButtonPressed: () => controller.navigateToRentals(),
-        color: AppColors.success,
-      );
-    });
+          // Return empty state if no data
+          return _buildTabContent(
+            icon: Icons.check_circle_outline,
+            title: 'Belum ada sewa diterima',
+            subtitle: 'Sewa yang sudah diterima akan muncul di sini',
+            buttonText: 'Sewa Sekarang',
+            onButtonPressed: () => controller.navigateToRentals(),
+            color: AppColors.success,
+          );
+        }),
+      ),
+    );
   }
 
   Widget _buildDiterimaRentalCard(Map<String, dynamic> rental) {
@@ -947,43 +970,45 @@ class WargaSewaView extends GetView<WargaSewaController> {
   }
 
   Widget _buildSelesaiTab() {
-    return Obx(() {
-      if (controller.isLoadingCompleted.value) {
-        return const Center(
-          child: Padding(
-            padding: EdgeInsets.all(20.0),
-            child: CircularProgressIndicator(),
-          ),
-        );
-      }
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Obx(() {
+          if (controller.isLoadingCompleted.value) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
 
-      if (controller.completedRentals.isEmpty) {
-        return _buildTabContent(
-          icon: Icons.check_circle_outline,
-          title: 'Belum Ada Sewa Selesai',
-          subtitle: 'Anda belum memiliki riwayat sewa yang telah selesai',
-          buttonText: 'Lihat Aset',
-          onButtonPressed: () => Get.toNamed('/warga-aset'),
-          color: AppColors.info,
-        );
-      }
+          if (controller.completedRentals.isEmpty) {
+            return _buildTabContent(
+              icon: Icons.check_circle_outline,
+              title: 'Belum Ada Sewa Selesai',
+              subtitle: 'Anda belum memiliki riwayat sewa yang telah selesai',
+              buttonText: 'Lihat Aset',
+              onButtonPressed: () => Get.toNamed('/warga-aset'),
+              color: AppColors.info,
+            );
+          }
 
-      return SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children:
-              controller.completedRentals
-                  .map(
-                    (rental) => Padding(
-                      padding: const EdgeInsets.only(bottom: 16.0),
-                      child: _buildSelesaiRentalCard(rental),
-                    ),
-                  )
-                  .toList(),
-        ),
-      );
-    });
+          return Column(
+            children:
+                controller.completedRentals
+                    .map(
+                      (rental) => Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: _buildSelesaiRentalCard(rental),
+                      ),
+                    )
+                    .toList(),
+          );
+        }),
+      ),
+    );
   }
 
   Widget _buildSelesaiRentalCard(Map<String, dynamic> rental) {
@@ -1170,43 +1195,45 @@ class WargaSewaView extends GetView<WargaSewaController> {
   }
 
   Widget _buildDibatalkanTab() {
-    return Obx(() {
-      if (controller.isLoadingCancelled.value) {
-        return const Center(
-          child: Padding(
-            padding: EdgeInsets.all(20.0),
-            child: CircularProgressIndicator(),
-          ),
-        );
-      }
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Obx(() {
+          if (controller.isLoadingCancelled.value) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
 
-      if (controller.cancelledRentals.isEmpty) {
-        return _buildTabContent(
-          icon: Icons.cancel_outlined,
-          title: 'Belum Ada Sewa Dibatalkan',
-          subtitle: 'Anda belum memiliki riwayat sewa yang dibatalkan',
-          buttonText: 'Lihat Aset',
-          onButtonPressed: () => Get.toNamed('/warga-aset'),
-          color: AppColors.error,
-        );
-      }
+          if (controller.cancelledRentals.isEmpty) {
+            return _buildTabContent(
+              icon: Icons.cancel_outlined,
+              title: 'Belum Ada Sewa Dibatalkan',
+              subtitle: 'Anda belum memiliki riwayat sewa yang dibatalkan',
+              buttonText: 'Lihat Aset',
+              onButtonPressed: () => Get.toNamed('/warga-aset'),
+              color: AppColors.error,
+            );
+          }
 
-      return SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children:
-              controller.cancelledRentals
-                  .map(
-                    (rental) => Padding(
-                      padding: const EdgeInsets.only(bottom: 16.0),
-                      child: _buildDibatalkanRentalCard(rental),
-                    ),
-                  )
-                  .toList(),
-        ),
-      );
-    });
+          return Column(
+            children:
+                controller.cancelledRentals
+                    .map(
+                      (rental) => Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: _buildDibatalkanRentalCard(rental),
+                      ),
+                    )
+                    .toList(),
+          );
+        }),
+      ),
+    );
   }
 
   Widget _buildDibatalkanRentalCard(Map<String, dynamic> rental) {
@@ -1413,7 +1440,7 @@ class WargaSewaView extends GetView<WargaSewaController> {
     required Color color,
   }) {
     return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
+      physics: const AlwaysScrollableScrollPhysics(),
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
@@ -1634,41 +1661,43 @@ class WargaSewaView extends GetView<WargaSewaController> {
   }
 
   Widget _buildDikembalikanTab() {
-    return Obx(() {
-      if (controller.isLoadingReturned.value) {
-        return const Center(
-          child: Padding(
-            padding: EdgeInsets.all(20.0),
-            child: CircularProgressIndicator(),
-          ),
-        );
-      }
-      if (controller.returnedRentals.isEmpty) {
-        return _buildTabContent(
-          icon: Icons.assignment_return,
-          title: 'Belum Ada Sewa Dikembalikan',
-          subtitle: 'Sewa yang sudah dikembalikan akan muncul di sini',
-          buttonText: 'Lihat Aset',
-          onButtonPressed: () => Get.toNamed('/warga-aset'),
-          color: Colors.deepPurple,
-        );
-      }
-      return SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children:
-              controller.returnedRentals
-                  .map(
-                    (rental) => Padding(
-                      padding: const EdgeInsets.only(bottom: 16.0),
-                      child: _buildDikembalikanRentalCard(rental),
-                    ),
-                  )
-                  .toList(),
-        ),
-      );
-    });
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Obx(() {
+          if (controller.isLoadingReturned.value) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+          if (controller.returnedRentals.isEmpty) {
+            return _buildTabContent(
+              icon: Icons.assignment_return,
+              title: 'Belum Ada Sewa Dikembalikan',
+              subtitle: 'Sewa yang sudah dikembalikan akan muncul di sini',
+              buttonText: 'Lihat Aset',
+              onButtonPressed: () => Get.toNamed('/warga-aset'),
+              color: Colors.deepPurple,
+            );
+          }
+          return Column(
+            children:
+                controller.returnedRentals
+                    .map(
+                      (rental) => Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: _buildDikembalikanRentalCard(rental),
+                      ),
+                    )
+                    .toList(),
+          );
+        }),
+      ),
+    );
   }
 
   Widget _buildDikembalikanRentalCard(Map<String, dynamic> rental) {

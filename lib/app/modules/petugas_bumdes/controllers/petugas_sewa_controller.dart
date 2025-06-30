@@ -50,22 +50,24 @@ class PetugasSewaController extends GetxController {
   void _updateFilteredList() {
     filteredSewaList.value =
         sewaList.where((sewa) {
-          final query = searchQuery.value.toLowerCase();
-          // Apply search filter: nama warga, id pesanan, atau asetId
-          final matchesSearch =
-              sewa.wargaNama.toLowerCase().contains(query) ||
-              sewa.id.toLowerCase().contains(query) ||
-              (sewa.asetId != null &&
-                  sewa.asetId!.toLowerCase().contains(query));
+            final query = searchQuery.value.toLowerCase();
+            // Apply search filter: nama warga, id pesanan, atau asetId
+            final matchesSearch =
+                sewa.wargaNama.toLowerCase().contains(query) ||
+                sewa.id.toLowerCase().contains(query) ||
+                (sewa.asetId != null &&
+                    sewa.asetId!.toLowerCase().contains(query));
 
-          // Apply status filter if not 'Semua'
-          final matchesStatus =
-              selectedStatusFilter.value == 'Semua' ||
-              sewa.status.toUpperCase() ==
-                  selectedStatusFilter.value.toUpperCase();
+            // Apply status filter if not 'Semua'
+            final matchesStatus =
+                selectedStatusFilter.value == 'Semua' ||
+                sewa.status.toUpperCase() ==
+                    selectedStatusFilter.value.toUpperCase();
 
-          return matchesSearch && matchesStatus;
-        }).toList();
+            return matchesSearch && matchesStatus;
+          }).toList()
+          // Sort filtered results by tanggal_pemesanan in descending order (newest first)
+          ..sort((a, b) => b.tanggalPemesanan.compareTo(a.tanggalPemesanan));
   }
 
   // Load sewa data (mock data for now)
@@ -74,6 +76,8 @@ class PetugasSewaController extends GetxController {
 
     try {
       final data = await SewaService().fetchAllSewa();
+      // Sort data by tanggal_pemesanan in descending order (newest first)
+      data.sort((a, b) => b.tanggalPemesanan.compareTo(a.tanggalPemesanan));
       sewaList.assignAll(data);
     } catch (e) {
       print('Error loading sewa data: $e');
@@ -101,23 +105,27 @@ class PetugasSewaController extends GetxController {
   void resetFilters() {
     selectedStatusFilter.value = 'Semua';
     searchQuery.value = '';
-    filteredSewaList.value = sewaList;
+    // Assign a sorted copy of sewaList to filteredSewaList
+    filteredSewaList.value = List<SewaModel>.from(sewaList)
+      ..sort((a, b) => b.tanggalPemesanan.compareTo(a.tanggalPemesanan));
   }
 
   void applyFilters() {
     filteredSewaList.value =
         sewaList.where((sewa) {
-          bool matchesStatus =
-              selectedStatusFilter.value == 'Semua' ||
-              sewa.status.toUpperCase() ==
-                  selectedStatusFilter.value.toUpperCase();
-          bool matchesSearch =
-              searchQuery.value.isEmpty ||
-              sewa.wargaNama.toLowerCase().contains(
-                searchQuery.value.toLowerCase(),
-              );
-          return matchesStatus && matchesSearch;
-        }).toList();
+            bool matchesStatus =
+                selectedStatusFilter.value == 'Semua' ||
+                sewa.status.toUpperCase() ==
+                    selectedStatusFilter.value.toUpperCase();
+            bool matchesSearch =
+                searchQuery.value.isEmpty ||
+                sewa.wargaNama.toLowerCase().contains(
+                  searchQuery.value.toLowerCase(),
+                );
+            return matchesStatus && matchesSearch;
+          }).toList()
+          // Sort filtered results by tanggal_pemesanan in descending order (newest first)
+          ..sort((a, b) => b.tanggalPemesanan.compareTo(a.tanggalPemesanan));
   }
 
   // Format price to rupiah

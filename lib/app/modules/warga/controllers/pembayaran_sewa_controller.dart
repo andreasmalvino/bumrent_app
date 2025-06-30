@@ -59,6 +59,13 @@ class PembayaranSewaController extends GetxController
   final RxList<WebImageFile> imagesToDeleteTagihanAwal = <WebImageFile>[].obs;
   final RxList<WebImageFile> imagesToDeleteDenda = <WebImageFile>[].obs;
 
+  // Package related properties
+  final isPaket = false.obs;
+  final paketId = ''.obs;
+  final paketDetails = Rx<Map<String, dynamic>>({});
+  final paketItems = <Map<String, dynamic>>[].obs;
+  final isPaketItemsLoaded = false.obs;
+
   // Flag to track if there are changes that need to be saved
   final RxBool hasUnsavedChangesTagihanAwal = false.obs;
   final RxBool hasUnsavedChangesDenda = false.obs;
@@ -255,6 +262,24 @@ class PembayaranSewaController extends GetxController
       if (Get.arguments['orderId'] != null) {
         orderId.value = Get.arguments['orderId'];
 
+        // Get isPaket flag and paketId
+        isPaket.value = Get.arguments['isPaket'] == true;
+        if (isPaket.value && Get.arguments['paketId'] != null) {
+          paketId.value = Get.arguments['paketId'];
+          debugPrint(
+            '📦 This is a package order with paketId: ${paketId.value}',
+          );
+        }
+
+        // Set initial tab if specified
+        if (Get.arguments['initialTab'] != null) {
+          int initialTab = Get.arguments['initialTab'];
+          if (initialTab >= 0 && initialTab < tabController.length) {
+            debugPrint('Setting initial tab to: $initialTab');
+            tabController.animateTo(initialTab);
+          }
+        }
+
         // If rental data is passed, use it directly
         if (Get.arguments['rentalData'] != null) {
           Map<String, dynamic> rentalData = Get.arguments['rentalData'];
@@ -366,6 +391,11 @@ class PembayaranSewaController extends GetxController
             debugPrint(
               '✅ Sewa aset details loaded: ${sewaAsetDetails.value['id']}',
             );
+
+            // If this is a package order, load package details
+            if (isPaket.value && paketId.value.isNotEmpty) {
+              loadPaketDetails();
+            }
 
             // Debug all fields in the sewaAsetDetails
             debugPrint('📋 SEWA ASET DETAILS (COMPLETE DATA):');
@@ -1249,5 +1279,57 @@ class PembayaranSewaController extends GetxController
     }
 
     return Future.value();
+  }
+
+  // Load package details and items
+  Future<void> loadPaketDetails() async {
+    if (!isPaket.value || paketId.value.isEmpty) return;
+
+    try {
+      debugPrint('🔄 Loading package details for ID: ${paketId.value}');
+
+      // Get package details
+      final paketResponse =
+          await client
+              .from('paket')
+              .select('*')
+              .eq('id', paketId.value)
+              .maybeSingle();
+
+      if (paketResponse != null) {
+        paketDetails.value = paketResponse;
+        debugPrint('✅ Package details loaded: ${paketDetails.value['nama']}');
+      }
+
+      // Load package items
+      debugPrint('🔄 Loading package items for package ID: ${paketId.value}');
+      final itemsResponse = await client
+          .from('paket_item')
+          .select('*, aset(*)')
+          .eq('paket_id', paketId.value);
+
+      if (itemsResponse != null &&
+          itemsResponse is List &&
+          itemsResponse.isNotEmpty) {
+        paketItems.value = List<Map<String, dynamic>>.from(itemsResponse);
+        isPaketItemsLoaded.value = true;
+        debugPrint('✅ Loaded ${paketItems.length} package items');
+      } else {
+        paketItems.clear();
+        debugPrint('⚠️ No package items found');
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading package details: $e');
+    }
+  }
+
+  // Check if the sewa_aset table has the necessary columns
+
+  // Handle back button press - navigate to warga sewa page
+  void onBackPressed() {
+    debugPrint(
+      '🔙 Back button pressed in PembayaranSewaView - navigating to WargaSewa',
+    );
+    navigationService.toWargaSewa();
   }
 }

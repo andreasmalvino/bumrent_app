@@ -6,6 +6,7 @@ import '../widgets/petugas_bumdes_bottom_navbar.dart';
 import '../widgets/petugas_side_navbar.dart';
 import '../../../theme/app_colors_petugas.dart';
 import '../../../utils/format_utils.dart';
+import '../views/petugas_penyewa_view.dart';
 
 class PetugasBumdesDashboardView
     extends GetView<PetugasBumdesDashboardController> {
@@ -64,6 +65,8 @@ class PetugasBumdesDashboardView
       case 3:
         return 'Permintaan Sewa';
       case 4:
+        return 'Penyewa';
+      case 5:
         return 'Profil BUMDes';
       default:
         return 'Dashboard Petugas BUMDES';
@@ -81,6 +84,8 @@ class PetugasBumdesDashboardView
       case 3:
         return _buildSewaTab();
       case 4:
+        return const PetugasPenyewaView();
+      case 5:
         return _buildBumdesTab();
       default:
         return _buildDashboardTab();
@@ -94,6 +99,16 @@ class PetugasBumdesDashboardView
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildWelcomeCard(),
+          const SizedBox(height: 24),
+
+          // Tenant Statistics Section
+          _buildSectionHeader(
+            'Statistik Penyewa',
+            AppColorsPetugas.blueGrotto,
+            Icons.people_outline,
+          ),
+          _buildTenantStatistics(),
+
           const SizedBox(height: 24),
 
           // Detail Status Sewa Aset section with improved header
@@ -771,33 +786,29 @@ class PetugasBumdesDashboardView
   }
 
   Widget _buildRevenueSummary() {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: Obx(() {
-            final stats = controller.pembayaranStats;
-            final totalTunai = stats['totalTunai'] ?? 0.0;
-            return _buildRevenueQuickInfo(
-              'Tunai',
-              formatRupiah(totalTunai),
-              AppColorsPetugas.navyBlue,
-              Icons.payments,
-            );
-          }),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Obx(() {
-            final stats = controller.pembayaranStats;
-            final totalTransfer = stats['totalTransfer'] ?? 0.0;
-            return _buildRevenueQuickInfo(
-              'Transfer',
-              formatRupiah(totalTransfer),
-              AppColorsPetugas.blueGrotto,
-              Icons.account_balance,
-            );
-          }),
-        ),
+        Obx(() {
+          final stats = controller.pembayaranStats;
+          final totalTunai = stats['totalTunai'] ?? 0.0;
+          return _buildRevenueQuickInfo(
+            'Tunai',
+            formatRupiah(totalTunai),
+            AppColorsPetugas.navyBlue,
+            Icons.payments,
+          );
+        }),
+        const SizedBox(height: 12),
+        Obx(() {
+          final stats = controller.pembayaranStats;
+          final totalTransfer = stats['totalTransfer'] ?? 0.0;
+          return _buildRevenueQuickInfo(
+            'Transfer',
+            formatRupiah(totalTransfer),
+            AppColorsPetugas.blueGrotto,
+            Icons.account_balance,
+          );
+        }),
       ],
     );
   }
@@ -976,7 +987,13 @@ class PetugasBumdesDashboardView
                                     children: [
                                       Container(
                                         width: 35,
-                                        height: 170 * percentage,
+                                        height:
+                                            percentage.isNaN || percentage <= 0
+                                                ? 10.0
+                                                : (170 * percentage).clamp(
+                                                  10.0,
+                                                  170.0,
+                                                ),
                                         decoration: BoxDecoration(
                                           borderRadius:
                                               const BorderRadius.vertical(
@@ -1241,6 +1258,288 @@ class PetugasBumdesDashboardView
           ),
         ],
       ),
+    );
+  }
+
+  // New widget for tenant statistics
+  Widget _buildTenantStatistics() {
+    return Obx(() {
+      if (controller.isPenyewaStatsLoading.value) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(20.0),
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+
+      return Card(
+        elevation: 2,
+        shadowColor: AppColorsPetugas.shadowColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 16),
+              // Use LayoutBuilder to make the grid responsive
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return GridView.count(
+                    crossAxisCount: 3,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisSpacing: 14,
+                    mainAxisSpacing: 14,
+                    childAspectRatio: 0.75,
+                    children: [
+                      _buildTenantStatusItem(
+                        'Menunggu Verifikasi',
+                        controller.penyewaPendingCount.value.toString(),
+                        AppColorsPetugas.warning,
+                        Icons.pending_outlined,
+                      ),
+                      _buildTenantStatusItem(
+                        'Aktif',
+                        controller.penyewaActiveCount.value.toString(),
+                        AppColorsPetugas.success,
+                        Icons.check_circle_outline,
+                      ),
+                      _buildTenantStatusItem(
+                        'Ditangguhkan',
+                        controller.penyewaSuspendedCount.value.toString(),
+                        AppColorsPetugas.error,
+                        Icons.block_outlined,
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+              // Tenant distribution visualization
+              _buildTenantDistributionBar(),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _buildTenantStatusItem(
+    String title,
+    String value,
+    Color color,
+    IconData icon,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+        border: Border.all(color: color.withOpacity(0.1), width: 1),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 10,
+                height: 1.2,
+                color: AppColorsPetugas.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTenantDistributionBar() {
+    // Calculate the total count for all tenant statuses
+    final total = controller.penyewaTotalCount.value;
+
+    // Calculate percentages for each status (avoid division by zero)
+    final pendingPercent =
+        total > 0 ? controller.penyewaPendingCount.value / total : 0.0;
+    final activePercent =
+        total > 0 ? controller.penyewaActiveCount.value / total : 0.0;
+    final suspendedPercent =
+        total > 0 ? controller.penyewaSuspendedCount.value / total : 0.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Distribusi Status Penyewa',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppColorsPetugas.blueGrotto,
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Only show distribution bar if there are any tenants
+        if (total > 0)
+          Stack(
+            children: [
+              // Background for the progress bar
+              Container(
+                height: 12,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+              // Actual progress bar segments
+              Row(
+                children: [
+                  if (pendingPercent > 0)
+                    _buildProgressSegment(
+                      pendingPercent,
+                      AppColorsPetugas.warning,
+                      isFirst: true,
+                    ),
+                  if (activePercent > 0)
+                    _buildProgressSegment(
+                      activePercent,
+                      AppColorsPetugas.success,
+                    ),
+                  if (suspendedPercent > 0)
+                    _buildProgressSegment(
+                      suspendedPercent,
+                      AppColorsPetugas.error,
+                      isLast: true,
+                    ),
+                ],
+              ),
+            ],
+          )
+        else
+          Container(
+            height: 12,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Center(
+              child: Text(
+                'Belum ada data penyewa',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: AppColorsPetugas.textSecondary,
+                ),
+              ),
+            ),
+          ),
+        const SizedBox(height: 16),
+        // Use row layout for legends
+        Wrap(
+          spacing: 16,
+          runSpacing: 8,
+          children: [
+            if (pendingPercent > 0 || total == 0)
+              _buildStatusLegend(
+                'Menunggu Verifikasi',
+                AppColorsPetugas.warning,
+                pendingPercent,
+              ),
+            if (activePercent > 0 || total == 0)
+              _buildStatusLegend(
+                'Aktif',
+                AppColorsPetugas.success,
+                activePercent,
+              ),
+            if (suspendedPercent > 0 || total == 0)
+              _buildStatusLegend(
+                'Ditangguhkan',
+                AppColorsPetugas.error,
+                suspendedPercent,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgressSegment(
+    double percentage,
+    Color color, {
+    bool isFirst = false,
+    bool isLast = false,
+  }) {
+    final flex = (percentage * 100).round();
+    if (flex <= 0) return const SizedBox.shrink();
+
+    return Flexible(
+      flex: flex,
+      child: Container(
+        height: 12,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.horizontal(
+            left: isFirst ? const Radius.circular(6) : Radius.zero,
+            right: isLast ? const Radius.circular(6) : Radius.zero,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusLegend(String text, Color color, double percentage) {
+    final count = (percentage * 100).round();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          '$text ${count > 0 ? '($count%)' : ''}',
+          style: TextStyle(
+            fontSize: 10,
+            color: Colors.black87,
+            fontWeight: count > 20 ? FontWeight.w500 : FontWeight.normal,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -376,7 +376,6 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () => _showPaketDetails(context, paket),
             child: Row(
               children: [
                 // Paket image or icon
@@ -796,294 +795,104 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
     );
   }
 
-  void _showPaketDetails(BuildContext context, dynamic paket) {
-    // Handle both Map and PaketModel for backward compatibility
-    final isPaketModel = paket is PaketModel;
-    final String nama =
-        isPaketModel
-            ? paket.nama
-            : (paket['nama']?.toString() ?? 'Paket Tanpa Nama');
-    final String? deskripsi =
-        isPaketModel ? paket.deskripsi : paket['deskripsi']?.toString();
-    final bool isAvailable =
-        isPaketModel
-            ? (paket.kuantitas > 0)
-            : ((paket['kuantitas'] as int?) ?? 0) > 0;
-    final dynamic harga =
-        isPaketModel
-            ? (paket.satuanWaktuSewa.isNotEmpty
-                ? paket.satuanWaktuSewa.first['harga']
-                : paket.harga)
-            : (paket['harga'] ?? 0);
-    // Items are not part of the PaketModel, so we'll use an empty list
-    final List<Map<String, dynamic>> items = [];
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.75,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      nama,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColorsPetugas.navyBlue,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.close, color: AppColorsPetugas.blueGrotto),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: ListView(
-                  children: [
-                    Card(
-                      margin: EdgeInsets.zero,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildDetailItem(
-                              'Harga',
-                              'Rp ${_formatPrice(harga)}',
-                            ),
-                            _buildDetailItem(
-                              'Status',
-                              isAvailable ? 'Tersedia' : 'Tidak Tersedia',
-                            ),
-                            _buildDetailItem('Deskripsi', deskripsi ?? '-'),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Item dalam Paket',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColorsPetugas.navyBlue,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Card(
-                      margin: EdgeInsets.zero,
-                      child: ListView.separated(
-                        physics: const NeverScrollableScrollPhysics(),
-                        shrinkWrap: true,
-                        itemCount: items.length,
-                        separatorBuilder:
-                            (context, index) => const Divider(height: 1),
-                        itemBuilder: (context, index) {
-                          final item = items[index];
-                          return ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: AppColorsPetugas.babyBlue,
-                              child: Icon(
-                                Icons.inventory_2_outlined,
-                                color: AppColorsPetugas.blueGrotto,
-                                size: 16,
-                              ),
-                            ),
-                            title: Text(item['nama']),
-                            trailing: Text(
-                              '${item['jumlah']} unit',
-                              style: TextStyle(
-                                color: AppColorsPetugas.blueGrotto,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Get.toNamed(
-                          Routes.PETUGAS_TAMBAH_PAKET,
-                          arguments: paket,
-                        );
-                      },
-                      icon: const Icon(Icons.edit),
-                      label: const Text('Edit'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColorsPetugas.blueGrotto,
-                        side: BorderSide(color: AppColorsPetugas.blueGrotto),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _showDeleteConfirmation(context, paket);
-                      },
-                      icon: const Icon(Icons.delete),
-                      label: const Text('Hapus'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColorsPetugas.error,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDetailItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(fontSize: 14, color: AppColorsPetugas.blueGrotto),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: AppColorsPetugas.navyBlue,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAddEditPaketDialog(BuildContext context, {dynamic paket}) {
-    // Handle both Map and PaketModel for backward compatibility
-    final isPaketModel = paket is PaketModel;
-    final String? id = isPaketModel ? paket.id : paket?['id'];
-    final String title = id == null ? 'Tambah Paket' : 'Edit Paket';
-    final isEditing = paket != null;
-
-    // This would be implemented with proper form validation in a real app
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(
-            title,
-            style: TextStyle(color: AppColorsPetugas.navyBlue),
-          ),
-          content: const Text(
-            'Form pengelolaan paket akan ditampilkan di sini dengan field untuk nama, kategori, harga, deskripsi, status, dan item-item dalam paket.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Batal',
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                // In a real app, we would save the form data
-                Get.snackbar(
-                  isEditing ? 'Paket Diperbarui' : 'Paket Ditambahkan',
-                  isEditing
-                      ? 'Paket berhasil diperbarui'
-                      : 'Paket baru berhasil ditambahkan',
-                  backgroundColor: AppColorsPetugas.success,
-                  colorText: Colors.white,
-                  snackPosition: SnackPosition.BOTTOM,
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColorsPetugas.blueGrotto,
-              ),
-              child: Text(isEditing ? 'Simpan' : 'Tambah'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   void _showDeleteConfirmation(BuildContext context, dynamic paket) {
     // Handle both Map and PaketModel for backward compatibility
     final isPaketModel = paket is PaketModel;
     final String id = isPaketModel ? paket.id : (paket['id']?.toString() ?? '');
     final String nama =
         isPaketModel ? paket.nama : (paket['nama']?.toString() ?? 'Paket');
-
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text(
-            'Konfirmasi Hapus',
-            style: TextStyle(color: AppColorsPetugas.navyBlue),
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-          content: Text('Apakah Anda yakin ingin menghapus paket "$nama"?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Batal',
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Warning icon
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColorsPetugas.errorLight,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.delete_forever,
+                    color: AppColorsPetugas.error,
+                    size: 32,
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Title and message
+                Text(
+                  'Konfirmasi Hapus',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColorsPetugas.navyBlue,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                const SizedBox(height: 12),
+
+                Text(
+                  'Apakah Anda yakin ingin menghapus paket "$nama"? Tindakan ini tidak dapat dibatalkan.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColorsPetugas.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                const SizedBox(height: 24),
+
+                // Action buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColorsPetugas.textPrimary,
+                          side: BorderSide(color: AppColorsPetugas.divider),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Batal'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          controller.deletePaket(id);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColorsPetugas.error,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Hapus'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                controller.deletePaket(id);
-                Get.snackbar(
-                  'Paket Dihapus',
-                  'Paket berhasil dihapus dari sistem',
-                  backgroundColor: AppColorsPetugas.error,
-                  colorText: Colors.white,
-                  snackPosition: SnackPosition.BOTTOM,
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColorsPetugas.error,
-              ),
-              child: const Text('Hapus'),
-            ),
-          ],
+          ),
         );
       },
     );

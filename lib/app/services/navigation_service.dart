@@ -29,8 +29,14 @@ class NavigationService extends GetxService {
   }
 
   /// Navigasi ke halaman Order Sewa Aset dengan ID
-  Future<void> toOrderSewaAset(String asetId) async {
-    debugPrint('🧭 Navigating to OrderSewaAset with ID: $asetId');
+  Future<void> toOrderSewaAset(
+    String asetId, {
+    bool isAset = false,
+    bool isPaket = false,
+  }) async {
+    debugPrint(
+      '🧭 Navigating to OrderSewaAset with ID: $asetId, isAset: $isAset, isPaket: $isPaket',
+    );
     if (asetId.isEmpty) {
       Get.snackbar(
         'Error',
@@ -45,7 +51,7 @@ class NavigationService extends GetxService {
     // Navigasi dengan arguments
     Get.toNamed(
       Routes.ORDER_SEWA_ASET,
-      arguments: {'asetId': asetId},
+      arguments: {'asetId': asetId, 'isAset': isAset, 'isPaket': isPaket},
       preventDuplicates: false,
     );
   }
@@ -65,10 +71,7 @@ class NavigationService extends GetxService {
     }
 
     // Navigasi dengan arguments
-    Get.offAndToNamed(
-      Routes.PEMBAYARAN_SEWA,
-      arguments: {'sewaId': sewaId},
-    );
+    Get.offAndToNamed(Routes.PEMBAYARAN_SEWA, arguments: {'sewaId': sewaId});
   }
 
   /// Kembali ke halaman Sewa Aset
