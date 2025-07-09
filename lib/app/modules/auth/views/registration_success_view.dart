@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../theme/app_colors.dart';
 import 'package:flutter/rendering.dart';
+import '../../../routes/app_routes.dart';
 
 class RegistrationSuccessView extends StatefulWidget {
   const RegistrationSuccessView({Key? key}) : super(key: key);
@@ -284,7 +285,7 @@ class _RegistrationSuccessViewState extends State<RegistrationSuccessView>
                           Get.snackbar(
                             'Berhasil Disalin',
                             'Kode registrasi telah disalin ke clipboard',
-                            snackPosition: SnackPosition.BOTTOM,
+                            snackPosition: SnackPosition.TOP,
                             backgroundColor: AppColors.successLight,
                             colorText: AppColors.success,
                             margin: const EdgeInsets.all(16),
@@ -329,7 +330,7 @@ class _RegistrationSuccessViewState extends State<RegistrationSuccessView>
             child: ElevatedButton(
               onPressed: () {
                 // Navigate back to login page
-                Get.offAllNamed('/login');
+                Get.offNamed(Routes.LOGIN);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,

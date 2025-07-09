@@ -80,8 +80,18 @@ class AuthProvider extends GetxService {
     // Clear any cached user data or state
     // This method is called during logout to ensure all user-related data is cleared
     debugPrint('Clearing AuthProvider cached data');
-    // Currently, signOut() handles most of the cleanup, but this method can be extended
-    // if additional cleanup is needed in the future
+
+    // Explicitly clear any cached data that might be stored in the provider
+    // This is important to ensure no user data remains after logout or registration
+    try {
+      // Force refresh of the auth state
+      client.auth.refreshSession();
+
+      // Log the cleanup action
+      debugPrint('AuthProvider cached data cleared successfully');
+    } catch (e) {
+      debugPrint('Error clearing AuthProvider cached data: $e');
+    }
   }
 
   User? get currentUser => client.auth.currentUser;
@@ -667,6 +677,25 @@ class AuthProvider extends GetxService {
         for (var item in response) {
           final Map<String, dynamic> processedItem = Map<String, dynamic>.from(
             item,
+          );
+
+          // Ensure updated_at is not null, use created_at as fallback
+          if (processedItem['updated_at'] == null &&
+              processedItem['created_at'] != null) {
+            debugPrint('updated_at is null, using created_at as fallback');
+            processedItem['updated_at'] = processedItem['created_at'];
+          } else if (processedItem['updated_at'] == null &&
+              processedItem['created_at'] == null) {
+            // If both are null, use current timestamp as last resort
+            debugPrint(
+              'Both updated_at and created_at are null, using current timestamp',
+            );
+            processedItem['updated_at'] = DateTime.now().toIso8601String();
+          }
+
+          // Debug the updated_at field
+          debugPrint(
+            'updated_at after processing: ${processedItem['updated_at']}',
           );
 
           // If aset_id is null and paket_id is not null, fetch package data

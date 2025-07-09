@@ -14,6 +14,19 @@ class WargaDashboardView extends GetView<WargaDashboardController> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
+    // Check if coming from login and trigger refresh
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = Get.arguments;
+      final bool isFromLogin = args != null && args['from_login'] == true;
+      if (isFromLogin) {
+        // Trigger refresh after UI is built
+        controller.refreshData();
+        print(
+          'WargaDashboardView: Auto-refreshed data due to login navigation',
+        );
+      }
+    });
+
     return WillPopScope(
       onWillPop: () async => false, // Prevent back navigation
       child: WargaLayout(

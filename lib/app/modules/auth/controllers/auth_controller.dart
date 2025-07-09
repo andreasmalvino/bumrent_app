@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../data/providers/auth_provider.dart';
 import '../../../routes/app_routes.dart';
 import 'dart:math';
+import '../../../modules/warga/controllers/warga_dashboard_controller.dart';
 
 class AuthController extends GetxController {
   final AuthProvider _authProvider = Get.find<AuthProvider>();
@@ -185,7 +186,9 @@ class AuthController extends GetxController {
   }
 
   void _navigateToWargaDashboard() {
-    Get.offAllNamed(Routes.WARGA_DASHBOARD);
+    // Navigate to warga dashboard with parameter to indicate it's coming from login
+    // This will trigger an immediate refresh of the data
+    Get.offAllNamed(Routes.WARGA_DASHBOARD, arguments: {'from_login': true});
   }
 
   void forgotPassword() async {
@@ -215,7 +218,7 @@ class AuthController extends GetxController {
       Get.snackbar(
         'Berhasil',
         'Link reset password telah dikirim ke email Anda',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.green[100],
         colorText: Colors.green[800],
         icon: const Icon(Icons.check_circle, color: Colors.green),
@@ -312,7 +315,18 @@ class AuthController extends GetxController {
           'register_id': registerId, // Add register_id to the warga_desa table
         });
 
-        // Registration successful
+        // Reset registration fields BEFORE navigation to ensure clean state
+        resetRegistrationFields();
+
+        // Bersihkan data auth provider untuk memastikan tidak ada data user yang tersimpan
+        _authProvider.clearAuthData();
+
+        // Print debug message
+        print(
+          'Registration successful: Fields and controllers have been cleared',
+        );
+
+        // Registration successful - navigate to success page
         Get.offNamed(
           Routes.REGISTRATION_SUCCESS,
           arguments: {'register_id': registerId},
@@ -477,5 +491,100 @@ class AuthController extends GetxController {
     }
 
     return true;
+  }
+
+  // Check registration status by register_id and email
+  Future<Map<String, dynamic>?> checkRegistrationStatus(
+    String registerId,
+    String email,
+  ) async {
+    try {
+      isLoading.value = true;
+
+      print('Checking registration status - ID: $registerId, Email: $email');
+
+      // Validasi input
+      if (registerId.isEmpty || email.isEmpty) {
+        print('Invalid input: registerId or email is empty');
+        return null;
+      }
+
+      // Query warga_desa table where register_id and email match
+      final response =
+          await _authProvider.client
+              .from('warga_desa')
+              .select(
+                '*',
+              ) // Ensure we select all columns including 'keterangan'
+              .eq('register_id', registerId)
+              .eq('email', email)
+              .maybeSingle();
+
+      // Log response for debugging
+      print('Registration status query response: $response');
+
+      // Validasi hasil query
+      if (response == null) {
+        print('No matching registration found');
+        return null;
+      }
+
+      if (response is Map<String, dynamic> && response.isEmpty) {
+        print('Empty response received');
+        return null;
+      }
+
+      // Jika berhasil, kembalikan data
+      print('Registration found with status: ${response['status']}');
+      return response;
+    } catch (e) {
+      print('Error checking registration status: ${e.toString()}');
+      return null;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // Reset all registration fields
+  void resetRegistrationFields() {
+    // Reset text controllers
+    emailController.clear();
+    passwordController.clear();
+    nameController.clear();
+    confirmPasswordController.clear();
+
+    // Reset form fields
+    email.value = '';
+    password.value = '';
+    nik.value = '';
+    phoneNumber.value = '';
+    selectedRole.value = 'WARGA'; // Reset to default role
+    alamatLengkap.value = '';
+    tanggalLahir.value = null;
+    rtRw.value = '';
+    kelurahan.value = '';
+    kecamatan.value = '';
+
+    // Reset form status
+    isPasswordVisible.value = false;
+    isConfirmPasswordVisible.value = false;
+    errorMessage.value = '';
+
+    // Reset form key if needed
+    if (formKey.currentState != null) {
+      formKey.currentState!.reset();
+    }
+
+    // Bersihkan WargaDashboardController jika terdaftar
+    try {
+      if (Get.isRegistered<WargaDashboardController>()) {
+        print(
+          'Removing WargaDashboardController to ensure clean state after registration',
+        );
+        Get.delete<WargaDashboardController>(force: true);
+      }
+    } catch (e) {
+      print('Error removing WargaDashboardController: $e');
+    }
   }
 }

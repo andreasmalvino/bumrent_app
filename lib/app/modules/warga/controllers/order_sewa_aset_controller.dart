@@ -185,7 +185,7 @@ class OrderSewaAsetController extends GetxController {
         Get.snackbar(
           'Error',
           errorMessage.value,
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
         );
       });
     }
@@ -211,7 +211,7 @@ class OrderSewaAsetController extends GetxController {
         Get.snackbar(
           'Info',
           'Tidak dapat menampilkan data - data tidak tersedia',
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.amber,
           colorText: Colors.black,
           duration: const Duration(seconds: 3),
@@ -230,6 +230,9 @@ class OrderSewaAsetController extends GetxController {
       box.write('current_aset_id', asetId.value);
       debugPrint('💾 Saved asetId to GetStorage: ${asetId.value}');
     }
+
+    // Bersihkan data controller
+    clearData();
 
     super.onClose();
   }
@@ -444,6 +447,9 @@ class OrderSewaAsetController extends GetxController {
   // Ketika tombol back pada halaman order-sewa-aset ditekan
   void onBackPressed() {
     debugPrint('🔙 Back button pressed in OrderSewaAsetView');
+
+    // Bersihkan data controller sebelum kembali
+    clearData();
 
     try {
       // Try to use the navigation service
@@ -2287,7 +2293,7 @@ class OrderSewaAsetController extends GetxController {
       Get.snackbar(
         'Error',
         message,
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -2299,7 +2305,7 @@ class OrderSewaAsetController extends GetxController {
     Get.snackbar(
       'Sukses',
       message,
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
       backgroundColor: Colors.green,
       colorText: Colors.white,
     );
@@ -2767,7 +2773,7 @@ class OrderSewaAsetController extends GetxController {
         Get.snackbar(
           'Error',
           'Gagal membuat pesanan',
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.red,
           colorText: Colors.white,
         );
@@ -2777,7 +2783,7 @@ class OrderSewaAsetController extends GetxController {
       Get.snackbar(
         'Error',
         'Terjadi kesalahan: $e',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -3536,5 +3542,44 @@ class OrderSewaAsetController extends GetxController {
     } finally {
       isLoadingBookings(false);
     }
+  }
+
+  // Clear controller data
+  void clearData() {
+    aset.value = null;
+    isLoading.value = true;
+    hasError.value = false;
+    errorMessage.value = '';
+    asetId.value = '';
+    isAset.value = true;
+    isPaket.value = false;
+    assetPhotos.clear();
+    currentPhotoIndex.value = 0;
+    isPhotosLoading.value = false;
+    selectedSatuanWaktu.value = null;
+    duration.value = 1;
+    totalPrice.value = 0;
+    jumlahUnit.value = 1;
+    maxUnit.value = 1;
+    selectedDate.value = '';
+    startHour.value = -1;
+    endHour.value = -1;
+    formattedTimeRange.value = '';
+    startDate.value = null;
+    endDate.value = null;
+    formattedDateRange.value = '';
+    bookedDates.clear();
+    isLoadingBookedDates.value = false;
+    maxDayLimit.value = 0;
+    availableHours.clear();
+    bookedHours.clear();
+    selectedHours.clear();
+    bookedHoursList.clear();
+    isLoadingBookings.value = false;
+    hourlyInventory.clear();
+    unavailableDatesForHourly.clear();
+    paketItems.clear();
+    isPaketItemsLoaded.value = false;
+    paketId.value = '';
   }
 }

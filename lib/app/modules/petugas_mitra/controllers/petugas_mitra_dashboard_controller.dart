@@ -41,7 +41,7 @@ class PetugasMitraDashboardController extends GetxController {
       Get.snackbar(
         'Error',
         'Gagal keluar dari aplikasi',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     }
   }

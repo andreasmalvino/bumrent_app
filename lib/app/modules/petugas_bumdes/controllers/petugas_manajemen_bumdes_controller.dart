@@ -79,7 +79,7 @@ class PetugasManajemenBumdesController extends GetxController {
     Get.snackbar(
       'Sukses',
       'Rekening utama berhasil diubah',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
     );
   }
 
@@ -93,7 +93,7 @@ class PetugasManajemenBumdesController extends GetxController {
     Get.snackbar(
       'Sukses',
       'Status mitra berhasil diubah',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
     );
   }
 
@@ -110,7 +110,7 @@ class PetugasManajemenBumdesController extends GetxController {
     Get.snackbar(
       'Sukses',
       'Rekening bank berhasil ditambahkan',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
     );
   }
 
@@ -124,7 +124,7 @@ class PetugasManajemenBumdesController extends GetxController {
     Get.snackbar(
       'Sukses',
       'Rekening bank berhasil diperbarui',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
     );
   }
 
@@ -145,7 +145,7 @@ class PetugasManajemenBumdesController extends GetxController {
     Get.snackbar(
       'Sukses',
       'Rekening bank berhasil dihapus',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
     );
   }
 
@@ -155,7 +155,7 @@ class PetugasManajemenBumdesController extends GetxController {
     Get.snackbar(
       'Sukses',
       'Mitra berhasil ditambahkan',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
     );
   }
 
@@ -166,7 +166,7 @@ class PetugasManajemenBumdesController extends GetxController {
     Get.snackbar(
       'Sukses',
       'Mitra berhasil diperbarui',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
     );
   }
 
@@ -177,7 +177,7 @@ class PetugasManajemenBumdesController extends GetxController {
     Get.snackbar(
       'Sukses',
       'Mitra berhasil dihapus',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
     );
   }
 }

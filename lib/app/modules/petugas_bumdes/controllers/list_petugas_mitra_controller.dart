@@ -49,7 +49,7 @@ class ListPetugasMitraController extends GetxController {
     Get.snackbar(
       'Sukses',
       'Petugas mitra berhasil ditambahkan',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
     );
   }
 
@@ -62,7 +62,7 @@ class ListPetugasMitraController extends GetxController {
       Get.snackbar(
         'Sukses',
         'Data petugas mitra berhasil diperbarui',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     }
   }
@@ -73,7 +73,7 @@ class ListPetugasMitraController extends GetxController {
     Get.snackbar(
       'Sukses',
       'Petugas mitra berhasil dihapus',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
     );
   }
 
@@ -86,7 +86,7 @@ class ListPetugasMitraController extends GetxController {
       Get.snackbar(
         'Status Diperbarui',
         'Status petugas mitra diubah menjadi ${!currentStatus ? 'Aktif' : 'Nonaktif'}',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     }
   }

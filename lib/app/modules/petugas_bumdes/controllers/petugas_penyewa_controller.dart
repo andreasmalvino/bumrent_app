@@ -6,6 +6,7 @@ class PetugasPenyewaController extends GetxController {
 
   // Reactive variables
   final isLoading = true.obs;
+  final isRefreshing = false.obs;
   final penyewaList = <Map<String, dynamic>>[].obs;
   final filteredPenyewaList = <Map<String, dynamic>>[].obs;
   final filterStatus = 'all'.obs;
@@ -28,6 +29,39 @@ class PetugasPenyewaController extends GetxController {
   // Method to refresh data when returning to the page
   void refreshData() {
     fetchPenyewaList();
+  }
+
+  // Method khusus untuk pull-to-refresh yang tidak menampilkan loading spinner penuh layar
+  Future<void> refreshPenyewaList() async {
+    try {
+      isRefreshing.value = true;
+
+      // Get all penyewa data without filtering
+      final data =
+          await _authProvider.client
+                  .from('warga_desa')
+                  .select(
+                    'user_id, nama_lengkap, email, nik, no_hp, avatar, status, keterangan',
+                  )
+              as List<dynamic>;
+
+      // Filter out rows where user_id is null
+      final filteredData = data.where((row) => row['user_id'] != null).toList();
+
+      // Get total sewa count for each user
+      final enrichedData = await _enrichWithSewaCount(filteredData);
+
+      penyewaList.value = enrichedData;
+
+      // Apply filters to update filteredPenyewaList
+      applyFilters();
+
+      // Tampilkan pesan sukses
+    } catch (e) {
+      print('Error refreshing penyewa list: $e');
+    } finally {
+      isRefreshing.value = false;
+    }
   }
 
   void changeTab(int index) {
@@ -180,14 +214,14 @@ class PetugasPenyewaController extends GetxController {
       Get.snackbar(
         'Berhasil',
         'Status penyewa berhasil diperbarui',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     } catch (e) {
       print('Error updating penyewa status: $e');
       Get.snackbar(
         'Gagal',
         'Terjadi kesalahan saat memperbarui status penyewa',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     } finally {
       isLoading.value = false;

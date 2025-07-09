@@ -5,6 +5,7 @@ import 'package:bumrent_app/app/data/models/paket_model.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:bumrent_app/app/data/providers/aset_provider.dart';
 import 'dart:io';
+import 'package:bumrent_app/app/routes/app_routes.dart';
 import 'package:uuid/uuid.dart';
 
 class PetugasTambahPaketController extends GetxController {
@@ -47,6 +48,9 @@ class PetugasTambahPaketController extends GetxController {
   // New RxBool for editing
   final isEditing = false.obs;
 
+  // New RxBool for viewing (read-only mode)
+  final isViewing = false.obs;
+
   final timeOptions = {'Per Jam': true.obs, 'Per Hari': false.obs};
   final pricePerHourController = TextEditingController();
   final maxHourController = TextEditingController();
@@ -64,11 +68,13 @@ class PetugasTambahPaketController extends GetxController {
   void onInit() {
     super.onInit();
 
-    // Ambil flag isEditing dari arguments
+    // Ambil flag isEditing dan isViewing dari arguments
     isEditing.value =
         Get.arguments != null && Get.arguments['isEditing'] == true;
+    isViewing.value =
+        Get.arguments != null && Get.arguments['isViewing'] == true;
 
-    if (isEditing.value) {
+    if (isEditing.value || isViewing.value) {
       final paketArg = Get.arguments['paket'];
       String? paketId;
       if (paketArg != null) {
@@ -230,7 +236,7 @@ class PetugasTambahPaketController extends GetxController {
       Get.snackbar(
         'Error',
         'Pilih aset dan masukkan jumlah',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -251,7 +257,7 @@ class PetugasTambahPaketController extends GetxController {
       Get.snackbar(
         'Error',
         'Jumlah harus lebih dari 0',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -264,7 +270,7 @@ class PetugasTambahPaketController extends GetxController {
       Get.snackbar(
         'Error',
         'Jumlah melebihi stok yang tersedia',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -286,7 +292,7 @@ class PetugasTambahPaketController extends GetxController {
     Get.snackbar(
       'Sukses',
       'Item berhasil ditambahkan ke paket',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
       backgroundColor: Colors.green,
       colorText: Colors.white,
     );
@@ -300,7 +306,7 @@ class PetugasTambahPaketController extends GetxController {
       Get.snackbar(
         'Error',
         'Pilih aset dan masukkan jumlah',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -321,7 +327,7 @@ class PetugasTambahPaketController extends GetxController {
       Get.snackbar(
         'Error',
         'Jumlah harus lebih dari 0',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -349,7 +355,7 @@ class PetugasTambahPaketController extends GetxController {
         Get.snackbar(
           'Error',
           'Jumlah melebihi stok yang tersedia',
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.red,
           colorText: Colors.white,
         );
@@ -362,7 +368,7 @@ class PetugasTambahPaketController extends GetxController {
         Get.snackbar(
           'Error',
           'Jumlah melebihi stok yang tersedia',
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.red,
           colorText: Colors.white,
         );
@@ -385,7 +391,7 @@ class PetugasTambahPaketController extends GetxController {
     Get.snackbar(
       'Sukses',
       'Item berhasil diperbarui',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
       backgroundColor: Colors.green,
       colorText: Colors.white,
     );
@@ -402,7 +408,7 @@ class PetugasTambahPaketController extends GetxController {
     Get.snackbar(
       'Dihapus',
       'Item berhasil dihapus dari paket',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
       backgroundColor: Colors.orange,
       colorText: Colors.white,
     );
@@ -538,13 +544,13 @@ class PetugasTambahPaketController extends GetxController {
         }
 
         // Sukses
-        Get.back();
+        Get.offNamed(Routes.PETUGAS_PAKET);
         Get.snackbar(
           'Berhasil',
           'Paket berhasil diperbarui',
           backgroundColor: Colors.green,
           colorText: Colors.white,
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
         );
       } else {
         // --- ADD LOGIC ---
@@ -611,13 +617,13 @@ class PetugasTambahPaketController extends GetxController {
           }
         }
         // Sukses
-        Get.back();
+        Get.back(result: true);
         Get.snackbar(
           'Berhasil',
           'Paket berhasil ditambahkan',
           backgroundColor: Colors.green,
           colorText: Colors.white,
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
         );
       }
     } catch (e) {
@@ -627,7 +633,7 @@ class PetugasTambahPaketController extends GetxController {
         'Terjadi kesalahan: \\${e.toString()}',
         backgroundColor: Colors.red,
         colorText: Colors.white,
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     } finally {
       isSubmitting.value = false;
@@ -810,7 +816,7 @@ class PetugasTambahPaketController extends GetxController {
       Get.snackbar(
         'Error',
         'Gagal mengambil gambar dari kamera: $e',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -833,7 +839,7 @@ class PetugasTambahPaketController extends GetxController {
       Get.snackbar(
         'Error',
         'Gagal memilih gambar dari galeri: $e',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );

@@ -1524,7 +1524,7 @@ class SewaAsetView extends GetView<SewaAsetController> {
                         Get.snackbar(
                           'Error',
                           'ID aset tidak valid',
-                          snackPosition: SnackPosition.BOTTOM,
+                          snackPosition: SnackPosition.TOP,
                           backgroundColor: Colors.red,
                           colorText: Colors.white,
                         );
@@ -1754,7 +1754,7 @@ class SewaAsetView extends GetView<SewaAsetController> {
                           Get.snackbar(
                             'Error',
                             'ID aset tidak valid',
-                            snackPosition: SnackPosition.BOTTOM,
+                            snackPosition: SnackPosition.TOP,
                             backgroundColor: Colors.red,
                             colorText: Colors.white,
                           );
@@ -1801,7 +1801,7 @@ class SewaAsetView extends GetView<SewaAsetController> {
       Get.snackbar(
         'Error',
         'ID aset tidak valid',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );

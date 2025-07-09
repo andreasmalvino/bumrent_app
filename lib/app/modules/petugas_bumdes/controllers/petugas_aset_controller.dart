@@ -122,7 +122,7 @@ class PetugasAsetController extends GetxController {
       Get.snackbar(
         'Error Memuat Data',
         'Gagal mengambil data aset dari server. Silakan coba lagi nanti.',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -258,7 +258,7 @@ class PetugasAsetController extends GetxController {
         Get.snackbar(
           'Gagal',
           'Terjadi kesalahan saat menghapus aset',
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.red,
           colorText: Colors.white,
         );
@@ -274,7 +274,7 @@ class PetugasAsetController extends GetxController {
       Get.snackbar(
         'Error',
         'Gagal menghapus aset: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );

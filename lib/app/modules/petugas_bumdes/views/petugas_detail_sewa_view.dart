@@ -1023,7 +1023,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
                             'Status sewa telah diubah menjadi SELESAI',
                             backgroundColor: Colors.green,
                             colorText: Colors.white,
-                            snackPosition: SnackPosition.BOTTOM,
+                            snackPosition: SnackPosition.TOP,
                           );
                         },
                         style: ElevatedButton.styleFrom(
@@ -1054,7 +1054,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
                         'Status sewa telah diubah menjadi DIKEMBALIKAN',
                         backgroundColor: Colors.teal,
                         colorText: Colors.white,
-                        snackPosition: SnackPosition.BOTTOM,
+                        snackPosition: SnackPosition.TOP,
                       );
                     },
                     style: ElevatedButton.styleFrom(
@@ -1127,7 +1127,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
                                         'Status sewa telah diubah menjadi DIBATALKAN',
                                         backgroundColor: Colors.red,
                                         colorText: Colors.white,
-                                        snackPosition: SnackPosition.BOTTOM,
+                                        snackPosition: SnackPosition.TOP,
                                       );
                                     },
                                     style: ElevatedButton.styleFrom(
@@ -1381,7 +1381,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
           'Status pengajuan diubah menjadi Periksa Pembayaran',
           backgroundColor: Colors.amber.shade700,
           colorText: Colors.white,
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
         );
         break;
 
@@ -1394,7 +1394,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
           'Pengajuan sewa aset telah disetujui',
           backgroundColor: Colors.green.shade600,
           colorText: Colors.white,
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
         );
         break;
 
@@ -1407,7 +1407,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
           'Permintaan pembayaran denda telah dikirim',
           backgroundColor: Colors.deepOrange,
           colorText: Colors.white,
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
         );
         break;
 
@@ -1420,7 +1420,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
           'Status pengajuan diubah menjadi Periksa Denda',
           backgroundColor: Colors.red.shade600,
           colorText: Colors.white,
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
         );
         break;
 
@@ -1433,7 +1433,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
           'Aset telah dikembalikan dan sewa telah selesai',
           backgroundColor: Colors.green.shade600,
           colorText: Colors.white,
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
         );
         break;
 
@@ -1476,7 +1476,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
                       'Status sewa telah diubah menjadi DIBATALKAN',
                       backgroundColor: Colors.red,
                       colorText: Colors.white,
-                      snackPosition: SnackPosition.BOTTOM,
+                      snackPosition: SnackPosition.TOP,
                     );
                   },
                   style: ElevatedButton.styleFrom(
@@ -1595,7 +1595,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
                                   'Status sewa diubah menjadi Dikembalikan',
                                   backgroundColor: Colors.teal,
                                   colorText: Colors.white,
-                                  snackPosition: SnackPosition.BOTTOM,
+                                  snackPosition: SnackPosition.TOP,
                                 );
                               },
                             ),
@@ -1628,7 +1628,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
                                   'Permintaan pembayaran denda telah dikirim',
                                   backgroundColor: Colors.deepOrange,
                                   colorText: Colors.white,
-                                  snackPosition: SnackPosition.BOTTOM,
+                                  snackPosition: SnackPosition.TOP,
                                 );
                               },
                             ),
@@ -1661,7 +1661,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
           'Sewa aset telah selesai',
           backgroundColor: Colors.purple,
           colorText: Colors.white,
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
         );
       };
     } else if (status == 'Dikembalikan') {
@@ -1709,7 +1709,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
                     'Sewa aset telah selesai',
                     backgroundColor: Colors.purple,
                     colorText: Colors.white,
-                    snackPosition: SnackPosition.BOTTOM,
+                    snackPosition: SnackPosition.TOP,
                   );
                 },
                 icon: const Icon(Icons.task_alt_outlined),
@@ -1817,7 +1817,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
                     'Bukti sewa dalam format PDF sedang diunduh',
                     backgroundColor: AppColorsPetugas.blueGrotto,
                     colorText: Colors.white,
-                    snackPosition: SnackPosition.BOTTOM,
+                    snackPosition: SnackPosition.TOP,
                   );
                 },
               ),
@@ -1837,7 +1837,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
                     'Bukti sewa dalam format JPG sedang diunduh',
                     backgroundColor: AppColorsPetugas.blueGrotto,
                     colorText: Colors.white,
-                    snackPosition: SnackPosition.BOTTOM,
+                    snackPosition: SnackPosition.TOP,
                   );
                 },
               ),
@@ -1857,7 +1857,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
                     'Data sewa dalam format XLSX sedang diunduh',
                     backgroundColor: AppColorsPetugas.blueGrotto,
                     colorText: Colors.white,
-                    snackPosition: SnackPosition.BOTTOM,
+                    snackPosition: SnackPosition.TOP,
                   );
                 },
               ),
@@ -1963,7 +1963,8 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    nominalController.text = sewa.totalTagihan.toString();
+                    nominalController.text =
+                        sewa.totalTagihan.toInt().toString();
                   },
                   icon: Icon(
                     Icons.payments_outlined,
@@ -2456,7 +2457,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
                           'Nominal denda harus diisi',
                           backgroundColor: Colors.red,
                           colorText: Colors.white,
-                          snackPosition: SnackPosition.BOTTOM,
+                          snackPosition: SnackPosition.TOP,
                         );
                         return;
                       }
@@ -2501,7 +2502,7 @@ class _PetugasDetailSewaViewState extends State<PetugasDetailSewaView> {
                         'Permintaan pembayaran denda telah dikirim',
                         backgroundColor: Colors.deepOrange,
                         colorText: Colors.white,
-                        snackPosition: SnackPosition.BOTTOM,
+                        snackPosition: SnackPosition.TOP,
                       );
                     },
                     icon: const Icon(Icons.check_circle),

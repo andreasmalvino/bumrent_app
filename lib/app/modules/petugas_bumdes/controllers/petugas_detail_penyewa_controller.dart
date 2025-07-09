@@ -21,7 +21,7 @@ class PetugasDetailPenyewaController extends GetxController {
       Get.snackbar(
         'Error',
         'Data penyewa tidak ditemukan',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     }
   }
@@ -46,7 +46,7 @@ class PetugasDetailPenyewaController extends GetxController {
       Get.snackbar(
         'Error',
         'Gagal memuat data penyewa',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     } finally {
       isLoading.value = false;
@@ -203,14 +203,14 @@ class PetugasDetailPenyewaController extends GetxController {
       Get.snackbar(
         'Berhasil',
         'Status penyewa berhasil diperbarui',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     } catch (e) {
       print('Error updating penyewa status: $e');
       Get.snackbar(
         'Error',
         'Gagal memperbarui status penyewa',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     } finally {
       isLoading.value = false;

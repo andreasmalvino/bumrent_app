@@ -46,30 +46,51 @@ class WargaDashboardController extends GetxController {
   final dendaAktifCount = 0.obs;
 
   @override
-  void onInit() {
+  void onInit() async {
     super.onInit();
 
     // Set navigation index to Home (0)
     navigationService.setNavIndex(0);
 
-    // Load user data
-    fetchProfileFromWargaDesa();
-    _loadUserData();
+    // Check if navigation is coming from login
+    final args = Get.arguments;
+    final bool isFromLogin = args != null && args['from_login'] == true;
 
-    // Load sample data
-    _loadSampleData();
+    if (isFromLogin) {
+      print('onInit: Navigation from login detected, prioritizing data fetch');
+    }
 
-    // Load dummy data for bills and penalties
-    loadDummyData();
+    // Verifikasi bahwa pengguna sudah login sebelum melakukan fetch data
+    if (_authProvider.currentUser != null) {
+      // Prioritize loading user profile data first
+      await fetchProfileFromWargaDesa();
 
-    // Load unpaid rentals
-    loadUnpaidRentals();
+      // If the profile data was not loaded successfully, try again after a short delay
+      if (userName.value == 'Pengguna Warga' || userNik.value.isEmpty) {
+        print('onInit: Profile data not loaded, retrying after delay');
+        await Future.delayed(const Duration(milliseconds: 800));
+        await fetchProfileFromWargaDesa();
+      }
 
-    // Debug count sewa_aset by status
-    _debugCountSewaAset();
+      // Load other user data
+      await _loadUserData();
 
-    // Load sewa aktif
-    loadActiveRentals();
+      // Load other data in parallel to speed up the dashboard initialization
+      Future.wait([
+        _loadSampleData(),
+        loadDummyData(),
+        loadUnpaidRentals(),
+        _debugCountSewaAset(),
+        loadActiveRentals(),
+      ]).then((_) => print('onInit: All data loaded successfully'));
+
+      // If coming from login, make sure UI is updated
+      if (isFromLogin) {
+        update();
+      }
+    } else {
+      print('onInit: User not logged in, skipping data fetch');
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -116,7 +137,7 @@ class WargaDashboardController extends GetxController {
     }
   }
 
-  void _loadSampleData() {
+  Future<void> _loadSampleData() async {
     // Clear any existing data
     activeRentals.clear();
 
@@ -147,10 +168,37 @@ class WargaDashboardController extends GetxController {
     navigationService.toSewaAset();
   }
 
-  void refreshData() {
-    fetchProfileFromWargaDesa();
-    _loadSampleData();
-    loadDummyData();
+  Future<void> refreshData() async {
+    print('refreshData: Refreshing dashboard data');
+    try {
+      // First fetch profile data
+      await fetchProfileFromWargaDesa();
+      await _loadUserData();
+
+      // Then load all other data in parallel
+      await Future.wait([
+        _loadSampleData(),
+        loadDummyData(),
+        loadUnpaidRentals(),
+        loadActiveRentals(),
+        _debugCountSewaAset(),
+      ]);
+
+      // Update UI
+      update();
+      print('refreshData: Dashboard data refreshed successfully');
+    } catch (e) {
+      print('refreshData: Error refreshing data: $e');
+      // Show error message to user
+      Get.snackbar(
+        'Perhatian',
+        'Terjadi kesalahan saat memuat data',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red.shade100,
+        colorText: Colors.red.shade900,
+        duration: const Duration(seconds: 3),
+      );
+    }
   }
 
   void onNavItemTapped(int index) {
@@ -176,12 +224,14 @@ class WargaDashboardController extends GetxController {
     Get.toNamed(Routes.WARGA_SEWA, arguments: {'tab': 3});
   }
 
-  void logout() async {
+  Future<void> logout() async {
+    print('logout: Logging out user');
     await _authProvider.signOut();
     navigationService.toLogin();
+    print('logout: User logged out and redirected to login screen');
   }
 
-  void loadDummyData() {
+  Future<void> loadDummyData() async {
     // Dummy active bills
     activeBills.clear();
     activeBills.add({
@@ -331,24 +381,77 @@ class WargaDashboardController extends GetxController {
   Future<void> fetchProfileFromWargaDesa() async {
     try {
       final user = _authProvider.currentUser;
-      if (user == null) return;
+      if (user == null) {
+        print(
+          'fetchProfileFromWargaDesa: No current user found, skipping fetch',
+        );
+        return; // Exit early if no user is logged in
+      }
+
       final userId = user.id;
+      print('fetchProfileFromWargaDesa: Fetching data for user: $userId');
+
       final data =
           await _authProvider.client
               .from('warga_desa')
               .select('nik, alamat, email, nama_lengkap, no_hp, avatar')
               .eq('user_id', userId)
               .maybeSingle();
+
       if (data != null) {
+        print('fetchProfileFromWargaDesa: Data retrieved successfully');
         userNik.value = data['nik']?.toString() ?? '';
         userAddress.value = data['alamat']?.toString() ?? '';
         userEmail.value = data['email']?.toString() ?? '';
         userName.value = data['nama_lengkap']?.toString() ?? '';
         userPhone.value = data['no_hp']?.toString() ?? '';
         userAvatar.value = data['avatar']?.toString() ?? '';
+
+        // Trigger UI refresh
+        update();
+        print('fetchProfileFromWargaDesa: Profile data updated');
+      } else {
+        print('fetchProfileFromWargaDesa: No data found for user: $userId');
       }
     } catch (e) {
       print('Error fetching profile from warga_desa: $e');
+      // If it fails, try again after a delay
+      await Future.delayed(const Duration(seconds: 1));
+      try {
+        await _retryFetchProfile();
+      } catch (retryError) {
+        print('Retry error fetching profile: $retryError');
+      }
+    }
+  }
+
+  // Helper method to retry fetching profile
+  Future<void> _retryFetchProfile() async {
+    final user = _authProvider.currentUser;
+    if (user == null) {
+      print('_retryFetchProfile: No current user found, skipping retry');
+      return; // Exit early if no user is logged in
+    }
+
+    print('_retryFetchProfile: Retrying fetch for user: ${user.id}');
+
+    final data =
+        await _authProvider.client
+            .from('warga_desa')
+            .select('nik, alamat, email, nama_lengkap, no_hp, avatar')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+    if (data != null) {
+      print('_retryFetchProfile: Data retrieved successfully on retry');
+      userNik.value = data['nik']?.toString() ?? '';
+      userAddress.value = data['alamat']?.toString() ?? '';
+      userEmail.value = data['email']?.toString() ?? '';
+      userName.value = data['nama_lengkap']?.toString() ?? '';
+      userPhone.value = data['no_hp']?.toString() ?? '';
+      userAvatar.value = data['avatar']?.toString() ?? '';
+      update();
+      print('_retryFetchProfile: Profile data updated');
     }
   }
 
@@ -533,7 +636,7 @@ class WargaDashboardController extends GetxController {
       Get.snackbar(
         'Gagal',
         'Tidak dapat mengakses ${source == ImageSource.camera ? 'kamera' : 'galeri'}',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red.shade700,
         colorText: Colors.white,
         duration: const Duration(seconds: 3),

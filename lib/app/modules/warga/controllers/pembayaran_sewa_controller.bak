@@ -378,7 +378,7 @@ class PembayaranSewaController extends GetxController
       Get.snackbar(
         'Pesanan Dibatalkan',
         'Batas waktu pembayaran telah berakhir',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
         duration: Duration(seconds: 5),
@@ -417,7 +417,7 @@ class PembayaranSewaController extends GetxController
       Get.snackbar(
         'Error',
         'Gagal mengambil foto: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -443,7 +443,7 @@ class PembayaranSewaController extends GetxController
       Get.snackbar(
         'Error',
         'Gagal memilih foto dari galeri: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -459,7 +459,7 @@ class PembayaranSewaController extends GetxController
       Get.snackbar(
         'Error',
         'Mohon unggah bukti pembayaran terlebih dahulu',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -541,7 +541,7 @@ class PembayaranSewaController extends GetxController
       Get.snackbar(
         'Sukses',
         'Bukti pembayaran berhasil diunggah',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.green,
         colorText: Colors.white,
       );
@@ -550,7 +550,7 @@ class PembayaranSewaController extends GetxController
       Get.snackbar(
         'Error',
         'Gagal mengunggah bukti pembayaran: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -654,7 +654,7 @@ class PembayaranSewaController extends GetxController
     Get.snackbar(
       'Sukses',
       'Pembayaran tunai berhasil disubmit',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
       backgroundColor: Colors.green,
       colorText: Colors.white,
     );
@@ -1090,7 +1090,7 @@ class PembayaranSewaController extends GetxController
       Get.snackbar(
         'Berhasil',
         'Data berhasil diperbarui',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.green,
         colorText: Colors.white,
         duration: const Duration(seconds: 2),
@@ -1104,7 +1104,7 @@ class PembayaranSewaController extends GetxController
       Get.snackbar(
         'Error',
         'Gagal memperbarui data',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );

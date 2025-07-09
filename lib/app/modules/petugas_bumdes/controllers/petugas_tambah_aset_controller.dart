@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:bumrent_app/app/data/models/aset_model.dart';
 import 'package:bumrent_app/app/data/providers/aset_provider.dart';
+import 'package:bumrent_app/app/routes/app_routes.dart';
 
 class PetugasTambahAsetController extends GetxController {
   // Flag to check if in edit mode
@@ -13,34 +14,38 @@ class PetugasTambahAsetController extends GetxController {
   @override
   Future<void> onInit() async {
     super.onInit();
-    
+
     try {
       // Handle edit mode and load data if needed
       final args = Get.arguments;
-      debugPrint('[DEBUG] PetugasTambahAsetController initialized with args: $args');
-      
+      debugPrint(
+        '[DEBUG] PetugasTambahAsetController initialized with args: $args',
+      );
+
       if (args != null && args is Map<String, dynamic>) {
         isEditing.value = args['isEditing'] ?? false;
         debugPrint('[DEBUG] isEditing set to: ${isEditing.value}');
-        
+
         if (isEditing.value) {
           // Get asset ID from arguments
           final assetId = args['assetId']?.toString() ?? '';
           debugPrint('[DEBUG] Edit mode: Loading asset with ID: $assetId');
-          
+
           if (assetId.isNotEmpty) {
             // Store the asset ID and load asset data
             this.assetId = assetId;
             debugPrint('[DEBUG] Asset ID set to: $assetId');
-            
+
             // Load asset data and await completion
             await _loadAssetData(assetId);
           } else {
-            debugPrint('[ERROR] Edit mode but no assetId provided in arguments');
+            debugPrint(
+              '[ERROR] Edit mode but no assetId provided in arguments',
+            );
             Get.snackbar(
               'Error',
               'ID Aset tidak ditemukan',
-              snackPosition: SnackPosition.BOTTOM,
+              snackPosition: SnackPosition.TOP,
             );
             // Optionally navigate back if in edit mode without an ID
             Future.delayed(Duration.zero, () => Get.back());
@@ -53,7 +58,9 @@ class PetugasTambahAsetController extends GetxController {
         }
       } else {
         // Default values for new asset when no arguments are passed
-        debugPrint('[DEBUG] No arguments passed, defaulting to add new asset mode');
+        debugPrint(
+          '[DEBUG] No arguments passed, defaulting to add new asset mode',
+        );
         quantityController.text = '1';
         unitOfMeasureController.text = 'Unit';
       }
@@ -62,11 +69,11 @@ class PetugasTambahAsetController extends GetxController {
       debugPrint('Stack trace: $stackTrace');
       // Ensure loading is set to false even if there's an error
       isLoading.value = false;
-      
+
       Get.snackbar(
         'Error',
         'Terjadi kesalahan saat memuat data',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     }
 
@@ -85,21 +92,21 @@ class PetugasTambahAsetController extends GetxController {
     try {
       isLoading.value = true;
       debugPrint('[DEBUG] Fetching asset data for ID: $assetId');
-      
+
       // Fetch asset data from Supabase
       final aset = await _asetProvider.getAsetById(assetId);
-      
+
       if (aset == null) {
         throw Exception('Aset tidak ditemukan');
       }
-      
+
       debugPrint('[DEBUG] Successfully fetched asset data: ${aset.toJson()}');
-      
+
       // Populate form fields with the fetched data
       nameController.text = aset.nama ?? '';
       descriptionController.text = aset.deskripsi ?? '';
       quantityController.text = (aset.kuantitas ?? 1).toString();
-      
+
       // Ensure the status matches one of the available options exactly
       final status = aset.status?.toLowerCase() ?? 'tersedia';
       if (status == 'tersedia') {
@@ -110,18 +117,19 @@ class PetugasTambahAsetController extends GetxController {
         // Default to 'Tersedia' if status is not recognized
         selectedStatus.value = 'Tersedia';
       }
-      
+
       // Handle time options and pricing
       if (aset.satuanWaktuSewa != null && aset.satuanWaktuSewa!.isNotEmpty) {
         // Reset time options
         timeOptions.forEach((key, value) => value.value = false);
-        
+
         // Process each satuan waktu sewa
         for (var sws in aset.satuanWaktuSewa) {
-          final satuan = sws['nama_satuan_waktu']?.toString().toLowerCase() ?? '';
+          final satuan =
+              sws['nama_satuan_waktu']?.toString().toLowerCase() ?? '';
           final harga = sws['harga'] as int? ?? 0;
           final maksimalWaktu = sws['maksimal_waktu'] as int? ?? 24;
-          
+
           if (satuan.contains('jam')) {
             timeOptions['Per Jam']?.value = true;
             pricePerHourController.text = harga.toString();
@@ -133,19 +141,21 @@ class PetugasTambahAsetController extends GetxController {
           }
         }
       }
-      
+
       // Clear existing images
       selectedImages.clear();
       networkImageUrls.clear();
-      
+
       // Get all image URLs from the model
       final allImageUrls = aset.imageUrls.toList();
-      
+
       // If no imageUrls but has imageUrl, use that as fallback (backward compatibility)
-      if (allImageUrls.isEmpty && aset.imageUrl != null && aset.imageUrl!.isNotEmpty) {
+      if (allImageUrls.isEmpty &&
+          aset.imageUrl != null &&
+          aset.imageUrl!.isNotEmpty) {
         allImageUrls.add(aset.imageUrl!);
       }
-      
+
       // Add all images to the lists
       for (final imageUrl in allImageUrls) {
         if (imageUrl != null && imageUrl.isNotEmpty) {
@@ -161,27 +171,30 @@ class PetugasTambahAsetController extends GetxController {
           }
         }
       }
-      
-      debugPrint('Total ${networkImageUrls.length} images loaded for asset $assetId');
+
+      debugPrint(
+        'Total ${networkImageUrls.length} images loaded for asset $assetId',
+      );
       debugPrint('[DEBUG] Successfully loaded asset data for ID: $assetId');
     } catch (e, stackTrace) {
       debugPrint('[ERROR] Failed to load asset data: $e');
       debugPrint('Stack trace: $stackTrace');
-      
+
       Get.snackbar(
         'Error',
         'Gagal memuat data aset: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
-      
+
       // Optionally navigate back if there's an error
       Future.delayed(const Duration(seconds: 2), () => Get.back());
     } finally {
       isLoading.value = false;
     }
   }
+
   // Form controllers
   final nameController = TextEditingController();
   final descriptionController = TextEditingController();
@@ -212,8 +225,6 @@ class PetugasTambahAsetController extends GetxController {
   // Form validation
   final isFormValid = false.obs;
   final isSubmitting = false.obs;
-
-
 
   @override
   void onClose() {
@@ -255,11 +266,10 @@ class PetugasTambahAsetController extends GetxController {
     if (!anySelected) {
       timeOptions[option]?.value = true;
     }
-    
+
     validateForm();
   }
 
-  
   // Create a new asset in Supabase
   Future<String?> _createAsset(
     Map<String, dynamic> assetData,
@@ -268,7 +278,7 @@ class PetugasTambahAsetController extends GetxController {
     try {
       // Create the asset in the 'aset' table
       final response = await _asetProvider.createAset(assetData);
-      
+
       if (response == null || response['id'] == null) {
         debugPrint('❌ Failed to create asset: No response or ID from server');
         return null;
@@ -285,7 +295,7 @@ class PetugasTambahAsetController extends GetxController {
           harga: sws['harga'],
           maksimalWaktu: sws['maksimal_waktu'],
         );
-        
+
         if (!success) {
           debugPrint('❌ Failed to add satuan waktu sewa: $sws');
         }
@@ -307,12 +317,12 @@ class PetugasTambahAsetController extends GetxController {
   ) async {
     try {
       debugPrint('\n🔄 Starting update for asset ID: $assetId');
-      
+
       // 1. Extract and remove foto_aset from assetData as it's not in the aset table
       final fotoAsetUrl = assetData['foto_aset'];
       assetData.remove('foto_aset');
       debugPrint('📝 Asset data prepared for update (without foto_aset)');
-      
+
       // 2. Update the main asset data (without foto_aset)
       debugPrint('🔄 Updating main asset data...');
       final success = await _asetProvider.updateAset(assetId, assetData);
@@ -326,7 +336,7 @@ class PetugasTambahAsetController extends GetxController {
       debugPrint('\n🔄 Updating rental time units...');
       // First, delete existing satuan waktu sewa
       await _asetProvider.deleteSatuanWaktuSewaByAsetId(assetId);
-      
+
       // Then add the new ones
       for (var sws in satuanWaktuSewa) {
         debugPrint('   - Adding: ${sws['satuan_waktu']} (${sws['harga']} IDR)');
@@ -346,21 +356,25 @@ class PetugasTambahAsetController extends GetxController {
           ...networkImageUrls,
           ...selectedImages.map((file) => file.path),
         ];
-        
+
         debugPrint('\n🖼️  Processing photos for asset $assetId');
         debugPrint('   - Network URLs: ${networkImageUrls.length}');
         debugPrint('   - Local files: ${selectedImages.length}');
-        debugPrint('   - Total unique photos: ${allImageUrls.toSet().length} (before deduplication)');
-        
+        debugPrint(
+          '   - Total unique photos: ${allImageUrls.toSet().length} (before deduplication)',
+        );
+
         try {
           // Use updateFotoAset which handles both uploading new photos and updating the database
           final photoSuccess = await _asetProvider.updateFotoAset(
             asetId: assetId,
             fotoUrls: allImageUrls,
           );
-          
+
           if (!photoSuccess) {
-            debugPrint('⚠️  Some photos might not have been updated for asset $assetId');
+            debugPrint(
+              '⚠️  Some photos might not have been updated for asset $assetId',
+            );
             // We don't fail the whole update if photo update fails
             // as the main asset data has been saved successfully
           } else {
@@ -377,7 +391,6 @@ class PetugasTambahAsetController extends GetxController {
 
       debugPrint('\n✅ Asset update completed successfully for ID: $assetId');
       return true;
-      
     } catch (e, stackTrace) {
       debugPrint('❌ Error updating asset: $e');
       debugPrint('Stack trace: $stackTrace');
@@ -445,30 +458,30 @@ class PetugasTambahAsetController extends GetxController {
 
       // Handle time options and pricing
       final List<Map<String, dynamic>> satuanWaktuSewa = [];
-      
+
       if (timeOptions['Per Jam']?.value == true) {
         final hargaPerJam = int.tryParse(pricePerHourController.text) ?? 0;
         final maxJam = int.tryParse(maxHourController.text) ?? 24;
-        
+
         if (hargaPerJam <= 0) {
           throw Exception('Harga per jam harus lebih dari 0');
         }
-        
+
         satuanWaktuSewa.add({
           'satuan_waktu': 'jam',
           'harga': hargaPerJam,
           'maksimal_waktu': maxJam,
         });
       }
-      
+
       if (timeOptions['Per Hari']?.value == true) {
         final hargaPerHari = int.tryParse(pricePerDayController.text) ?? 0;
         final maxHari = int.tryParse(maxDayController.text) ?? 30;
-        
+
         if (hargaPerHari <= 0) {
           throw Exception('Harga per hari harus lebih dari 0');
         }
-        
+
         satuanWaktuSewa.add({
           'satuan_waktu': 'hari',
           'harga': hargaPerHari,
@@ -483,7 +496,7 @@ class PetugasTambahAsetController extends GetxController {
 
       // Handle image uploads
       List<String> imageUrls = [];
-      
+
       if (networkImageUrls.isNotEmpty) {
         // Use existing network URLs
         imageUrls = List.from(networkImageUrls);
@@ -505,12 +518,12 @@ class PetugasTambahAsetController extends GetxController {
       // Create or update the asset
       bool success;
       String? createdAssetId;
-      
+
       if (isEditing.value && (assetId?.isNotEmpty ?? false)) {
         // Update existing asset
         debugPrint('🔄 Updating asset with ID: $assetId');
         success = await _updateAsset(assetId!, assetData, satuanWaktuSewa);
-        
+
         // Update all photos if we have any
         if (success && imageUrls.isNotEmpty) {
           await _asetProvider.updateFotoAset(
@@ -523,7 +536,7 @@ class PetugasTambahAsetController extends GetxController {
         debugPrint('🔄 Creating new asset');
         createdAssetId = await _createAsset(assetData, satuanWaktuSewa);
         success = createdAssetId != null;
-        
+
         // Add all photos for new asset
         if (success && createdAssetId != null && imageUrls.isNotEmpty) {
           await _asetProvider.updateFotoAset(
@@ -537,16 +550,18 @@ class PetugasTambahAsetController extends GetxController {
         // Show success message
         Get.snackbar(
           'Sukses',
-          isEditing.value ? 'Aset berhasil diperbarui' : 'Aset berhasil ditambahkan',
-          snackPosition: SnackPosition.BOTTOM,
+          isEditing.value
+              ? 'Aset berhasil diperbarui'
+              : 'Aset berhasil ditambahkan',
+          snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.green,
           colorText: Colors.white,
-          duration: const Duration(seconds: 3),
+          duration: const Duration(seconds: 2),
         );
 
-        // Navigate back with success after a short delay
-        await Future.delayed(const Duration(seconds: 1));
-        Get.back(result: true);
+        // Navigate back with success result instead of using offNamed
+        await Future.delayed(const Duration(milliseconds: 500));
+        Get.offNamed(Routes.PETUGAS_ASET);
       } else {
         throw Exception('Gagal menyimpan aset');
       }
@@ -557,14 +572,13 @@ class PetugasTambahAsetController extends GetxController {
         'Terjadi kesalahan: ${e.toString()}',
         backgroundColor: Colors.red,
         colorText: Colors.white,
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     } finally {
       isSubmitting.value = false;
     }
   }
 
-  
   // Example method to upload images (to be implemented with your backend)
   // Future<List<String>> _uploadImages(List<XFile> images) async {
   //   List<String> urls = [];
@@ -593,7 +607,7 @@ class PetugasTambahAsetController extends GetxController {
       Get.snackbar(
         'Error',
         'Gagal mengambil gambar dari kamera: $e',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -615,7 +629,7 @@ class PetugasTambahAsetController extends GetxController {
       Get.snackbar(
         'Error',
         'Gagal memilih gambar dari galeri: $e',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -625,7 +639,9 @@ class PetugasTambahAsetController extends GetxController {
   // For demonstration purposes: add sample image
   void addSampleImage() {
     // In a real app, this would open the image picker
-    selectedImages.add(XFile('assets/images/sample_asset_${selectedImages.length + 1}.jpg'));
+    selectedImages.add(
+      XFile('assets/images/sample_asset_${selectedImages.length + 1}.jpg'),
+    );
     validateForm();
   }
 }

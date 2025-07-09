@@ -305,6 +305,9 @@ class PembayaranSewaController extends GetxController
                     : 0,
             'status': rentalData['status'] ?? 'MENUNGGU PEMBAYARAN',
             'created_at': DateTime.now().toString(),
+            'updated_at':
+                DateTime.now()
+                    .toString(), // Explicitly set updated_at for countdown
             'denda': 0, // Default value
             'keterangan': '', // Default value
             'image_url': rentalData['imageUrl'],
@@ -359,12 +362,18 @@ class PembayaranSewaController extends GetxController
         'price_per_unit': 10000,
         'total_price': 50000,
         'status': 'MENUNGGU PEMBAYARAN',
-        'created_at':
-            DateTime.now().toString(), // Use this for countdown calculation
+        'created_at': DateTime.now().toString(),
+        'updated_at':
+            DateTime.now()
+                .toString(), // Explicitly set updated_at for countdown
         'denda': 20000, // Dummy data for denda
         'keterangan':
             'Terjadi kerusakan pada bagian kaki', // Dummy keterangan for denda
       };
+
+      debugPrint(
+        'DEBUG: Set updated_at in orderDetails: ${orderDetails.value['updated_at']}',
+      );
 
       // Update the current step based on the status
       updateCurrentStepBasedOnStatus();
@@ -433,14 +442,27 @@ class PembayaranSewaController extends GetxController
               if (data['status'] != null &&
                   data['status'].toString().isNotEmpty) {
                 val?['status'] = data['status'];
-                debugPrint(
-                  '📊 Order status from sewa_aset: \\${data['status']}',
-                );
+                debugPrint('📊 Order status from sewa_aset: ${data['status']}');
               }
-              // Tambahkan mapping updated_at
+
+              // Ensure updated_at is always set
               if (data['updated_at'] != null) {
                 val?['updated_at'] = data['updated_at'];
+                debugPrint(
+                  '📅 Using updated_at from database: ${data['updated_at']}',
+                );
+              } else if (data['created_at'] != null) {
+                val?['updated_at'] = data['created_at'];
+                debugPrint(
+                  '📅 Using created_at as fallback for updated_at: ${data['created_at']}',
+                );
+              } else {
+                val?['updated_at'] = DateTime.now().toIso8601String();
+                debugPrint(
+                  '📅 Using current timestamp as fallback for updated_at',
+                );
               }
+
               // Format rental period
               if (data['waktu_mulai'] != null &&
                   data['waktu_selesai'] != null) {
@@ -448,12 +470,12 @@ class PembayaranSewaController extends GetxController
                   final startTime = DateTime.parse(data['waktu_mulai']);
                   final endTime = DateTime.parse(data['waktu_selesai']);
                   val?['rental_period'] =
-                      '\\${startTime.day}/\\${startTime.month}/\\${startTime.year}, \\${startTime.hour}:\\${startTime.minute.toString().padLeft(2, '0')} - \\${endTime.hour}:\\${endTime.minute.toString().padLeft(2, '0')}';
+                      '${startTime.day}/${startTime.month}/${startTime.year}, ${startTime.hour}:${startTime.minute.toString().padLeft(2, '0')} - ${endTime.hour}:${endTime.minute.toString().padLeft(2, '0')}';
                   debugPrint(
-                    '✅ Successfully formatted rental period: \\${val?['rental_period']}',
+                    '✅ Successfully formatted rental period: ${val?['rental_period']}',
                   );
                 } catch (e) {
-                  debugPrint('❌ Error parsing date: \\${e}');
+                  debugPrint('❌ Error parsing date: ${e}');
                 }
               } else {
                 debugPrint(
@@ -577,7 +599,7 @@ class PembayaranSewaController extends GetxController
       Get.snackbar(
         'Pesanan Dibatalkan',
         'Batas waktu pembayaran telah berakhir',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
         duration: Duration(seconds: 5),
@@ -624,7 +646,7 @@ class PembayaranSewaController extends GetxController
       Get.snackbar(
         'Error',
         'Gagal mengambil foto: \\${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -653,7 +675,7 @@ class PembayaranSewaController extends GetxController
       Get.snackbar(
         'Error',
         'Gagal memilih foto dari galeri: \\${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -679,7 +701,7 @@ class PembayaranSewaController extends GetxController
       Get.snackbar(
         'Error',
         'Mohon unggah bukti pembayaran terlebih dahulu',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -691,7 +713,7 @@ class PembayaranSewaController extends GetxController
       Get.snackbar(
         'Info',
         'Tidak ada perubahan yang perlu disimpan',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.blue,
         colorText: Colors.white,
       );
@@ -843,7 +865,7 @@ class PembayaranSewaController extends GetxController
             val?['status'] == 'PEMBAYARAN DENDA') {
           val?['status'] = 'PERIKSA PEMBAYARAN DENDA';
         } else {
-          val?['status'] = 'MEMERIKSA PEMBAYARAN';
+          val?['status'] = 'PERIKSA PEMBAYARAN';
         }
       });
 
@@ -894,7 +916,7 @@ class PembayaranSewaController extends GetxController
       Get.snackbar(
         'Sukses',
         'Bukti pembayaran berhasil diunggah',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.green,
         colorText: Colors.white,
       );
@@ -903,7 +925,7 @@ class PembayaranSewaController extends GetxController
       Get.snackbar(
         'Error',
         'Gagal mengunggah bukti pembayaran: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -930,19 +952,19 @@ class PembayaranSewaController extends GetxController
         newStatus = 'MENUNGGU PEMBAYARAN';
         break;
       case 1:
-        newStatus = 'MEMERIKSA PEMBAYARAN';
+        newStatus = 'PERIKSA PEMBAYARAN';
         break;
       case 2:
         newStatus = 'DITERIMA';
         break;
       case 3:
-        newStatus = 'PENGEMBALIAN';
+        newStatus = 'DIKEMBALIKAN';
         break;
       case 4:
         newStatus = 'PEMBAYARAN DENDA';
         break;
       case 5:
-        newStatus = 'MEMERIKSA PEMBAYARAN DENDA';
+        newStatus = 'PERIKSA PEMBAYARAN DENDA';
         break;
       case 6:
         newStatus = 'SELESAI';
@@ -965,7 +987,7 @@ class PembayaranSewaController extends GetxController
       case 'MENUNGGU PEMBAYARAN':
         currentStep.value = 0;
         break;
-      case 'MEMERIKSA PEMBAYARAN':
+      case 'PERIKSA PEMBAYARAN':
         currentStep.value = 1;
         break;
       case 'DITERIMA':
@@ -974,7 +996,7 @@ class PembayaranSewaController extends GetxController
       case 'AKTIF':
         currentStep.value = 3;
         break;
-      case 'PENGEMBALIAN':
+      case 'DIKEMBALIKAN':
         currentStep.value = 4;
         break;
       case 'PEMBAYARAN DENDA':
@@ -1003,7 +1025,7 @@ class PembayaranSewaController extends GetxController
   void submitCashPayment() {
     // Update order status
     orderDetails.update((val) {
-      val?['status'] = 'MEMERIKSA PEMBAYARAN';
+      val?['status'] = 'PERIKSA PEMBAYARAN';
     });
 
     // Cancel countdown timer as payment has been submitted
@@ -1013,7 +1035,7 @@ class PembayaranSewaController extends GetxController
     Get.snackbar(
       'Sukses',
       'Pembayaran tunai berhasil disubmit',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
       backgroundColor: Colors.green,
       colorText: Colors.white,
     );
@@ -1266,7 +1288,20 @@ class PembayaranSewaController extends GetxController
       updateCurrentStepBasedOnStatus();
 
       // Restart countdown timer if needed
-      if (orderDetails.value['status'] == 'MENUNGGU PEMBAYARAN') {
+      if ((orderDetails.value['status'] ?? '').toString().toUpperCase() ==
+          'MENUNGGU PEMBAYARAN') {
+        debugPrint('Status is MENUNGGU PEMBAYARAN, restarting countdown timer');
+
+        // Ensure updated_at is set to current time if refreshing with MENUNGGU PEMBAYARAN status
+        if (orderDetails.value['updated_at'] == null) {
+          orderDetails.update((val) {
+            val?['updated_at'] = DateTime.now().toIso8601String();
+          });
+          debugPrint(
+            'Set updated_at to current time: ${orderDetails.value['updated_at']}',
+          );
+        }
+
         _countdownTimer?.cancel();
         startCountdownTimer();
       }

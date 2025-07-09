@@ -81,11 +81,15 @@ class _PetugasAsetViewState extends State<PetugasAsetView>
         ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () {
-            // Navigate to PetugasTambahAsetView in add mode
+            // Navigate to PetugasTambahAsetView in add mode and refresh data when returning
             Get.toNamed(
               Routes.PETUGAS_TAMBAH_ASET,
               arguments: {'isEditing': false, 'assetData': null},
-            );
+            )?.then((_) {
+              // Refresh data when returning from tambah_aset page
+              debugPrint('Returning from tambah aset page, refreshing data...');
+              controller.loadAsetData();
+            });
           },
           backgroundColor: AppColorsPetugas.babyBlueBright,
           icon: Icon(Icons.add, color: AppColorsPetugas.blueGrotto),
@@ -456,7 +460,7 @@ class _PetugasAsetViewState extends State<PetugasAsetView>
                                   Get.snackbar(
                                     'Error',
                                     'ID Aset tidak valid',
-                                    snackPosition: SnackPosition.BOTTOM,
+                                    snackPosition: SnackPosition.TOP,
                                   );
                                   return;
                                 }
@@ -467,7 +471,13 @@ class _PetugasAsetViewState extends State<PetugasAsetView>
                                     'isEditing': true,
                                     'assetId': assetId,
                                   },
-                                );
+                                )?.then((_) {
+                                  // Refresh data when returning from edit page
+                                  debugPrint(
+                                    'Returning from edit aset page, refreshing data...',
+                                  );
+                                  controller.loadAsetData();
+                                });
                               },
                               child: Container(
                                 padding: const EdgeInsets.all(5),
@@ -670,235 +680,16 @@ class _PetugasAsetViewState extends State<PetugasAsetView>
     }
   }
 
-  void _showAddEditAssetDialog(
-    BuildContext context, {
-    Map<String, dynamic>? aset,
-  }) {
-    final isEditing = aset != null;
-
-    // In a real app, this would have proper form handling with controllers
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColorsPetugas.babyBlue,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        isEditing ? Icons.edit : Icons.add,
-                        color: AppColorsPetugas.navyBlue,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isEditing ? 'Edit Aset' : 'Tambah Aset Baru',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppColorsPetugas.navyBlue,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Silakan lengkapi form di bawah ini',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppColorsPetugas.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-
-                // Mock form - In a real app this would have actual form fields
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColorsPetugas.babyBlueBright,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColorsPetugas.babyBlue),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Form pengelolaan aset akan ditampilkan di sini dengan field untuk:',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColorsPetugas.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildMockFormField('Nama Aset', 'Contoh: Meja Rapat'),
-                      _buildMockFormField('Kategori', 'Pilih kategori aset'),
-                      _buildMockFormField(
-                        'Harga',
-                        'Masukkan harga per unit/periode',
-                      ),
-                      _buildMockFormField(
-                        'Satuan',
-                        'Contoh: per hari, per bulan',
-                      ),
-                      _buildMockFormField('Stok', 'Jumlah unit tersedia'),
-                      _buildMockFormField(
-                        'Deskripsi',
-                        'Keterangan lengkap aset',
-                      ),
-                      _buildMockToggle(
-                        'Status Ketersediaan',
-                        isEditing && aset?['tersedia'] == true,
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Action buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(
-                        'Batal',
-                        style: TextStyle(
-                          color: AppColorsPetugas.textSecondary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        // In a real app, we would save the form data
-                        Get.snackbar(
-                          isEditing ? 'Aset Diperbarui' : 'Aset Ditambahkan',
-                          isEditing
-                              ? 'Aset berhasil diperbarui'
-                              : 'Aset baru berhasil ditambahkan',
-                          backgroundColor: AppColorsPetugas.success,
-                          colorText: Colors.white,
-                          snackPosition: SnackPosition.BOTTOM,
-                          margin: const EdgeInsets.all(16),
-                          borderRadius: 10,
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColorsPetugas.blueGrotto,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(isEditing ? 'Simpan' : 'Tambah'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildMockFormField(String label, String hint) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: AppColorsPetugas.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColorsPetugas.babyBlue),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    hint,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColorsPetugas.textLight,
-                    ),
-                  ),
-                ),
-                Icon(
-                  Icons.keyboard_arrow_down,
-                  color: AppColorsPetugas.textSecondary,
-                  size: 20,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMockToggle(String label, bool value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: AppColorsPetugas.textPrimary,
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: (_) {},
-            activeColor: AppColorsPetugas.blueGrotto,
-          ),
-        ],
-      ),
-    );
+  void _showAddEditAssetDialog(BuildContext context) {
+    // Navigate to PetugasTambahAsetView in add mode and refresh data when returning
+    Get.toNamed(
+      Routes.PETUGAS_TAMBAH_ASET,
+      arguments: {'isEditing': false, 'assetData': null},
+    )?.then((_) {
+      // Refresh data when returning from tambah_aset page
+      debugPrint('Returning from tambah aset page, refreshing data...');
+      controller.loadAsetData();
+    });
   }
 
   void _showDeleteConfirmation(

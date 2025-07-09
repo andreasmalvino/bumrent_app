@@ -41,7 +41,7 @@ class NavigationService extends GetxService {
       Get.snackbar(
         'Error',
         'ID aset tidak valid',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -63,7 +63,7 @@ class NavigationService extends GetxService {
       Get.snackbar(
         'Error',
         'ID sewa tidak valid',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -87,7 +87,7 @@ class NavigationService extends GetxService {
       Get.snackbar(
         'Error',
         'ID paket tidak valid',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -133,7 +133,7 @@ class NavigationService extends GetxService {
   void toProfile() {
     debugPrint('🧭 Navigating to Profile');
     setNavIndex(2); // Profile tab
-    Get.offNamed(Routes.PROFILE);
+    Get.offAllNamed(Routes.PROFILE);
   }
 
   /// Navigasi ke dashboard sesuai role

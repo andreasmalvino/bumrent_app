@@ -19,12 +19,12 @@ class PetugasBumdesBinding extends Bindings {
       print('Error removing controller: $e');
     }
 
-    // Gunakan put untuk memastikan controller selalu tersedia dan permanent
-    Get.put<PetugasBumdesDashboardController>(
-      PetugasBumdesDashboardController(),
-      permanent: true,
+    // Gunakan lazyPut untuk memastikan controller hanya diinisialisasi saat dibutuhkan
+    Get.lazyPut<PetugasBumdesDashboardController>(
+      () => PetugasBumdesDashboardController(),
+      fenix: true, // Akan dibuat ulang jika dihapus
     );
 
-    print('✅ PetugasBumdesDashboardController registered successfully');
+    print('✅ PetugasBumdesDashboardController initialized successfully');
   }
 }

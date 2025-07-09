@@ -111,6 +111,27 @@ class _PetugasPenyewaViewState extends State<PetugasPenyewaView>
               ),
             ),
           ),
+          actions: [
+            // Tambahkan indikator refresh
+            Obx(
+              () =>
+                  controller.isRefreshing.value
+                      ? Padding(
+                        padding: const EdgeInsets.only(right: 16.0),
+                        child: Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        ),
+                      )
+                      : SizedBox.shrink(),
+            ),
+          ],
         ),
         drawer: PetugasSideNavbar(controller: dashboardController),
         drawerEdgeDragWidth: 60,
@@ -148,7 +169,13 @@ class _PetugasPenyewaViewState extends State<PetugasPenyewaView>
                         }
 
                         if (controller.filteredPenyewaList.isEmpty) {
-                          return _buildEmptyState();
+                          return RefreshIndicator(
+                            onRefresh: () async {
+                              await controller.refreshPenyewaList();
+                            },
+                            color: AppColorsPetugas.blueGrotto,
+                            child: _buildEmptyStateWithScrollView(),
+                          );
                         }
 
                         return _buildPenyewaList();
@@ -282,208 +309,234 @@ class _PetugasPenyewaViewState extends State<PetugasPenyewaView>
     );
   }
 
+  // Widget untuk menampilkan empty state dengan ScrollView untuk mendukung RefreshIndicator
+  Widget _buildEmptyStateWithScrollView() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(
+          height: MediaQuery.of(Get.context!).size.height * 0.7,
+          child: _buildEmptyState(),
+        ),
+      ],
+    );
+  }
+
   Widget _buildPenyewaList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: controller.filteredPenyewaList.length,
-      itemBuilder: (context, index) {
-        final penyewa = controller.filteredPenyewaList[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
-            child: InkWell(
+    return RefreshIndicator(
+      onRefresh: () async {
+        await controller.refreshPenyewaList();
+      },
+      color: AppColorsPetugas.blueGrotto,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: controller.filteredPenyewaList.length,
+        itemBuilder: (context, index) {
+          final penyewa = controller.filteredPenyewaList[index];
+          return Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              child: Padding(
-                padding: const EdgeInsets.all(0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header with avatar and badge
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColorsPetugas.babyBlueLight.withOpacity(0.2),
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          topRight: Radius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.all(0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header with avatar and badge
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColorsPetugas.babyBlueLight.withOpacity(
+                            0.2,
+                          ),
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(16),
+                            topRight: Radius.circular(16),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            // Avatar with border
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: CircleAvatar(
+                                radius: 24,
+                                backgroundColor: AppColorsPetugas.babyBlueLight,
+                                backgroundImage:
+                                    penyewa['avatar'] != null &&
+                                            penyewa['avatar']
+                                                .toString()
+                                                .isNotEmpty
+                                        ? NetworkImage(penyewa['avatar'])
+                                        : null,
+                                child:
+                                    penyewa['avatar'] == null ||
+                                            penyewa['avatar'].toString().isEmpty
+                                        ? const Icon(
+                                          Icons.person,
+                                          color: Colors.white,
+                                        )
+                                        : null,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            // Name and email
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    penyewa['nama_lengkap'] ??
+                                        'Nama tidak tersedia',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColorsPetugas.navyBlue,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.email_outlined,
+                                        size: 14,
+                                        color: Colors.grey[600],
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          penyewa['email'] ??
+                                              'Email tidak tersedia',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.grey[600],
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            _buildStatusBadge(penyewa['status']),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          // Avatar with border
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: 24,
-                              backgroundColor: AppColorsPetugas.babyBlueLight,
-                              backgroundImage:
-                                  penyewa['avatar'] != null &&
-                                          penyewa['avatar']
-                                              .toString()
-                                              .isNotEmpty
-                                      ? NetworkImage(penyewa['avatar'])
-                                      : null,
-                              child:
-                                  penyewa['avatar'] == null ||
-                                          penyewa['avatar'].toString().isEmpty
-                                      ? const Icon(
-                                        Icons.person,
-                                        color: Colors.white,
-                                      )
-                                      : null,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          // Name and email
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  penyewa['nama_lengkap'] ??
-                                      'Nama tidak tersedia',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColorsPetugas.navyBlue,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.email_outlined,
-                                      size: 14,
-                                      color: Colors.grey[600],
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Expanded(
-                                      child: Text(
-                                        penyewa['email'] ??
-                                            'Email tidak tersedia',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: Colors.grey[600],
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          _buildStatusBadge(penyewa['status']),
-                        ],
-                      ),
-                    ),
 
-                    // Content section
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Show additional info only for Aktif and Ditangguhkan tabs
-                          if (controller.currentTabIndex.value != 0) ...[
-                            Row(
-                              children: [
-                                _buildInfoChip(
-                                  Icons.credit_card_outlined,
-                                  'NIK: ${penyewa['nik'] ?? 'Tidak tersedia'}',
-                                ),
-                                const SizedBox(width: 8),
-                                _buildInfoChip(
-                                  Icons.phone_outlined,
-                                  penyewa['no_hp'] ?? 'No. HP tidak tersedia',
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                _buildInfoTile(
-                                  'Total Sewa',
-                                  penyewa['total_sewa']?.toString() ?? '0',
-                                  Icons.shopping_bag_outlined,
-                                  AppColorsPetugas.blueGrotto,
-                                ),
-                                if (controller.currentTabIndex.value == 1 ||
-                                    controller.currentTabIndex.value == 2)
-                                  _buildActionChip(
-                                    label: 'Lihat Detail',
-                                    color: AppColorsPetugas.blueGrotto,
-                                    icon: Icons.visibility,
-                                    onTap: () {
-                                      Get.toNamed(
-                                        Routes.PETUGAS_DETAIL_PENYEWA,
-                                        arguments: {
-                                          'userId': penyewa['user_id'],
-                                        },
-                                      );
-                                    },
+                      // Content section
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Show additional info only for Aktif and Ditangguhkan tabs
+                            if (controller.currentTabIndex.value != 0) ...[
+                              Row(
+                                children: [
+                                  _buildInfoChip(
+                                    Icons.credit_card_outlined,
+                                    'NIK: ${penyewa['nik'] ?? 'Tidak tersedia'}',
                                   ),
-                              ],
-                            ),
-                          ],
+                                  const SizedBox(width: 8),
+                                  _buildInfoChip(
+                                    Icons.phone_outlined,
+                                    penyewa['no_hp'] ?? 'No. HP tidak tersedia',
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  _buildInfoTile(
+                                    'Total Sewa',
+                                    penyewa['total_sewa']?.toString() ?? '0',
+                                    Icons.shopping_bag_outlined,
+                                    AppColorsPetugas.blueGrotto,
+                                  ),
+                                  if (controller.currentTabIndex.value == 1 ||
+                                      controller.currentTabIndex.value == 2)
+                                    _buildActionChip(
+                                      label: 'Lihat Detail',
+                                      color: AppColorsPetugas.blueGrotto,
+                                      icon: Icons.visibility,
+                                      onTap: () {
+                                        Get.toNamed(
+                                          Routes.PETUGAS_DETAIL_PENYEWA,
+                                          arguments: {
+                                            'userId': penyewa['user_id'],
+                                          },
+                                        );
+                                      },
+                                    ),
+                                ],
+                              ),
+                            ],
 
-                          // Add "Detail" button for Verifikasi tab
-                          if (controller.currentTabIndex.value == 0) ...[
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: _buildActionChip(
-                                    label: 'Lihat Detail & Verifikasi',
-                                    color: AppColorsPetugas.blueGrotto,
-                                    icon: Icons.visibility,
-                                    onTap: () {
-                                      Get.toNamed(
-                                        Routes.PETUGAS_DETAIL_PENYEWA,
-                                        arguments: {
-                                          'userId': penyewa['user_id'],
-                                        },
-                                      );
-                                    },
+                            // Add "Detail" button for Verifikasi tab
+                            if (controller.currentTabIndex.value == 0) ...[
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: _buildActionChip(
+                                      label: 'Lihat Detail & Verifikasi',
+                                      color: AppColorsPetugas.blueGrotto,
+                                      icon: Icons.visibility,
+                                      onTap: () {
+                                        Get.toNamed(
+                                          Routes.PETUGAS_DETAIL_PENYEWA,
+                                          arguments: {
+                                            'userId': penyewa['user_id'],
+                                          },
+                                        );
+                                      },
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
+                                ],
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 

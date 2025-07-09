@@ -567,7 +567,7 @@ class PetugasManajemenBumdesView
                       Get.snackbar(
                         'Info',
                         'Fitur tambah rekening bank sedang dalam pengembangan',
-                        snackPosition: SnackPosition.BOTTOM,
+                        snackPosition: SnackPosition.TOP,
                       );
                     },
                     style: ElevatedButton.styleFrom(
@@ -639,7 +639,7 @@ class PetugasManajemenBumdesView
                       Get.snackbar(
                         'Info',
                         'Fitur edit rekening bank sedang dalam pengembangan',
-                        snackPosition: SnackPosition.BOTTOM,
+                        snackPosition: SnackPosition.TOP,
                       );
                     },
                     style: ElevatedButton.styleFrom(
@@ -689,7 +689,7 @@ class PetugasManajemenBumdesView
                       Get.snackbar(
                         'Info',
                         'Fitur hapus rekening bank sedang dalam pengembangan',
-                        snackPosition: SnackPosition.BOTTOM,
+                        snackPosition: SnackPosition.TOP,
                       );
                     },
                     style: ElevatedButton.styleFrom(
@@ -765,7 +765,7 @@ class PetugasManajemenBumdesView
                       Get.snackbar(
                         'Info',
                         'Fitur tambah mitra sedang dalam pengembangan',
-                        snackPosition: SnackPosition.BOTTOM,
+                        snackPosition: SnackPosition.TOP,
                       );
                     },
                     style: ElevatedButton.styleFrom(
@@ -845,7 +845,7 @@ class PetugasManajemenBumdesView
                       Get.snackbar(
                         'Info',
                         'Fitur edit mitra sedang dalam pengembangan',
-                        snackPosition: SnackPosition.BOTTOM,
+                        snackPosition: SnackPosition.TOP,
                       );
                     },
                     style: ElevatedButton.styleFrom(
@@ -895,7 +895,7 @@ class PetugasManajemenBumdesView
                       Get.snackbar(
                         'Info',
                         'Fitur hapus mitra sedang dalam pengembangan',
-                        snackPosition: SnackPosition.BOTTOM,
+                        snackPosition: SnackPosition.TOP,
                       );
                     },
                     style: ElevatedButton.styleFrom(

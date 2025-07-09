@@ -285,9 +285,10 @@ class OrderSewaAsetView extends GetView<OrderSewaAsetController> {
 
     return WillPopScope(
       onWillPop: () async {
-        // Handle back button press here
-        handleBackButtonPress();
-        return false; // We handle the navigation ourselves
+        // Bersihkan controller saat pengguna keluar dari halaman dengan tombol back perangkat
+        controller.clearData();
+        debugPrint('🧹 Controller data cleared by WillPopScope');
+        return true;
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
@@ -474,108 +475,60 @@ class OrderSewaAsetView extends GetView<OrderSewaAsetController> {
             },
             // Add onTap handler for the image
             onTap: () {
-              debugPrint("📸 Image tapped - opening fullscreen viewer");
-              final imageUrl = controller.getCurrentPhotoUrl();
-              if (imageUrl != null && imageUrl.isNotEmpty) {
-                debugPrint("📸 Current image URL: $imageUrl");
-                debugPrint("📸 Total photos: ${controller.assetPhotos.length}");
+              debugPrint(
+                "📸 Image tapped - attempting to open fullscreen viewer",
+              );
+              try {
+                final imageUrl = controller.getCurrentPhotoUrl();
+                if (imageUrl != null && imageUrl.isNotEmpty) {
+                  debugPrint("📸 Current image URL: $imageUrl");
+                  debugPrint(
+                    "📸 Total photos: ${controller.assetPhotos.length}",
+                  );
 
-                // Extract all image URLs from the assetPhotos collection
-                final List<String> photoUrls = [];
-                for (var photo in controller.assetPhotos) {
-                  final url = photo.fotoAset;
-                  if (url.isNotEmpty) {
-                    photoUrls.add(url);
-                    debugPrint("📸 Added photo URL: $url");
+                  // Extract all image URLs from the assetPhotos collection
+                  final List<String> photoUrls = [];
+                  for (var photo in controller.assetPhotos) {
+                    final url = photo.fotoAset;
+                    if (url.isNotEmpty) {
+                      photoUrls.add(url);
+                      debugPrint("📸 Added photo URL: $url");
+                    }
                   }
+
+                  if (photoUrls.isEmpty) {
+                    debugPrint("📸 No valid photo URLs found");
+                    return;
+                  }
+
+                  debugPrint(
+                    "📸 About to navigate to fullscreen viewer with ${photoUrls.length} photos",
+                  );
+
+                  // Navigate to full screen image viewer using GetX
+                  Get.to(
+                    () => FullScreenImageViewer(
+                      imageUrls: photoUrls,
+                      initialIndex: controller.currentPhotoIndex.value,
+                    ),
+                    fullscreenDialog: true,
+                    transition: Transition.fade,
+                  );
+
+                  debugPrint("📸 Navigation initiated");
+                } else {
+                  debugPrint("📸 No valid current image URL");
                 }
-
-                if (photoUrls.isEmpty) {
-                  debugPrint("📸 No valid photo URLs found");
-                  return;
-                }
-
-                showDialog(
-                  context: Get.context!,
-                  builder:
-                      (context) => Dialog(
-                        insetPadding: EdgeInsets.zero,
-                        child: Container(
-                          width: double.infinity,
-                          height: double.infinity,
-                          color: Colors.black,
-                          child: Stack(
-                            children: [
-                              // Image
-                              Center(
-                                child: InteractiveViewer(
-                                  panEnabled: true,
-                                  boundaryMargin: EdgeInsets.all(80),
-                                  minScale: 0.5,
-                                  maxScale: 4,
-                                  child: CachedNetworkImage(
-                                    imageUrl:
-                                        photoUrls[controller
-                                            .currentPhotoIndex
-                                            .value],
-                                    fit: BoxFit.contain,
-                                    placeholder:
-                                        (context, url) => Center(
-                                          child: CircularProgressIndicator(
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                    errorWidget:
-                                        (context, url, error) => Center(
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.broken_image_rounded,
-                                                size: 64,
-                                                color: Colors.grey[400],
-                                              ),
-                                              SizedBox(height: 16),
-                                              Text(
-                                                'Gagal memuat foto',
-                                                style: TextStyle(
-                                                  color: Colors.grey[600],
-                                                  fontSize: 16,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                  ),
-                                ),
-                              ),
-
-                              // Close button
-                              Positioned(
-                                top: 40,
-                                right: 20,
-                                child: IconButton(
-                                  icon: Container(
-                                    padding: EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black54,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      Icons.close,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  onPressed: () => Navigator.of(context).pop(),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+              } catch (e) {
+                debugPrint("📸 ERROR in image tap handler: $e");
+                Get.snackbar(
+                  'Error',
+                  'Failed to open image viewer',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: Colors.red.shade100,
+                  colorText: Colors.red.shade900,
+                  duration: const Duration(seconds: 2),
                 );
-              } else {
-                debugPrint("📸 No valid current image URL");
               }
             },
             child: ClipRRect(
@@ -667,17 +620,19 @@ class OrderSewaAsetView extends GetView<OrderSewaAsetController> {
 
         // Gradient overlay
         Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withOpacity(0.1),
-                  Colors.transparent,
-                  Colors.black.withOpacity(0.3),
-                ],
-                stops: [0.0, 0.6, 1.0],
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.1),
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.3),
+                  ],
+                  stops: [0.0, 0.6, 1.0],
+                ),
               ),
             ),
           ),
@@ -687,13 +642,15 @@ class OrderSewaAsetView extends GetView<OrderSewaAsetController> {
         Positioned(
           bottom: 16,
           right: 16,
-          child: Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(12),
+          child: IgnorePointer(
+            child: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.zoom_in, color: Colors.white, size: 24),
             ),
-            child: Icon(Icons.zoom_in, color: Colors.white, size: 24),
           ),
         ),
 
@@ -1058,88 +1015,176 @@ class OrderSewaAsetView extends GetView<OrderSewaAsetController> {
                                                   asetId,
                                                 ),
                                                 builder: (context, snapshot) {
-                                                  return Container(
-                                                    width: 60,
-                                                    height: 60,
-                                                    decoration: BoxDecoration(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            8,
-                                                          ),
-                                                      color:
-                                                          AppColors
-                                                              .surfaceLight,
-                                                    ),
-                                                    child:
-                                                        snapshot.connectionState ==
-                                                                ConnectionState
-                                                                    .waiting
-                                                            ? Center(
-                                                              child: SizedBox(
-                                                                width: 20,
-                                                                height: 20,
-                                                                child: CircularProgressIndicator(
-                                                                  strokeWidth:
-                                                                      2,
-                                                                  color:
-                                                                      AppColors
-                                                                          .primary,
-                                                                ),
+                                                  return GestureDetector(
+                                                    onTap: () async {
+                                                      debugPrint(
+                                                        "📸 Package item image tapped - attempting to open fullscreen viewer for asset ID: $asetId",
+                                                      );
+                                                      try {
+                                                        // Get all photos for this asset
+                                                        final photos =
+                                                            await controller
+                                                                .asetProvider
+                                                                .getAsetPhotos(
+                                                                  asetId,
+                                                                );
+                                                        if (photos.isEmpty) {
+                                                          debugPrint(
+                                                            "📸 No photos found for asset ID: $asetId",
+                                                          );
+                                                          return;
+                                                        }
+
+                                                        // Extract valid photo URLs
+                                                        final List<String>
+                                                        photoUrls = [];
+                                                        for (var photo
+                                                            in photos) {
+                                                          final url =
+                                                              photo.fotoAset;
+                                                          if (url.isNotEmpty) {
+                                                            photoUrls.add(url);
+                                                            debugPrint(
+                                                              "📸 Added photo URL: $url",
+                                                            );
+                                                          }
+                                                        }
+
+                                                        if (photoUrls.isEmpty) {
+                                                          debugPrint(
+                                                            "📸 No valid photo URLs found",
+                                                          );
+                                                          return;
+                                                        }
+
+                                                        debugPrint(
+                                                          "📸 About to navigate to fullscreen viewer with ${photoUrls.length} photos",
+                                                        );
+
+                                                        // Navigate to full screen image viewer using GetX
+                                                        Get.to(
+                                                          () =>
+                                                              FullScreenImageViewer(
+                                                                imageUrls:
+                                                                    photoUrls,
+                                                                initialIndex: 0,
                                                               ),
-                                                            )
-                                                            : snapshot.data !=
-                                                                null
-                                                            ? ClipRRect(
-                                                              borderRadius:
-                                                                  BorderRadius.circular(
-                                                                    8,
+                                                          fullscreenDialog:
+                                                              true,
+                                                          transition:
+                                                              Transition.fade,
+                                                        );
+
+                                                        debugPrint(
+                                                          "📸 Navigation initiated",
+                                                        );
+                                                      } catch (e) {
+                                                        debugPrint(
+                                                          "📸 ERROR in package item image tap handler: $e",
+                                                        );
+                                                        Get.snackbar(
+                                                          'Error',
+                                                          'Failed to open image viewer',
+                                                          snackPosition:
+                                                              SnackPosition
+                                                                  .BOTTOM,
+                                                          backgroundColor:
+                                                              Colors
+                                                                  .red
+                                                                  .shade100,
+                                                          colorText:
+                                                              Colors
+                                                                  .red
+                                                                  .shade900,
+                                                          duration:
+                                                              const Duration(
+                                                                seconds: 2,
+                                                              ),
+                                                        );
+                                                      }
+                                                    },
+                                                    child: Container(
+                                                      width: 60,
+                                                      height: 60,
+                                                      decoration: BoxDecoration(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              8,
+                                                            ),
+                                                        color:
+                                                            AppColors
+                                                                .surfaceLight,
+                                                      ),
+                                                      child:
+                                                          snapshot.connectionState ==
+                                                                  ConnectionState
+                                                                      .waiting
+                                                              ? Center(
+                                                                child: SizedBox(
+                                                                  width: 20,
+                                                                  height: 20,
+                                                                  child: CircularProgressIndicator(
+                                                                    strokeWidth:
+                                                                        2,
+                                                                    color:
+                                                                        AppColors
+                                                                            .primary,
                                                                   ),
-                                                              child: CachedNetworkImage(
-                                                                imageUrl:
-                                                                    snapshot
-                                                                        .data!,
-                                                                fit:
-                                                                    BoxFit
-                                                                        .cover,
-                                                                placeholder:
-                                                                    (
-                                                                      context,
-                                                                      url,
-                                                                    ) => Center(
-                                                                      child: SizedBox(
-                                                                        width:
-                                                                            20,
-                                                                        height:
-                                                                            20,
-                                                                        child: CircularProgressIndicator(
-                                                                          strokeWidth:
-                                                                              2,
-                                                                          color:
-                                                                              AppColors.primary,
+                                                                ),
+                                                              )
+                                                              : snapshot.data !=
+                                                                  null
+                                                              ? ClipRRect(
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      8,
+                                                                    ),
+                                                                child: CachedNetworkImage(
+                                                                  imageUrl:
+                                                                      snapshot
+                                                                          .data!,
+                                                                  fit:
+                                                                      BoxFit
+                                                                          .cover,
+                                                                  placeholder:
+                                                                      (
+                                                                        context,
+                                                                        url,
+                                                                      ) => Center(
+                                                                        child: SizedBox(
+                                                                          width:
+                                                                              20,
+                                                                          height:
+                                                                              20,
+                                                                          child: CircularProgressIndicator(
+                                                                            strokeWidth:
+                                                                                2,
+                                                                            color:
+                                                                                AppColors.primary,
+                                                                          ),
                                                                         ),
                                                                       ),
-                                                                    ),
-                                                                errorWidget:
-                                                                    (
-                                                                      context,
-                                                                      url,
-                                                                      error,
-                                                                    ) => Icon(
-                                                                      Icons
-                                                                          .image_not_supported_outlined,
-                                                                      color:
-                                                                          AppColors
-                                                                              .textLight,
-                                                                    ),
+                                                                  errorWidget:
+                                                                      (
+                                                                        context,
+                                                                        url,
+                                                                        error,
+                                                                      ) => Icon(
+                                                                        Icons
+                                                                            .image_not_supported_outlined,
+                                                                        color:
+                                                                            AppColors.textLight,
+                                                                      ),
+                                                                ),
+                                                              )
+                                                              : Icon(
+                                                                Icons
+                                                                    .image_not_supported_outlined,
+                                                                color:
+                                                                    AppColors
+                                                                        .textLight,
                                                               ),
-                                                            )
-                                                            : Icon(
-                                                              Icons
-                                                                  .image_not_supported_outlined,
-                                                              color:
-                                                                  AppColors
-                                                                      .textLight,
-                                                            ),
+                                                    ),
                                                   );
                                                 },
                                               ),
@@ -2458,98 +2503,173 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
     for (int i = 0; i < widget.imageUrls.length && i < 3; i++) {
       debugPrint("📸 Image URL $i: ${widget.imageUrls[i]}");
     }
+
+    // Hide status bar for immersive view
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: [], // Hide all system UI
+    ).catchError((error) {
+      debugPrint("📸 Error setting system UI mode: $error");
+    });
   }
 
   @override
   void dispose() {
+    // Restore status bar when exiting
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values, // Restore all system UI
+    ).catchError((error) {
+      debugPrint("📸 Error restoring system UI mode: $error");
+    });
+
     pageController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // Photo Gallery
-          PhotoViewGallery.builder(
-            scrollPhysics: const BouncingScrollPhysics(),
-            builder: (BuildContext context, int index) {
-              final imageUrl = widget.imageUrls[index];
-              debugPrint("📸 Building image at index $index: $imageUrl");
+    return WillPopScope(
+      onWillPop: () async {
+        // Ensure UI is restored on back button press
+        SystemChrome.setEnabledSystemUIMode(
+          SystemUiMode.manual,
+          overlays: SystemUiOverlay.values,
+        );
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              // Photo Gallery
+              GestureDetector(
+                onTap: () {
+                  // Add tap functionality to close when tapping on image
+                  Navigator.of(context).pop();
+                },
+                child: PhotoViewGallery.builder(
+                  scrollPhysics: const BouncingScrollPhysics(),
+                  builder: (BuildContext context, int index) {
+                    final imageUrl = widget.imageUrls[index];
+                    debugPrint("📸 Building image at index $index: $imageUrl");
 
-              return PhotoViewGalleryPageOptions(
-                imageProvider: CachedNetworkImageProvider(imageUrl),
-                initialScale: PhotoViewComputedScale.contained,
-                minScale: PhotoViewComputedScale.contained * 0.8,
-                maxScale: PhotoViewComputedScale.covered * 2.0,
-                heroAttributes: PhotoViewHeroAttributes(tag: "photo_$index"),
-              );
-            },
-            itemCount: widget.imageUrls.length,
-            loadingBuilder:
-                (context, event) => Center(
-                  child: SizedBox(
-                    width: 30.0,
-                    height: 30.0,
-                    child: CircularProgressIndicator(
-                      value:
-                          event == null
-                              ? 0
-                              : event.cumulativeBytesLoaded /
-                                  event.expectedTotalBytes!,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    return PhotoViewGalleryPageOptions(
+                      imageProvider: CachedNetworkImageProvider(imageUrl),
+                      initialScale: PhotoViewComputedScale.contained,
+                      minScale: PhotoViewComputedScale.contained * 0.8,
+                      maxScale: PhotoViewComputedScale.covered * 2.0,
+                      heroAttributes: PhotoViewHeroAttributes(
+                        tag: "photo_$index",
+                      ),
+                      errorBuilder: (context, error, stackTrace) {
+                        debugPrint("📸 Error loading image: $error");
+                        return Container(
+                          color: Colors.black,
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.broken_image_rounded,
+                                  color: Colors.white70,
+                                  size: 50,
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Gagal memuat gambar',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                  itemCount: widget.imageUrls.length,
+                  loadingBuilder:
+                      (context, event) => Center(
+                        child: Container(
+                          width: 40.0,
+                          height: 40.0,
+                          child: CircularProgressIndicator(
+                            value:
+                                event == null
+                                    ? 0
+                                    : event.cumulativeBytesLoaded /
+                                        (event.expectedTotalBytes ?? 1),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                  backgroundDecoration: const BoxDecoration(
+                    color: Colors.black,
+                  ),
+                  pageController: pageController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      currentIndex = index;
+                      debugPrint("📸 Page changed to index: $index");
+                    });
+                  },
+                ),
+              ),
+
+              // Close button
+              Positioned(
+                top: 20,
+                left: 20,
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 24,
                     ),
                   ),
                 ),
-            backgroundDecoration: BoxDecoration(color: Colors.black),
-            pageController: pageController,
-            onPageChanged: (index) {
-              setState(() {
-                currentIndex = index;
-                debugPrint("📸 Page changed to index: $index");
-              });
-            },
-          ),
-
-          // Close button
-          Positioned(
-            top: 40,
-            left: 20,
-            child: IconButton(
-              icon: Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.close, color: Colors.white),
               ),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ),
 
-          // Image counter
-          Positioned(
-            top: 40,
-            right: 20,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                '${currentIndex + 1}/${widget.imageUrls.length}',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+              // Image counter
+              Positioned(
+                top: 20,
+                right: 20,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    '${currentIndex + 1}/${widget.imageUrls.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

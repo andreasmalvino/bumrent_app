@@ -476,7 +476,7 @@ class ListPetugasMitraView extends GetView<ListPetugasMitraController> {
                               Get.snackbar(
                                 'Error',
                                 'Harap isi semua data',
-                                snackPosition: SnackPosition.BOTTOM,
+                                snackPosition: SnackPosition.TOP,
                                 backgroundColor: Colors.red,
                                 colorText: Colors.white,
                               );
@@ -600,7 +600,7 @@ class ListPetugasMitraView extends GetView<ListPetugasMitraController> {
                               Get.snackbar(
                                 'Error',
                                 'Harap isi semua data',
-                                snackPosition: SnackPosition.BOTTOM,
+                                snackPosition: SnackPosition.TOP,
                                 backgroundColor: Colors.red,
                                 colorText: Colors.white,
                               );

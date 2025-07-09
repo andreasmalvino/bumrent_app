@@ -1,12 +1,14 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../data/providers/auth_provider.dart';
-import '../../../routes/app_routes.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bumrent_app/app/data/providers/auth_provider.dart';
+import 'package:bumrent_app/app/data/providers/aset_provider.dart';
+import 'package:bumrent_app/app/data/providers/pesanan_provider.dart';
+import 'package:bumrent_app/app/routes/app_routes.dart';
 import '../../../services/sewa_service.dart';
 import '../../../services/service_manager.dart';
 import '../../../data/models/pembayaran_model.dart';
 import '../../../services/pembayaran_service.dart';
-import '../../../data/providers/aset_provider.dart';
-import '../../../data/providers/pesanan_provider.dart';
 
 class PetugasBumdesDashboardController extends GetxController {
   AuthProvider? _authProvider;
@@ -297,37 +299,56 @@ class PetugasBumdesDashboardController extends GetxController {
 
   void logout() async {
     try {
-      // Clear providers data
+      // Store login route for navigation
+      final loginRoute = Routes.LOGIN;
+
+      // Sign out from Supabase
       if (_authProvider != null) {
-        // Sign out from Supabase
         await _authProvider!.signOut();
-
-        // Clear auth provider data
-        _authProvider!.clearAuthData();
-
-        // Clear aset provider data
-        try {
-          final asetProvider = Get.find<AsetProvider>();
-          asetProvider.clearCache();
-        } catch (e) {
-          print('Error clearing AsetProvider: $e');
-        }
-
-        // Clear pesanan provider data
-        try {
-          final pesananProvider = Get.find<PesananProvider>();
-          pesananProvider.clearCache();
-        } catch (e) {
-          print('Error clearing PesananProvider: $e');
-        }
       }
 
-      // Navigate to login screen
-      Get.offAllNamed(Routes.LOGIN);
+      // Navigate to login screen while context is still valid
+      Get.offAllNamed(loginRoute);
+
+      // Clear auth provider data if available
+      if (_authProvider != null) {
+        _authProvider!.clearAuthData();
+      }
+
+      // Clear provider caches
+      _clearProviderCaches();
+
+      // Clean up GetX controllers but keep navigation intact
+      Get.deleteAll(force: false);
     } catch (e) {
       print('Error during logout: $e');
       // Still try to navigate to login even if sign out fails
       Get.offAllNamed(Routes.LOGIN);
     }
+  }
+
+  // Helper method to clear provider caches that need explicit clearing
+  void _clearProviderCaches() {
+    try {
+      // Clear AsetProvider cache
+      if (Get.isRegistered<AsetProvider>()) {
+        final asetProvider = Get.find<AsetProvider>();
+        asetProvider.clearCache();
+      }
+    } catch (e) {
+      print('Error clearing AsetProvider: $e');
+    }
+
+    try {
+      // Clear PesananProvider cache
+      if (Get.isRegistered<PesananProvider>()) {
+        final pesananProvider = Get.find<PesananProvider>();
+        pesananProvider.clearCache();
+      }
+    } catch (e) {
+      print('Error clearing PesananProvider: $e');
+    }
+
+    // Add other providers here that need explicit cache clearing
   }
 }

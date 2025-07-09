@@ -15,7 +15,9 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
       appBar: AppBar(
         title: Obx(
           () => Text(
-            controller.isEditing.value ? 'Edit Paket' : 'Tambah Paket',
+            controller.isViewing.value
+                ? 'Detail Paket'
+                : (controller.isEditing.value ? 'Edit Paket' : 'Tambah Paket'),
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
         ),
@@ -168,15 +170,16 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
                   'Item Paket',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                ElevatedButton.icon(
-                  onPressed: () => _showAddItemDialog(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Tambah Item'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColorsPetugas.babyBlueLight,
-                    foregroundColor: AppColorsPetugas.blueGrotto,
+                if (!controller.isViewing.value)
+                  ElevatedButton.icon(
+                    onPressed: () => _showAddItemDialog(),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Tambah Item'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColorsPetugas.babyBlueLight,
+                      foregroundColor: AppColorsPetugas.blueGrotto,
+                    ),
                   ),
-                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -208,26 +211,33 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
                                     Text('Stok tersedia: ${item['stok']}'),
                                 ],
                               ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.edit,
-                                      color: Colors.blue,
-                                    ),
-                                    onPressed: () => _showEditItemDialog(index),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.delete,
-                                      color: Colors.red,
-                                    ),
-                                    onPressed:
-                                        () => controller.removeItem(index),
-                                  ),
-                                ],
-                              ),
+                              trailing:
+                                  controller.isViewing.value
+                                      ? null
+                                      : Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.edit,
+                                              color: Colors.blue,
+                                            ),
+                                            onPressed:
+                                                () =>
+                                                    _showEditItemDialog(index),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.delete,
+                                              color: Colors.red,
+                                            ),
+                                            onPressed:
+                                                () => controller.removeItem(
+                                                  index,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
                             ),
                           );
                         },
@@ -526,6 +536,9 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
     String? prefixText,
     IconData? prefixIcon,
   }) {
+    final petugasController =
+        this.controller; // Reference to PetugasTambahPaketController
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -539,7 +552,7 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
                 color: AppColorsPetugas.textPrimary,
               ),
             ),
-            if (isRequired) ...[
+            if (isRequired && !petugasController.isViewing.value) ...[
               const SizedBox(width: 4),
               Text(
                 '*',
@@ -553,43 +566,55 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
           ],
         ),
         const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          maxLines: maxLines,
-          keyboardType: keyboardType,
-          inputFormatters: inputFormatters,
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: AppColorsPetugas.textLight),
-            filled: true,
-            fillColor: AppColorsPetugas.babyBlueBright,
-            prefixText: prefixText,
-            prefixIcon:
-                prefixIcon != null
-                    ? Icon(
-                      prefixIcon,
-                      size: 20,
-                      color: AppColorsPetugas.textSecondary,
-                    )
-                    : null,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
+        Obx(
+          () => TextFormField(
+            controller: controller,
+            maxLines: maxLines,
+            keyboardType: keyboardType,
+            inputFormatters: inputFormatters,
+            readOnly: petugasController.isViewing.value,
+            style: TextStyle(
+              color:
+                  petugasController.isViewing.value
+                      ? AppColorsPetugas.textSecondary
+                      : AppColorsPetugas.textPrimary,
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(
-                color: AppColorsPetugas.blueGrotto,
-                width: 1.5,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(color: AppColorsPetugas.textLight),
+              filled: true,
+              fillColor:
+                  petugasController.isViewing.value
+                      ? AppColorsPetugas.babyBlueLight
+                      : AppColorsPetugas.babyBlueBright,
+              prefixText: prefixText,
+              prefixIcon:
+                  prefixIcon != null
+                      ? Icon(
+                        prefixIcon,
+                        size: 20,
+                        color: AppColorsPetugas.textSecondary,
+                      )
+                      : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
               ),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 12,
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(
+                  color: AppColorsPetugas.blueGrotto,
+                  width: 1.5,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
             ),
           ),
         ),
@@ -646,7 +671,10 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
                   vertical: 12,
                 ),
                 filled: true,
-                fillColor: AppColorsPetugas.babyBlueBright,
+                fillColor:
+                    controller.isViewing.value
+                        ? AppColorsPetugas.babyBlueLight
+                        : AppColorsPetugas.babyBlueBright,
               ),
               items:
                   options.map((option) {
@@ -661,9 +689,12 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
                       ),
                     );
                   }).toList(),
-              onChanged: (value) {
-                if (value != null) onChanged(value);
-              },
+              onChanged:
+                  controller.isViewing.value
+                      ? null // Disable in view-only mode
+                      : (value) {
+                        if (value != null) onChanged(value);
+                      },
               icon: Icon(
                 Icons.keyboard_arrow_down_rounded,
                 color: AppColorsPetugas.blueGrotto,
@@ -717,41 +748,42 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
               runSpacing: 12,
               children: [
                 // Add button
-                GestureDetector(
-                  onTap: _showImageSourceOptions,
-                  child: Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: AppColorsPetugas.babyBlueBright,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: AppColorsPetugas.babyBlue,
-                        width: 1,
-                        style: BorderStyle.solid,
+                if (!controller.isViewing.value)
+                  GestureDetector(
+                    onTap: _showImageSourceOptions,
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: AppColorsPetugas.babyBlueBright,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppColorsPetugas.babyBlue,
+                          width: 1,
+                          style: BorderStyle.solid,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.add_photo_alternate_outlined,
+                            color: AppColorsPetugas.blueGrotto,
+                            size: 32,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tambah Foto',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColorsPetugas.blueGrotto,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.add_photo_alternate_outlined,
-                          color: AppColorsPetugas.blueGrotto,
-                          size: 32,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Tambah Foto',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColorsPetugas.blueGrotto,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
-                ),
                 // Image previews
                 ...List<Widget>.generate(controller.selectedImages.length, (
                   index,
@@ -811,21 +843,24 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
                       Positioned(
                         top: 4,
                         right: 4,
-                        child: InkWell(
-                          onTap: () => controller.removeImage(index),
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.close,
-                              size: 18,
-                              color: Colors.red,
-                            ),
-                          ),
-                        ),
+                        child:
+                            !controller.isViewing.value
+                                ? InkWell(
+                                  onTap: () => controller.removeImage(index),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      size: 18,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                )
+                                : const SizedBox.shrink(),
                       ),
                     ],
                   );
@@ -949,67 +984,97 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          OutlinedButton.icon(
-            onPressed: () => Get.back(),
-            icon: const Icon(Icons.arrow_back),
-            label: const Text('Batal'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColorsPetugas.textSecondary,
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              side: BorderSide(color: AppColorsPetugas.divider),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+      child: Obx(() {
+        // In view-only mode, just show a back button
+        if (controller.isViewing.value) {
+          return SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => Get.back(),
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Kembali'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColorsPetugas.blueGrotto,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Obx(() {
-              final isValid = controller.isFormValid.value;
-              final isSubmitting = controller.isSubmitting.value;
-              return ElevatedButton.icon(
-                onPressed:
-                    controller.isFormChanged.value && !isSubmitting
-                        ? controller.savePaket
-                        : null,
-                icon:
+          );
+        }
+
+        // For edit/add mode, show cancel and save buttons
+        return Row(
+          children: [
+            OutlinedButton.icon(
+              onPressed: () => Get.back(),
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Batal'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColorsPetugas.textSecondary,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
+                side: BorderSide(color: AppColorsPetugas.divider),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Obx(() {
+                final isValid = controller.isFormValid.value;
+                final isSubmitting = controller.isSubmitting.value;
+                return ElevatedButton.icon(
+                  onPressed:
+                      controller.isFormChanged.value && !isSubmitting
+                          ? controller.savePaket
+                          : null,
+                  icon:
+                      isSubmitting
+                          ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                          : const Icon(Icons.save),
+                  label: Text(
                     isSubmitting
-                        ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                        : const Icon(Icons.save),
-                label: Text(
-                  isSubmitting
-                      ? 'Menyimpan...'
-                      : (controller.isEditing.value
-                          ? 'Simpan Paket'
-                          : 'Tambah Paket'),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColorsPetugas.blueGrotto,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  textStyle: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                        ? 'Menyimpan...'
+                        : (controller.isEditing.value
+                            ? 'Simpan Paket'
+                            : 'Tambah Paket'),
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColorsPetugas.blueGrotto,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    disabledBackgroundColor: AppColorsPetugas.textLight,
                   ),
-                  disabledBackgroundColor: AppColorsPetugas.textLight,
-                ),
-              );
-            }),
-          ),
-        ],
-      ),
+                );
+              }),
+            ),
+          ],
+        );
+      }),
     );
   }
 
@@ -1035,7 +1100,10 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
                 () => Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () => controller.toggleTimeOption(option),
+                    onTap:
+                        controller.isViewing.value
+                            ? null
+                            : () => controller.toggleTimeOption(option),
                     borderRadius: BorderRadius.circular(12),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -1173,12 +1241,22 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
                       controller: priceController,
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      readOnly: controller.isViewing.value,
+                      style: TextStyle(
+                        color:
+                            controller.isViewing.value
+                                ? AppColorsPetugas.textSecondary
+                                : AppColorsPetugas.textPrimary,
+                      ),
                       decoration: InputDecoration(
                         hintText: 'Masukkan harga',
                         hintStyle: TextStyle(color: AppColorsPetugas.textLight),
                         prefixText: 'Rp ',
                         filled: true,
-                        fillColor: AppColorsPetugas.babyBlueBright,
+                        fillColor:
+                            controller.isViewing.value
+                                ? AppColorsPetugas.babyBlueLight
+                                : AppColorsPetugas.babyBlueBright,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 12,
@@ -1210,11 +1288,21 @@ class PetugasTambahPaketView extends GetView<PetugasTambahPaketController> {
                       controller: maxController,
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      readOnly: controller.isViewing.value,
+                      style: TextStyle(
+                        color:
+                            controller.isViewing.value
+                                ? AppColorsPetugas.textSecondary
+                                : AppColorsPetugas.textPrimary,
+                      ),
                       decoration: InputDecoration(
                         hintText: 'Opsional',
                         hintStyle: TextStyle(color: AppColorsPetugas.textLight),
                         filled: true,
-                        fillColor: AppColorsPetugas.babyBlueBright,
+                        fillColor:
+                            controller.isViewing.value
+                                ? AppColorsPetugas.babyBlueLight
+                                : AppColorsPetugas.babyBlueBright,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 12,

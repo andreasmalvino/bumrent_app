@@ -87,7 +87,7 @@ class PetugasPaketController extends GetxController {
       Get.snackbar(
         'Error',
         'Gagal memuat data paket. Silakan coba lagi.',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -320,7 +320,7 @@ class PetugasPaketController extends GetxController {
       Get.snackbar(
         'Sukses',
         'Paket baru berhasil ditambahkan',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.green,
         colorText: Colors.white,
       );
@@ -334,7 +334,7 @@ class PetugasPaketController extends GetxController {
       Get.snackbar(
         'Error',
         'Gagal menambahkan paket. Silakan coba lagi.',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -373,7 +373,7 @@ class PetugasPaketController extends GetxController {
         Get.snackbar(
           'Sukses',
           'Paket berhasil diperbarui',
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.green,
           colorText: Colors.white,
         );
@@ -388,7 +388,7 @@ class PetugasPaketController extends GetxController {
       Get.snackbar(
         'Error',
         'Gagal memperbarui paket. Silakan coba lagi.',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -440,7 +440,7 @@ class PetugasPaketController extends GetxController {
         Get.snackbar(
           'Gagal',
           'Terjadi kesalahan saat menghapus paket',
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.red,
           colorText: Colors.white,
           duration: const Duration(seconds: 3),
@@ -462,7 +462,7 @@ class PetugasPaketController extends GetxController {
       Get.snackbar(
         'Error',
         'Gagal menghapus paket: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
         duration: const Duration(seconds: 3),

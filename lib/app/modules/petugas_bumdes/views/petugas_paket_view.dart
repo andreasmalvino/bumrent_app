@@ -55,11 +55,17 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
           ),
         ),
         floatingActionButton: FloatingActionButton.extended(
-          onPressed:
-              () => Get.toNamed(
-                Routes.PETUGAS_TAMBAH_PAKET,
-                arguments: {'isEditing': false},
-              ),
+          onPressed: () async {
+            final result = await Get.toNamed(
+              Routes.PETUGAS_TAMBAH_PAKET,
+              arguments: {'isEditing': false},
+            );
+
+            // Refresh the package list if a package was added
+            if (result == true) {
+              controller.loadPaketData();
+            }
+          },
           label: Text(
             'Tambah Paket',
             style: TextStyle(
@@ -142,11 +148,17 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
-                onPressed:
-                    () => Get.toNamed(
-                      Routes.PETUGAS_TAMBAH_PAKET,
-                      arguments: {'isEditing': false},
-                    ),
+                onPressed: () async {
+                  final result = await Get.toNamed(
+                    Routes.PETUGAS_TAMBAH_PAKET,
+                    arguments: {'isEditing': false},
+                  );
+
+                  // Refresh the package list if a package was added
+                  if (result == true) {
+                    controller.loadPaketData();
+                  }
+                },
                 icon: const Icon(Icons.add),
                 label: const Text('Tambah Paket'),
                 style: ElevatedButton.styleFrom(
@@ -376,6 +388,21 @@ class PetugasPaketView extends GetView<PetugasPaketController> {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
+            onTap: () async {
+              final result = await Get.toNamed(
+                Routes.PETUGAS_TAMBAH_PAKET,
+                arguments: {
+                  'isEditing': false,
+                  'isViewing': true,
+                  'paket': paket,
+                },
+              );
+
+              // Refresh the package list if data was modified
+              if (result == true) {
+                controller.loadPaketData();
+              }
+            },
             child: Row(
               children: [
                 // Paket image or icon

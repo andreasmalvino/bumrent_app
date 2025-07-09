@@ -2,100 +2,108 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/auth_controller.dart';
 import '../../../theme/app_colors.dart';
+import 'package:intl/intl.dart';
 
 class RegistrationView extends GetView<AuthController> {
   const RegistrationView({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          // Background gradient - same as login page
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-                colors: [
-                  AppColors.primaryLight.withOpacity(0.1),
-                  AppColors.background,
-                  AppColors.accentLight.withOpacity(0.1),
-                ],
-              ),
-            ),
-          ),
-
-          // Pattern overlay - same as login page
-          Opacity(
-            opacity: 0.03,
-            child: Container(
+    return WillPopScope(
+      onWillPop: () async {
+        // Reset all registration fields when leaving the page
+        controller.resetRegistrationFields();
+        return true;
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            // Background gradient - same as login page
+            Container(
               decoration: BoxDecoration(
-                color: Colors.blue[50], // Temporary solid color
-              ),
-            ),
-          ),
-
-          // Accent circles - same as login page
-          Positioned(
-            top: -40,
-            right: -20,
-            child: Container(
-              width: 150,
-              height: 150,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
+                gradient: LinearGradient(
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
                   colors: [
-                    AppColors.primary.withOpacity(0.2),
-                    Colors.transparent,
+                    AppColors.primaryLight.withOpacity(0.1),
+                    AppColors.background,
+                    AppColors.accentLight.withOpacity(0.1),
                   ],
                 ),
               ),
             ),
-          ),
-          Positioned(
-            bottom: -50,
-            left: -30,
-            child: Container(
-              width: 180,
-              height: 180,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.accent.withOpacity(0.2),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
 
-          // Main content
-          SafeArea(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 20),
-                    _buildBackButton(),
-                    const SizedBox(height: 20),
-                    _buildHeader(),
-                    const SizedBox(height: 30),
-                    _buildRegistrationCard(),
-                    _buildLoginLink(),
-                    _buildCheckStatusLink(),
-                    const SizedBox(height: 30),
-                  ],
+            // Pattern overlay - same as login page
+            Opacity(
+              opacity: 0.03,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.blue[50], // Temporary solid color
                 ),
               ),
             ),
-          ),
-        ],
+
+            // Accent circles - same as login page
+            Positioned(
+              top: -40,
+              right: -20,
+              child: Container(
+                width: 150,
+                height: 150,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppColors.primary.withOpacity(0.2),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -50,
+              left: -30,
+              child: Container(
+                width: 180,
+                height: 180,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppColors.accent.withOpacity(0.2),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Main content
+            SafeArea(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 20),
+                      _buildBackButton(),
+                      const SizedBox(height: 20),
+                      _buildHeader(),
+                      const SizedBox(height: 30),
+                      _buildRegistrationCard(),
+                      _buildLoginLink(),
+                      _buildCheckStatusLink(),
+                      const SizedBox(height: 30),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -104,7 +112,11 @@ class RegistrationView extends GetView<AuthController> {
     return Align(
       alignment: Alignment.topLeft,
       child: InkWell(
-        onTap: () => Get.back(),
+        onTap: () {
+          // Reset all registration fields when going back
+          controller.resetRegistrationFields();
+          Get.back();
+        },
         borderRadius: BorderRadius.circular(50),
         child: Container(
           padding: const EdgeInsets.all(10),
@@ -644,7 +656,11 @@ class RegistrationView extends GetView<AuthController> {
             style: TextStyle(color: AppColors.textSecondary),
           ),
           TextButton(
-            onPressed: () => Get.back(),
+            onPressed: () {
+              // Reset all registration fields when going back to login
+              controller.resetRegistrationFields();
+              Get.back();
+            },
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
@@ -694,7 +710,8 @@ class RegistrationView extends GetView<AuthController> {
   // Show dialog to check registration status
   void _showCheckStatusDialog(BuildContext context) {
     final TextEditingController codeController = TextEditingController();
-    final TextEditingController identifierController = TextEditingController();
+    final TextEditingController emailController = TextEditingController();
+    final authController = Get.find<AuthController>();
 
     showDialog(
       context: context,
@@ -788,9 +805,9 @@ class RegistrationView extends GetView<AuthController> {
                 ),
                 const SizedBox(height: 16),
 
-                // Email/NIK/Phone field
+                // Email field
                 Text(
-                  'Email/NIK/No HP',
+                  'Email',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -799,12 +816,13 @@ class RegistrationView extends GetView<AuthController> {
                 ),
                 const SizedBox(height: 8),
                 TextField(
-                  controller: identifierController,
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
-                    hintText: 'Masukkan email, NIK, atau no HP',
+                    hintText: 'Masukkan email yang terdaftar',
                     hintStyle: TextStyle(color: AppColors.textLight),
                     prefixIcon: Icon(
-                      Icons.person_outline,
+                      Icons.email_outlined,
                       color: AppColors.iconGrey,
                       size: 22,
                     ),
@@ -835,20 +853,99 @@ class RegistrationView extends GetView<AuthController> {
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: () {
-                      // TODO: Implement check status functionality
+                    onPressed: () async {
+                      // Validasi input
+                      if (codeController.text.isEmpty ||
+                          emailController.text.isEmpty) {
+                        Get.snackbar(
+                          'Error',
+                          'Kode registrasi dan Email harus diisi',
+                          snackPosition: SnackPosition.TOP,
+                          backgroundColor: AppColors.errorLight,
+                          colorText: AppColors.error,
+                          icon: Icon(
+                            Icons.error_outline,
+                            color: AppColors.error,
+                          ),
+                          duration: const Duration(seconds: 3),
+                        );
+                        return;
+                      }
+
+                      // Simpan nilai input untuk digunakan nanti
+                      final String registerId = codeController.text.trim();
+                      final String email = emailController.text.trim();
+
+                      print(
+                        'Checking registration status for ID: $registerId, Email: $email',
+                      );
+
+                      // Tutup dialog input
                       Navigator.pop(context);
 
-                      // Show a mock response for now
-                      Get.snackbar(
-                        'Status Pendaftaran',
-                        'Status pendaftaran sedang diproses. Silakan tunggu konfirmasi lebih lanjut.',
-                        snackPosition: SnackPosition.BOTTOM,
-                        backgroundColor: AppColors.infoLight,
-                        colorText: AppColors.info,
-                        icon: Icon(Icons.info_outline, color: AppColors.info),
-                        duration: const Duration(seconds: 4),
+                      // Tampilkan loading indicator
+                      Get.dialog(
+                        const Center(child: CircularProgressIndicator()),
+                        barrierDismissible: false,
                       );
+
+                      try {
+                        // Cek status pendaftaran
+                        final result = await authController
+                            .checkRegistrationStatus(registerId, email);
+
+                        // Debug log
+                        print('Registration status check result: $result');
+
+                        // Tutup dialog loading
+                        Get.back();
+
+                        // Periksa hasil query
+                        if (result != null && result.isNotEmpty) {
+                          print('Valid result found, showing status dialog');
+
+                          // Tambahkan delay kecil untuk memastikan UI diperbarui dengan benar
+                          // Ini membantu memastikan dialog status muncul setelah dialog loading ditutup
+                          Future.delayed(const Duration(milliseconds: 100), () {
+                            _showRegistrationStatusDialog(result);
+                          });
+                        } else {
+                          print('No result found or empty result');
+
+                          // Tampilkan pesan error
+                          Get.snackbar(
+                            'Tidak Ditemukan',
+                            'Data pendaftaran tidak ditemukan. Pastikan kode registrasi dan email yang dimasukkan benar.',
+                            snackPosition: SnackPosition.TOP,
+                            backgroundColor: AppColors.errorLight,
+                            colorText: AppColors.error,
+                            icon: Icon(
+                              Icons.error_outline,
+                              color: AppColors.error,
+                            ),
+                            duration: const Duration(seconds: 4),
+                          );
+                        }
+                      } catch (e) {
+                        // Tutup dialog loading jika terjadi error
+                        Get.back();
+
+                        print('Error checking registration status: $e');
+
+                        // Tampilkan pesan error
+                        Get.snackbar(
+                          'Error',
+                          'Terjadi kesalahan saat memeriksa status. Silakan coba lagi nanti.',
+                          snackPosition: SnackPosition.TOP,
+                          backgroundColor: AppColors.errorLight,
+                          colorText: AppColors.error,
+                          icon: Icon(
+                            Icons.error_outline,
+                            color: AppColors.error,
+                          ),
+                          duration: const Duration(seconds: 4),
+                        );
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.accent,
@@ -873,6 +970,219 @@ class RegistrationView extends GetView<AuthController> {
         );
       },
     );
+  }
+
+  // Show dialog with registration status details
+  void _showRegistrationStatusDialog(Map<String, dynamic> data) {
+    // Log data yang diterima untuk debugging
+    print('Showing registration status dialog with data: $data');
+
+    // Validasi data
+    if (data.isEmpty) {
+      print('Error: Empty data received in _showRegistrationStatusDialog');
+      Get.snackbar(
+        'Error',
+        'Data status pendaftaran tidak valid',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: AppColors.errorLight,
+        colorText: AppColors.error,
+        duration: const Duration(seconds: 3),
+      );
+      return;
+    }
+
+    final String status = data['status'] ?? 'unknown';
+    final String namaLengkap = data['nama_lengkap'] ?? '';
+    final String keterangan = data['keterangan'] ?? '';
+
+    print('Processing status: $status, nama: $namaLengkap');
+
+    // Define status color and message based on status
+    Color statusColor;
+    String statusMessage;
+    IconData statusIcon;
+
+    switch (status) {
+      case 'pending':
+        statusColor = AppColors.warning;
+        statusMessage =
+            keterangan.isNotEmpty
+                ? keterangan
+                : 'Pendaftaran Anda sedang dalam proses verifikasi oleh petugas. Mohon tunggu konfirmasi lebih lanjut.';
+        statusIcon = Icons.hourglass_top;
+        break;
+      case 'active':
+        statusColor = AppColors.success;
+        statusMessage =
+            keterangan.isNotEmpty
+                ? keterangan
+                : 'Pendaftaran Anda telah disetujui. Anda dapat login menggunakan email dan password yang telah didaftarkan.';
+        statusIcon = Icons.check_circle;
+        break;
+      case 'dibatalkan':
+        statusColor = AppColors.error;
+        statusMessage =
+            keterangan.isNotEmpty
+                ? keterangan
+                : 'Maaf, pendaftaran Anda ditolak. Silakan hubungi admin untuk informasi lebih lanjut.';
+        statusIcon = Icons.cancel;
+        break;
+      case 'suspended':
+        statusColor = AppColors.error;
+        statusMessage =
+            keterangan.isNotEmpty
+                ? keterangan
+                : 'Akun Anda saat ini dinonaktifkan. Silakan hubungi admin untuk informasi lebih lanjut.';
+        statusIcon = Icons.block;
+        break;
+      default:
+        statusColor = AppColors.textSecondary;
+        statusMessage =
+            keterangan.isNotEmpty
+                ? keterangan
+                : 'Status pendaftaran tidak diketahui. Silakan hubungi admin untuk informasi lebih lanjut.';
+        statusIcon = Icons.help;
+    }
+
+    print('Preparing to show dialog with status: $status, color: $statusColor');
+
+    // Gunakan Get.dialog sebagai pengganti showDialog untuk menghindari masalah context
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(statusIcon, color: statusColor, size: 40),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Status Pendaftaran',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                namaLengkap,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Text(
+                  status.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                statusMessage,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+
+              // Tampilkan informasi tambahan jika ada
+              if (data.containsKey('tanggal_update') &&
+                  data['tanggal_update'] != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.infoLight.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: AppColors.info,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Informasi Tambahan',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: AppColors.info,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Terakhir diperbarui: ${_formatDate(data['tanggal_update'])}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Get.back(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: statusColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text(
+                    'Tutup',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      barrierDismissible: true,
+    );
+
+    print('Dialog setup completed');
   }
 
   // New method to build date picker field
@@ -943,5 +1253,25 @@ class RegistrationView extends GetView<AuthController> {
         );
       }),
     );
+  }
+
+  String _formatDate(dynamic date) {
+    if (date is String) {
+      try {
+        final DateTime parsedDate = DateTime.parse(date);
+        return DateFormat('dd MMM yyyy, HH:mm').format(parsedDate);
+      } catch (e) {
+        return date;
+      }
+    } else if (date is num) {
+      final DateTime parsedDate = DateTime.fromMillisecondsSinceEpoch(
+        date.toInt() * 1000,
+      );
+      return DateFormat('dd MMM yyyy, HH:mm').format(parsedDate);
+    } else if (date is DateTime) {
+      return DateFormat('dd MMM yyyy, HH:mm').format(date);
+    } else {
+      return "Format tanggal tidak diketahui";
+    }
   }
 }

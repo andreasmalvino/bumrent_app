@@ -184,7 +184,7 @@ class PetugasLaporanController extends GetxController {
         'Gagal membuat laporan: $e',
         backgroundColor: Colors.red[100],
         colorText: Colors.red[900],
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     } finally {
       isLoading.value = false;
@@ -1641,7 +1641,7 @@ class PetugasLaporanController extends GetxController {
         'Harap generate laporan terlebih dahulu',
         backgroundColor: Colors.amber[100],
         colorText: Colors.amber[900],
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     }
   }
@@ -1654,7 +1654,7 @@ class PetugasLaporanController extends GetxController {
         'Harap generate laporan terlebih dahulu',
         backgroundColor: Colors.amber[100],
         colorText: Colors.amber[900],
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
       return;
     }
@@ -1687,7 +1687,7 @@ class PetugasLaporanController extends GetxController {
         'Laporan disimpan di ${file.path}',
         backgroundColor: Colors.green[100],
         colorText: Colors.green[900],
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         duration: const Duration(seconds: 5),
       );
 
@@ -1701,7 +1701,7 @@ class PetugasLaporanController extends GetxController {
         'Gagal menyimpan laporan: $e',
         backgroundColor: Colors.red[100],
         colorText: Colors.red[900],
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     }
   }
@@ -1714,7 +1714,7 @@ class PetugasLaporanController extends GetxController {
         'Harap generate laporan terlebih dahulu',
         backgroundColor: Colors.amber[100],
         colorText: Colors.amber[900],
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
       return;
     }

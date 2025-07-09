@@ -254,10 +254,28 @@ class WargaSewaController extends GetxController
 
       debugPrint('Fetched ${sewaAsetList.length} sewa_aset records');
 
+      // Debug the structure of the first record if available
+      if (sewaAsetList.isNotEmpty) {
+        debugPrint('Sample sewa_aset record: ${sewaAsetList.first}');
+        debugPrint('updated_at field: ${sewaAsetList.first['updated_at']}');
+      }
+
       // Process each sewa_aset record
       for (var sewaAset in sewaAsetList) {
         final processedData = await _processRentalData(sewaAset);
         processedData['status'] = sewaAset['status'] ?? 'MENUNGGU PEMBAYARAN';
+
+        // Ensure updated_at is set correctly
+        if (sewaAset['updated_at'] == null &&
+            processedData['status'] == 'MENUNGGU PEMBAYARAN') {
+          // If updated_at is null but status is MENUNGGU PEMBAYARAN, use created_at as fallback
+          processedData['updated_at'] =
+              sewaAset['created_at'] ?? DateTime.now().toIso8601String();
+          debugPrint(
+            'Using created_at as fallback for updated_at: ${processedData['updated_at']}',
+          );
+        }
+
         rentals.add(processedData);
       }
 
@@ -321,7 +339,7 @@ class WargaSewaController extends GetxController
         Get.snackbar(
           'Berhasil',
           'Pesanan berhasil dibatalkan',
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.green,
           colorText: Colors.white,
         );
@@ -337,7 +355,7 @@ class WargaSewaController extends GetxController
         Get.snackbar(
           'Gagal',
           'Gagal membatalkan pesanan: $e',
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.red,
           colorText: Colors.white,
         );
@@ -377,7 +395,7 @@ class WargaSewaController extends GetxController
     Get.snackbar(
       'Info',
       'Navigasi ke halaman pembayaran',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
     );
   }
 

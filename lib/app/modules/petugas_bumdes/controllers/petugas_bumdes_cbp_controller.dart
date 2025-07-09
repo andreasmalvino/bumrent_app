@@ -66,7 +66,7 @@ class PetugasBumdesCbpController extends GetxController {
       Get.snackbar(
         'Error',
         'Gagal memuat data. Silakan coba lagi.',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     } finally {
       isLoading.value = false;
@@ -92,7 +92,7 @@ class PetugasBumdesCbpController extends GetxController {
       Get.snackbar(
         'Rekening Utama',
         'Rekening ${account['bank_name']} telah dijadikan rekening utama',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     }
   }
@@ -109,7 +109,7 @@ class PetugasBumdesCbpController extends GetxController {
     Get.snackbar(
       'Rekening Ditambahkan',
       'Rekening bank baru telah berhasil ditambahkan',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
     );
   }
 
@@ -125,7 +125,7 @@ class PetugasBumdesCbpController extends GetxController {
       Get.snackbar(
         'Rekening Diperbarui',
         'Informasi rekening bank telah berhasil diperbarui',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     }
   }
@@ -138,7 +138,7 @@ class PetugasBumdesCbpController extends GetxController {
         Get.snackbar(
           'Tidak Dapat Menghapus',
           'Rekening utama tidak dapat dihapus. Silakan atur rekening lain sebagai utama terlebih dahulu.',
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
         );
         return;
       }
@@ -148,7 +148,7 @@ class PetugasBumdesCbpController extends GetxController {
       Get.snackbar(
         'Rekening Dihapus',
         'Rekening bank telah berhasil dihapus',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     }
   }
@@ -164,7 +164,7 @@ class PetugasBumdesCbpController extends GetxController {
       Get.snackbar(
         'Status Diperbarui',
         'Status mitra telah diubah menjadi ${partner['is_active'] ? 'Aktif' : 'Tidak Aktif'}',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     }
   }
@@ -181,7 +181,7 @@ class PetugasBumdesCbpController extends GetxController {
     Get.snackbar(
       'Mitra Ditambahkan',
       'Mitra baru telah berhasil ditambahkan',
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
     );
   }
 
@@ -197,7 +197,7 @@ class PetugasBumdesCbpController extends GetxController {
       Get.snackbar(
         'Mitra Diperbarui',
         'Informasi mitra telah berhasil diperbarui',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     }
   }
@@ -210,7 +210,7 @@ class PetugasBumdesCbpController extends GetxController {
       Get.snackbar(
         'Mitra Dihapus',
         'Mitra telah berhasil dihapus',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
       );
     }
   }

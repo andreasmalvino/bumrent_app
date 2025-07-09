@@ -168,7 +168,7 @@ class SewaAsetController extends GetxController
       Get.snackbar(
         'Error',
         'Terjadi kesalahan saat memuat data aset',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -279,7 +279,7 @@ class SewaAsetController extends GetxController
     Get.snackbar(
       'Error',
       message,
-      snackPosition: SnackPosition.BOTTOM,
+      snackPosition: SnackPosition.TOP,
       backgroundColor: Colors.red,
       colorText: Colors.white,
     );
@@ -321,7 +321,7 @@ class SewaAsetController extends GetxController
         Get.snackbar(
           'Sukses',
           'Pesanan berhasil dibuat',
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.green,
           colorText: Colors.white,
         );
@@ -383,7 +383,7 @@ class SewaAsetController extends GetxController
       Get.snackbar(
         'Error',
         'Terjadi kesalahan saat memuat data paket',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -429,7 +429,7 @@ class SewaAsetController extends GetxController
       Get.snackbar(
         'Error',
         'Gagal memuat data paket. Silakan coba lagi nanti.',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -470,7 +470,7 @@ class SewaAsetController extends GetxController
         Get.snackbar(
           'Sukses',
           'Pesanan paket berhasil dibuat',
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.green,
           colorText: Colors.white,
         );

@@ -203,7 +203,7 @@ class ListTagihanPeriodeView extends GetView<ListTagihanPeriodeController> {
             backgroundColor: Colors.orange.withOpacity(0.1),
             colorText: Colors.orange.shade800,
             duration: const Duration(seconds: 3),
-            snackPosition: SnackPosition.BOTTOM,
+            snackPosition: SnackPosition.TOP,
             margin: const EdgeInsets.all(8),
           );
         },

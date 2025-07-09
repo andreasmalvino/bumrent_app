@@ -80,7 +80,7 @@ class WargaProfileView extends GetView<WargaDashboardController> {
                                 Get.snackbar(
                                   'Gagal',
                                   'Terjadi kesalahan saat menyimpan foto profil',
-                                  snackPosition: SnackPosition.BOTTOM,
+                                  snackPosition: SnackPosition.TOP,
                                   backgroundColor: Colors.red,
                                   colorText: Colors.white,
                                 );
@@ -99,7 +99,7 @@ class WargaProfileView extends GetView<WargaDashboardController> {
                                 Get.snackbar(
                                   'Gagal',
                                   'Terjadi kesalahan saat menghapus foto profil',
-                                  snackPosition: SnackPosition.BOTTOM,
+                                  snackPosition: SnackPosition.TOP,
                                   backgroundColor: Colors.red,
                                   colorText: Colors.white,
                                 );
@@ -124,7 +124,7 @@ class WargaProfileView extends GetView<WargaDashboardController> {
                               Get.snackbar(
                                 'Sukses',
                                 'Perubahan berhasil disimpan',
-                                snackPosition: SnackPosition.BOTTOM,
+                                snackPosition: SnackPosition.TOP,
                                 backgroundColor: Colors.green,
                                 colorText: Colors.white,
                               );
@@ -132,7 +132,7 @@ class WargaProfileView extends GetView<WargaDashboardController> {
                               Get.snackbar(
                                 'Gagal',
                                 'Terjadi kesalahan saat menyimpan perubahan',
-                                snackPosition: SnackPosition.BOTTOM,
+                                snackPosition: SnackPosition.TOP,
                                 backgroundColor: Colors.red,
                                 colorText: Colors.white,
                               );
@@ -156,6 +156,9 @@ class WargaProfileView extends GetView<WargaDashboardController> {
                     : IconButton(
                       onPressed: () {
                         isEditing.value = true;
+                        // Update controllers with current values when entering edit mode
+                        nameController.text = controller.userName.value;
+                        phoneController.text = controller.userPhone.value;
                       },
                       icon: const Icon(Icons.edit_outlined),
                       tooltip: 'Edit Profil',
@@ -365,14 +368,6 @@ class WargaProfileView extends GetView<WargaDashboardController> {
                               } else {
                                 // Set avatar deleted flag
                                 isAvatarDeleted.value = true;
-
-                                Get.snackbar(
-                                  'Info',
-                                  'Foto profil akan dihapus setelah menekan Simpan',
-                                  snackPosition: SnackPosition.BOTTOM,
-                                  backgroundColor: Colors.orange.shade700,
-                                  colorText: Colors.white,
-                                );
                               }
                             },
                             icon: const Icon(Icons.delete_outline, size: 16),
@@ -468,163 +463,242 @@ class WargaProfileView extends GetView<WargaDashboardController> {
   ) {
     return Column(
       children: [
-        // Section 1: Data Diri
+        // Section 1: Data Diri - Dengan desain yang lebih modern
         Card(
-          elevation: 4,
+          elevation: 2,
+          shadowColor: AppColors.primary.withOpacity(0.3),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
           ),
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.person_rounded,
-                      color: AppColors.primary,
-                      size: 22,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Data Diri',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    if (isEditing) ...[
-                      const Spacer(),
-                      Text(
-                        'Mode Edit',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.orange.shade700,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, AppColors.primary.withOpacity(0.05)],
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.person_rounded,
+                          color: AppColors.primary,
+                          size: 22,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Icon(
-                        Icons.edit_note,
-                        color: Colors.orange.shade700,
-                        size: 18,
+                      const SizedBox(width: 14),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Data Diri',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          Text(
+                            'Informasi personal Anda',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
                       ),
+                      if (isEditing) ...[
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade100,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.edit_note,
+                                color: Colors.orange.shade700,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Mode Edit',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.orange.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-                const SizedBox(height: 20),
-                // Email - always read-only
-                _buildInfoItemModern(
-                  context,
-                  icon: Icons.email_rounded,
-                  title: 'Email',
-                  value: controller.userEmail.value,
-                ),
-                const SizedBox(height: 16),
-                // Nama Lengkap - editable
-                _buildEditableInfoItem(
-                  context,
-                  icon: Icons.person_rounded,
-                  title: 'Nama Lengkap',
-                  value: controller.userName.value,
-                  isEditing: isEditing,
-                  controller: nameController,
-                ),
-                const SizedBox(height: 16),
-                // Nomor Telepon - editable
-                _buildEditableInfoItem(
-                  context,
-                  icon: Icons.phone_rounded,
-                  title: 'Nomor Telepon',
-                  value: controller.userPhone.value,
-                  isEditing: isEditing,
-                  controller: phoneController,
-                  keyboardType: TextInputType.phone,
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 24),
+                  // Email - always read-only
+                  _buildInfoItemModern(
+                    context,
+                    icon: Icons.email_rounded,
+                    title: 'Email',
+                    value: controller.userEmail.value,
+                    isVerified: true,
+                  ),
+                  const SizedBox(height: 16),
+                  // Nama Lengkap - editable
+                  _buildEditableInfoItem(
+                    context,
+                    icon: Icons.person_rounded,
+                    title: 'Nama Lengkap',
+                    value: controller.userName.value,
+                    isEditing: isEditing,
+                    controller: nameController,
+                  ),
+                  const SizedBox(height: 16),
+                  // Nomor Telepon - editable
+                  _buildEditableInfoItem(
+                    context,
+                    icon: Icons.phone_rounded,
+                    title: 'Nomor Telepon',
+                    value: controller.userPhone.value,
+                    isEditing: isEditing,
+                    controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
 
         const SizedBox(height: 16),
 
-        // Section 2: Informasi Warga
+        // Section 2: Informasi Warga - Dengan desain yang lebih modern
         Card(
-          elevation: 4,
+          elevation: 2,
+          shadowColor: AppColors.accent.withOpacity(0.3),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
           ),
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.badge_rounded,
-                      color: AppColors.primary,
-                      size: 22,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Informasi Warga',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, AppColors.accent.withOpacity(0.05)],
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.badge_rounded,
+                          color: AppColors.accent,
+                          size: 22,
+                        ),
                       ),
+                      const SizedBox(width: 14),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Informasi Warga',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.accent,
+                            ),
+                          ),
+                          Text(
+                            'Detail kependudukan',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  _buildInfoItemModern(
+                    context,
+                    icon: Icons.credit_card_rounded,
+                    title: 'NIK',
+                    value: controller.userNik.value,
+                    isImportant: true,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoItemModern(
+                    context,
+                    icon: Icons.calendar_today_rounded,
+                    title: 'Tanggal Lahir',
+                    value: formatTanggalLahir(
+                      controller.userTanggalLahir.value,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                _buildInfoItemModern(
-                  context,
-                  icon: Icons.credit_card_rounded,
-                  title: 'NIK',
-                  value: controller.userNik.value,
-                ),
-                const SizedBox(height: 16),
-                _buildInfoItemModern(
-                  context,
-                  icon: Icons.calendar_today_rounded,
-                  title: 'Tanggal Lahir',
-                  value: controller.userTanggalLahir.value,
-                ),
-                const SizedBox(height: 16),
-                _buildInfoItemModern(
-                  context,
-                  icon: Icons.home_rounded,
-                  title: 'Alamat',
-                  value: controller.userAddress.value,
-                  isMultiLine: true,
-                ),
-                const SizedBox(height: 16),
-                _buildInfoItemModern(
-                  context,
-                  icon: Icons.location_on_rounded,
-                  title: 'RT/RW',
-                  value: controller.userRtRw.value,
-                ),
-                const SizedBox(height: 16),
-                _buildInfoItemModern(
-                  context,
-                  icon: Icons.location_city_rounded,
-                  title: 'Kelurahan/Desa',
-                  value: controller.userKelurahanDesa.value,
-                ),
-                const SizedBox(height: 16),
-                _buildInfoItemModern(
-                  context,
-                  icon: Icons.map_rounded,
-                  title: 'Kecamatan',
-                  value: controller.userKecamatan.value,
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoItemModern(
+                    context,
+                    icon: Icons.home_rounded,
+                    title: 'Alamat',
+                    value: controller.userAddress.value,
+                    isMultiLine: true,
+                  ),
+                  const SizedBox(height: 16),
+                  // Tampilkan RT/RW dan Kelurahan/Desa dalam dua baris terpisah
+                  _buildInfoItemModern(
+                    context,
+                    icon: Icons.location_on_rounded,
+                    title: 'RT/RW',
+                    value: controller.userRtRw.value,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoItemModern(
+                    context,
+                    icon: Icons.location_city_rounded,
+                    title: 'Kelurahan/Desa',
+                    value: controller.userKelurahanDesa.value,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoItemModern(
+                    context,
+                    icon: Icons.map_rounded,
+                    title: 'Kecamatan',
+                    value: controller.userKecamatan.value,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -638,46 +712,85 @@ class WargaProfileView extends GetView<WargaDashboardController> {
     required String title,
     required String value,
     bool isMultiLine = false,
+    bool isImportant = false,
+    bool isVerified = false,
+    bool isCompact = false,
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color:
+              isImportant
+                  ? AppColors.primary.withOpacity(0.3)
+                  : Colors.grey.shade200,
+          width: isImportant ? 1.5 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.05),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: isCompact ? 12 : 16,
+      ),
       child: Row(
         crossAxisAlignment:
             isMultiLine ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: EdgeInsets.all(isCompact ? 6 : 8),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color:
+                  isImportant
+                      ? AppColors.primary.withOpacity(0.15)
+                      : AppColors.accent.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: AppColors.primary, size: 20),
+            child: Icon(
+              icon,
+              color: isImportant ? AppColors.primary : AppColors.accent,
+              size: isCompact ? 16 : 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey.shade600,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: isCompact ? 12 : 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    if (isVerified) ...[
+                      const SizedBox(width: 4),
+                      Icon(Icons.verified, size: 14, color: Colors.green),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value.isEmpty ? 'Tidak tersedia' : value,
                   style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade800,
+                    fontSize: isCompact ? 14 : 15,
+                    fontWeight: isImportant ? FontWeight.w700 : FontWeight.w600,
+                    color:
+                        isImportant
+                            ? AppColors.primary
+                            : value.isEmpty
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade800,
                   ),
                   maxLines: isMultiLine ? 3 : 1,
                   overflow: TextOverflow.ellipsis,
@@ -685,6 +798,12 @@ class WargaProfileView extends GetView<WargaDashboardController> {
               ],
             ),
           ),
+          if (isImportant)
+            Icon(
+              Icons.priority_high,
+              size: 16,
+              color: AppColors.primary.withOpacity(0.7),
+            ),
         ],
       ),
     );
@@ -821,7 +940,7 @@ class WargaProfileView extends GetView<WargaDashboardController> {
               Get.snackbar(
                 'Info',
                 'Fitur Ubah Password akan segera tersedia',
-                snackPosition: SnackPosition.BOTTOM,
+                snackPosition: SnackPosition.TOP,
               );
             },
           ),
@@ -932,5 +1051,55 @@ class WargaProfileView extends GetView<WargaDashboardController> {
         ),
       ),
     );
+  }
+
+  // Fungsi untuk memformat tanggal lahir ke format Indonesia
+  String formatTanggalLahir(String tanggal) {
+    if (tanggal.isEmpty) return '';
+
+    try {
+      // Coba parse tanggal dari berbagai format yang mungkin
+      DateTime? dateTime;
+
+      // Coba format yyyy-MM-dd
+      if (tanggal.contains('-')) {
+        final parts = tanggal.split('-');
+        if (parts.length == 3) {
+          dateTime = DateTime.tryParse(tanggal);
+        }
+      }
+      // Coba format dd/MM/yyyy
+      else if (tanggal.contains('/')) {
+        final parts = tanggal.split('/');
+        if (parts.length == 3) {
+          dateTime = DateTime.tryParse('${parts[2]}-${parts[1]}-${parts[0]}');
+        }
+      }
+
+      // Jika tidak bisa parse, kembalikan nilai asli
+      if (dateTime == null) return tanggal;
+
+      // Daftar nama bulan dalam bahasa Indonesia
+      final List<String> namaBulan = [
+        'Januari',
+        'Februari',
+        'Maret',
+        'April',
+        'Mei',
+        'Juni',
+        'Juli',
+        'Agustus',
+        'September',
+        'Oktober',
+        'November',
+        'Desember',
+      ];
+
+      // Format tanggal ke format Indonesia: dd Bulan yyyy
+      return '${dateTime.day} ${namaBulan[dateTime.month - 1]} ${dateTime.year}';
+    } catch (e) {
+      // Jika ada error, kembalikan nilai asli
+      return tanggal;
+    }
   }
 }

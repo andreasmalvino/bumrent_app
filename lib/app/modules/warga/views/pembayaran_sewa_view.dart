@@ -102,25 +102,25 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                           .toUpperCase();
                   final updatedAtStr =
                       controller.orderDetails.value['updated_at'];
-                  print('DEBUG status: ' + status);
-                  print(
-                    'DEBUG updated_at (raw): ' +
-                        (updatedAtStr?.toString() ?? 'NULL'),
+                  debugPrint('DEBUG status (batas waktu): $status');
+                  debugPrint(
+                    'DEBUG updated_at batas waktu (raw): ${updatedAtStr?.toString() ?? 'NULL'}',
                   );
                   if (status == 'MENUNGGU PEMBAYARAN' && updatedAtStr != null) {
                     try {
                       final updatedAt = DateTime.parse(updatedAtStr);
-                      print(
-                        'DEBUG updated_at (parsed): ' +
-                            updatedAt.toIso8601String(),
+                      debugPrint(
+                        'DEBUG updated_at batas waktu (parsed): ${updatedAt.toIso8601String()}',
                       );
                       return CountdownTimerWidget(updatedAt: updatedAt);
                     } catch (e) {
-                      print('ERROR parsing updated_at: ' + e.toString());
-                      return Text(
-                        'Format tanggal salah',
-                        style: TextStyle(color: Colors.red),
+                      debugPrint('ERROR parsing updated_at batas waktu: $e');
+                      // Fallback to current time if parsing fails
+                      final now = DateTime.now();
+                      debugPrint(
+                        'Using current time as fallback for batas waktu: ${now.toIso8601String()}',
                       );
+                      return CountdownTimerWidget(updatedAt: now);
                     }
                   }
                   return SizedBox.shrink();
@@ -322,25 +322,25 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
                           .toUpperCase();
                   final updatedAtStr =
                       controller.orderDetails.value['updated_at'];
-                  print('DEBUG status: ' + status);
-                  print(
-                    'DEBUG updated_at (raw): ' +
-                        (updatedAtStr?.toString() ?? 'NULL'),
+                  debugPrint('DEBUG status (batas waktu): $status');
+                  debugPrint(
+                    'DEBUG updated_at batas waktu (raw): ${updatedAtStr?.toString() ?? 'NULL'}',
                   );
                   if (status == 'MENUNGGU PEMBAYARAN' && updatedAtStr != null) {
                     try {
                       final updatedAt = DateTime.parse(updatedAtStr);
-                      print(
-                        'DEBUG updated_at (parsed): ' +
-                            updatedAt.toIso8601String(),
+                      debugPrint(
+                        'DEBUG updated_at batas waktu (parsed): ${updatedAt.toIso8601String()}',
                       );
                       return CountdownTimerWidget(updatedAt: updatedAt);
                     } catch (e) {
-                      print('ERROR parsing updated_at: ' + e.toString());
-                      return Text(
-                        'Format tanggal salah',
-                        style: TextStyle(color: Colors.red),
+                      debugPrint('ERROR parsing updated_at batas waktu: $e');
+                      // Fallback to current time if parsing fails
+                      final now = DateTime.now();
+                      debugPrint(
+                        'Using current time as fallback for batas waktu: ${now.toIso8601String()}',
                       );
+                      return CountdownTimerWidget(updatedAt: now);
                     }
                   }
                   return SizedBox.shrink();
@@ -363,7 +363,7 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
         'step': 0,
       },
       {
-        'title': 'Memeriksa Pembayaran',
+        'title': 'Periksa Pembayaran',
         'description': 'Pembayaran sedang diverifikasi oleh petugas',
         'icon': Icons.receipt_long,
         'step': 1,
@@ -381,8 +381,8 @@ class PembayaranSewaView extends GetView<PembayaranSewaController> {
         'step': 3,
       },
       {
-        'title': 'Pengembalian',
-        'description': 'Proses pengembalian aset sewa',
+        'title': 'Dikembalikan',
+        'description': 'Aset sudah dikembalikan',
         'icon': Icons.assignment_return,
         'step': 4,
       },
@@ -2585,9 +2585,8 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget> {
   @override
   void initState() {
     super.initState();
-    print(
-      'DEBUG [CountdownTimerWidget] updatedAt: ' +
-          widget.updatedAt.toIso8601String(),
+    debugPrint(
+      'DEBUG [CountdownTimerWidget] updatedAt: ${widget.updatedAt.toIso8601String()}',
     );
     updateRemaining();
     timer = Timer.periodic(
@@ -2599,18 +2598,29 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget> {
   void updateRemaining() {
     final now = DateTime.now();
     final end = widget.updatedAt.add(const Duration(hours: 1));
+
+    debugPrint('Current time: $now');
+    debugPrint('Deadline: $end');
+
     setState(() {
       remaining = end.difference(now);
+      debugPrint('Remaining time: ${remaining.inSeconds} seconds');
+
       if (remaining.isNegative) {
+        debugPrint('Countdown expired, setting to zero');
         remaining = Duration.zero;
         timer?.cancel();
-        widget.onTimeout?.call();
+        if (widget.onTimeout != null) {
+          debugPrint('Calling onTimeout callback');
+          widget.onTimeout?.call();
+        }
       }
     });
   }
 
   @override
   void dispose() {
+    debugPrint('CountdownTimerWidget disposed');
     timer?.cancel();
     super.dispose();
   }
@@ -2620,9 +2630,15 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget> {
     if (remaining.inSeconds <= 0) {
       return Text('Waktu habis', style: TextStyle(color: Colors.red));
     }
+
     final h = remaining.inHours;
     final m = remaining.inMinutes % 60;
     final s = remaining.inSeconds % 60;
+
+    final timeString =
+        '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    debugPrint('Rendering countdown: $timeString');
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -2636,7 +2652,7 @@ class _CountdownTimerWidgetState extends State<CountdownTimerWidget> {
           Icon(Icons.timer_outlined, size: 14, color: Colors.red),
           const SizedBox(width: 4),
           Text(
-            'Bayar dalam ${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}',
+            'Bayar dalam $timeString',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,

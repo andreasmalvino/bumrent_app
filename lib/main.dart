@@ -48,10 +48,6 @@ void main() async {
     debugPrint('❌ Error initializing auth provider: $e');
   }
 
-  // Pre-register the dashboard controller to fix dependency issues
-  Get.put(PetugasBumdesDashboardController(), permanent: true);
-  debugPrint('✅ PetugasBumdesDashboardController initialized globally');
-
   // Register services yang akan digunakan secara global
   ServiceManager.registerServices();
 

@@ -141,7 +141,7 @@ class OrderSewaPaketController extends GetxController {
           Get.snackbar(
             'Error',
             'Gagal memuat data paket',
-            snackPosition: SnackPosition.BOTTOM,
+            snackPosition: SnackPosition.TOP,
             backgroundColor: Colors.red,
             colorText: Colors.white,
           );
@@ -152,7 +152,7 @@ class OrderSewaPaketController extends GetxController {
       Get.snackbar(
         'Error',
         'Terjadi kesalahan saat memuat data paket',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -166,10 +166,10 @@ class OrderSewaPaketController extends GetxController {
     try {
       debugPrint('🔄 Processing paket data for ID: $id');
       debugPrint('📦 Raw paket data type: ${rawPaket.runtimeType}');
-      
+
       // Initialize loadedPaket with a default value
       late final PaketModel loadedPaket;
-      
+
       try {
         // Handle Map directly - pakets from getPakets() are always maps
         loadedPaket = PaketModel.fromMap(rawPaket);
@@ -183,10 +183,16 @@ class OrderSewaPaketController extends GetxController {
           deskripsi: getPaketDeskripsi(rawPaket),
           harga: getPaketHarga(rawPaket),
           kuantitas: getPaketKuantitas(rawPaket),
-          foto: const <String>[], // Initialize with empty list, will be populated later
+          foto:
+              const <
+                String
+              >[], // Initialize with empty list, will be populated later
           satuanWaktuSewa: getPaketSatuanWaktuSewa(rawPaket),
           foto_paket: getPaketMainPhoto(rawPaket),
-          images: const <String>[], // Initialize with empty list, will be populated later
+          images:
+              const <
+                String
+              >[], // Initialize with empty list, will be populated later
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         );
@@ -352,7 +358,7 @@ class OrderSewaPaketController extends GetxController {
       if (items.isNotEmpty) {
         paketItems.value = items;
         debugPrint('✅ Loaded ${paketItems.length} package items');
-      } 
+      }
     } catch (e) {
       debugPrint('❌ Error loading paket items: $e');
       paketItems.value = [];
@@ -1030,7 +1036,7 @@ class OrderSewaPaketController extends GetxController {
       Get.snackbar(
         'Waktu Tidak Tersedia',
         'Jam ini tidak tersedia karena ada aset dalam paket yang sudah dipesan',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.orange,
         colorText: Colors.white,
       );
@@ -1114,7 +1120,7 @@ class OrderSewaPaketController extends GetxController {
         Get.snackbar(
           'Error',
           'Data paket tidak lengkap',
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.red,
           colorText: Colors.white,
         );
@@ -1131,7 +1137,7 @@ class OrderSewaPaketController extends GetxController {
         Get.snackbar(
           'Error',
           'Silakan pilih waktu sewa',
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.red,
           colorText: Colors.white,
         );
@@ -1163,7 +1169,7 @@ class OrderSewaPaketController extends GetxController {
         durasi: orderData['durasi'] ?? 1, // Default to 1 if not provided
         totalHarga: orderData['total_harga'].toInt(),
       );
-      
+
       // Create a mock result for navigation
       final resultData = {
         'id': 'order_${DateTime.now().millisecondsSinceEpoch}',
@@ -1174,21 +1180,23 @@ class OrderSewaPaketController extends GetxController {
         Get.snackbar(
           'Sukses',
           'Pesanan berhasil dibuat',
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.green,
           colorText: Colors.white,
         );
 
         // Navigate to payment page
         if (result && resultData != null && resultData['id'] != null) {
-          navigationService.navigateToPembayaranSewa(resultData['id'].toString());
+          navigationService.navigateToPembayaranSewa(
+            resultData['id'].toString(),
+          );
         } else if (result) {
           // If result is true but we don't have an ID, navigate back to sewa aset
           navigationService.navigateToSewaAset();
           Get.snackbar(
             'Error',
             'Gagal mendapatkan ID pesanan',
-            snackPosition: SnackPosition.BOTTOM,
+            snackPosition: SnackPosition.TOP,
             backgroundColor: Colors.red,
             colorText: Colors.white,
           );
@@ -1196,7 +1204,7 @@ class OrderSewaPaketController extends GetxController {
           Get.snackbar(
             'Error',
             'Gagal membuat pesanan',
-            snackPosition: SnackPosition.BOTTOM,
+            snackPosition: SnackPosition.TOP,
             backgroundColor: Colors.red,
             colorText: Colors.white,
           );
@@ -1205,7 +1213,7 @@ class OrderSewaPaketController extends GetxController {
         Get.snackbar(
           'Error',
           'Gagal membuat pesanan',
-          snackPosition: SnackPosition.BOTTOM,
+          snackPosition: SnackPosition.TOP,
           backgroundColor: Colors.red,
           colorText: Colors.white,
         );
@@ -1215,7 +1223,7 @@ class OrderSewaPaketController extends GetxController {
       Get.snackbar(
         'Error',
         'Terjadi kesalahan: $e',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -1392,7 +1400,7 @@ class OrderSewaPaketController extends GetxController {
       Get.snackbar(
         'Peringatan',
         'Pilih tanggal terlebih dahulu',
-        snackPosition: SnackPosition.BOTTOM,
+        snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.orange,
         colorText: Colors.white,
       );
